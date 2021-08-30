@@ -1,0 +1,125 @@
+version: '2.3'
+
+services:
+  manager:
+    build: ./aica_django
+    container_name: 'manager'
+    env_file:
+      - aica_django/.env
+    command: sh /usr/local/bin/docker_entrypoint.sh
+    tty: true
+    volumes:
+      - ./aica_django/docker_entrypoint.sh:/usr/local/bin/docker_entrypoint.sh
+      - ids_log:/var/log/suricata
+    environment:
+      - DJANGO_SUPERUSER_USERNAME=django
+      - DJANGO_SUPERUSER_EMAIL=aica@anl.gov
+      - DJANGO_SUPERUSER_PASSWORD=django
+    ports:
+      - 5555:5555
+      - 8000:8000
+    depends_on:
+      manager_db:
+          condition: service_healthy
+      manager_mq:
+          condition: service_healthy
+      manager_mongodb:
+          condition: service_healthy
+      ids:
+          condition: service_started
+    networks:
+      - bridge
+      - control
+      - target
+  manager_db:
+    image: postgres
+    container_name: 'manager_db'
+    volumes:
+      - manager_db:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_DB=postgres
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - control
+  manager_mq:
+    image: rabbitmq:3-management
+    container_name: 'manager_mq'
+    ports:
+      - 5672:5672
+      - 15672:15672
+    volumes:
+        - manager_mq_data:/var/lib/rabbitmq
+        - manager_mq_log:/var/log/rabbitmq
+    healthcheck:
+      test: ["CMD-SHELL", "rabbitmq-diagnostics -q ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - control
+  attacker:
+    build: ./attacker
+    container_name: 'attacker'
+    networks:
+      - target
+    tty: true
+  target:
+    build: ./target
+    container_name: 'target'
+    command: sh /usr/local/bin/docker_entrypoint.sh
+    cap_add:
+      - sys_nice
+      - net_admin
+    networks:
+      - target
+  ids:
+    build: ./ids
+    container_name: 'ids'
+    command: sh /usr/local/bin/docker_entrypoint.sh
+    volumes:
+      - ids_log:/var/log/suricata
+    cap_add:
+      - sys_nice
+      - net_admin
+    network_mode: 'service:target'
+  honeypot:
+    image: hansdampf17/opencanary
+    container_name: 'honeypot'
+    networks:
+      - target
+  manager_mongodb:
+    build: ./mongodb
+    container_name: 'manager_mongodb'
+    environment:
+      - MONGO_INITDB_DATABASE:aica
+      - MONGO_INITDB_ROOT_USERNAME:aica_root
+      - MONGO_INITDB_ROOT_PASSWORD:A1c@2021!!
+    volumes:
+      - ./mongodb/init-mongo.js:/docker-entrypoint-initdb.d/init-mongo.js:ro
+      - mongodb:/data/db
+    ports:
+      - 27017:27017
+    networks:
+      - control
+    healthcheck:
+      test: ["CMD-SHELL", "docker-healthcheck" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+volumes:
+  manager_db:
+  manager_mq_data:
+  manager_mq_log:
+  ids_log:
+  mongodb:
+networks:
+  bridge:
+  control:
+  target:

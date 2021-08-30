@@ -1,0 +1,10 @@
+build
+venv
+.idea
+.coverage
+coverage.xml
+__pycache__
+.pytest_cache
+db.sqlite3
+data
+.env
