@@ -10,7 +10,7 @@ Before pushing your changes to a branch in GitLab, you should first locally exec
 
 Once you have a passing build, you should commit your changes to a branch with a commit message that will be meaningful to any reviewers of your code explaining (at a high level) what you changed and why. You can then push this branch up to Gitlab.
 
-Once the branch is in GitLab, you can view it [here](https://gitlab.risc.anl.gov/bblakely/cyst-public-api/-/branches). You can wait for the pipeline (build) to complete successfully and then create a merge request, or do so immediately. Either way your merge request will be blocked until the build passes and you have had another individual approve your change.
+Once the branch is in GitLab, you can wait for the pipeline (build) to complete successfully and then create a merge request, or do so immediately. Either way your merge request will be blocked until the build passes and you have had a maintainer approve your change.
 
 <h3>Running</h3>
 
