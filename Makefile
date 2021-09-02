@@ -14,7 +14,7 @@ ${ACTIVATE}: requirements.txt
 venv: ${ACTIVATE}
 
 deps: requirements.txt venv
-		@${PIP} install -qU wheel
+		@${PIP} install -qU pip wheel
 		@${PIP} install -qUr requirements.txt
 
 lint: deps
