@@ -17,20 +17,16 @@ deps: requirements.txt venv
 		@${PIP} install -qU pip wheel
 		@${PIP} install -qUr requirements.txt
 
-lint: deps
-		@find aica_django/ -name "*.py" -print0 | xargs -0 ${FLAKE}
-
-security: deps
-		@${BANDIT} -q -ll -ii -r aica_django/
-		@${SAFETY} check -r aica_django/requirements.txt --bare
-
-build: lint security aica_django/Dockerfile attacker/Dockerfile target/Dockerfile mongodb/Dockerfile
+build: deps aica_django/Dockerfile attacker/Dockerfile target/Dockerfile mongodb/Dockerfile ids/Dockerfile
 		@docker-compose build
 
 test: build
+		@find aica_django/ -name "*.py" -print0 | xargs -0 ${FLAKE}
+		@${BANDIT} -q -ll -ii -r aica_django/
+		@${SAFETY} check -r aica_django/requirements.txt --bare
 		@docker-compose run -e SKIP_TASKS=true --rm manager /opt/venv/bin/python3 manage.py test --noinput --failfast -v 3
 
-start:
+start: build
 		@docker-compose up -d
 
 stop:
