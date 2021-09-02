@@ -4,6 +4,8 @@ The intent of this project is to construct a functioning prototype of the AICA f
 
 It is important to ensure your main branch is up to date before each working session, and you should commit your changes incrementally and often to ensure minimal divergence and chance of merge conflicts. Changes should be "intact" functionally (i.e., don't submit partially-completed work) and keep the main repository in a working state. This means you should think about functionality in the smallest possible chunks so you can keep your contributed work up to date.
 
+Your host system will need to have a few things ready to go: Docker (installed from Docker itself, not your built-in distribution manager to ensure you get an up-to-date version), python3, python3-venv, build-essential (or the equivalent for your platform; `make` should be sufficient but you may need other build tools depending on pip's wheel support in your environment), and if there is not a cryptography wheel available from `pip` for your operating system, you will also need libssl-dev, libffi-dev, and python-dev.
+
 Set up and activate your venv, and then `make deps` to install required dependencies (or let your IDE handle that; PyCharm will detect the requirements file and prompt you). Note that when editing code inside of the Django project, PyCharm will not pay attention to its requirements.txt and will warn about missing dependencies. 
 
 Before pushing your changes to a branch in GitLab, you should first locally execute a `make test` and ensure it completes successfully. If it does not, either fix the issues or propose exclusions to the relevant test areas (will be subject to peer review).
