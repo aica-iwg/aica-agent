@@ -22,7 +22,7 @@ build: deps aica_django/Dockerfile attacker/Dockerfile target/Dockerfile ids/Doc
 		@docker-compose build
 
 test: build
-		@${YAMLLINT} docker-compose.yaml
+		@${YAMLLINT} docker-compose.yml
 		@find aica_django/ -name "*.py" -print0 | xargs -0 ${FLAKE}
 		@${BANDIT} -q -ll -ii -r aica_django/
 		@${SAFETY} check -r aica_django/requirements.txt honeypot/requirements.txt --bare
