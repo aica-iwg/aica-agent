@@ -25,7 +25,8 @@ test: build
 		@${YAMLLINT} docker-compose.yml
 		@find aica_django/ -name "*.py" -print0 | xargs -0 ${FLAKE}
 		@${BANDIT} -q -ll -ii -r aica_django/
-		@${SAFETY} check -r aica_django/requirements.txt honeypot/requirements.txt --bare
+		@${SAFETY} check -r aica_django/requirements.txt --bare
+		@${SAFETY} check -r honeypot/requirements.txt --bare
 		@docker-compose run -e SKIP_TASKS=true --rm manager \
 		    /opt/venv/bin/python3 manage.py test --noinput --failfast -v 3
 
