@@ -1,4 +1,5 @@
-version: '2.3'
+---
+version: "3.8"
 
 services:
   manager:
@@ -19,20 +20,16 @@ services:
       - 5555:5555
       - 8000:8000
     depends_on:
-      manager_db:
-          condition: service_healthy
-      manager_mq:
-          condition: service_healthy
-      manager_mongodb:
-          condition: service_healthy
-      ids:
-          condition: service_started
+      - manager_db
+      - manager_mq
+      - manager_mongodb
+      - ids
     networks:
       - bridge
       - control
       - target
   manager_db:
-    image: postgres
+    image: postgres:13-buster
     container_name: 'manager_db'
     volumes:
       - manager_db:/var/lib/postgresql/data
@@ -54,8 +51,8 @@ services:
       - 5672:5672
       - 15672:15672
     volumes:
-        - manager_mq_data:/var/lib/rabbitmq
-        - manager_mq_log:/var/log/rabbitmq
+      - manager_mq_data:/var/lib/rabbitmq
+      - manager_mq_log:/var/log/rabbitmq
     healthcheck:
       test: ["CMD-SHELL", "rabbitmq-diagnostics -q ping"]
       interval: 30s
@@ -89,12 +86,15 @@ services:
       - net_admin
     network_mode: 'service:target'
   honeypot:
-    image: hansdampf17/opencanary
+    build: ./honeypot
     container_name: 'honeypot'
+    command: /usr/bin/opencanaryd --dev
+    volumes:
+      - ./honeypot/opencanary.conf:/etc/opencanaryd/opencanary.conf
     networks:
       - target
   manager_mongodb:
-    build: ./mongodb
+    image: mongo:4
     container_name: 'manager_mongodb'
     environment:
       - MONGO_INITDB_DATABASE:aica
@@ -102,23 +102,25 @@ services:
       - MONGO_INITDB_ROOT_PASSWORD:A1c@2021!!
     volumes:
       - ./mongodb/init-mongo.js:/docker-entrypoint-initdb.d/init-mongo.js:ro
+      - ./mongodb/docker_healthcheck.sh:/usr/local/bin/docker_healthcheck.sh
       - mongodb:/data/db
     ports:
       - 27017:27017
     networks:
       - control
     healthcheck:
-      test: ["CMD-SHELL", "docker-healthcheck" ]
+      test: ["CMD-SHELL", "docker_healthcheck.sh"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 20s
+
 volumes:
   manager_db:
   manager_mq_data:
   manager_mq_log:
   ids_log:
   mongodb:
+
 networks:
   bridge:
   control:

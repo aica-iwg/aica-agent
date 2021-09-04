@@ -5,6 +5,7 @@ PIP := ${VENV}/bin/pip
 FLAKE := ${VENV}/bin/flake8
 BANDIT := ${VENV}/bin/bandit
 SAFETY := ${VENV}/bin/safety
+YAMLLINT := ${VENV}/bin/yamllint
 ACTIVATE := ${VENV}/bin/activate
 mkfile_path := $(abspath $(lastword $(MAKEFILE_LIST)))
 mkfile_dir := $(dir $(mkfile_path))
@@ -17,14 +18,17 @@ deps: requirements.txt venv
 		@${PIP} install -qU pip wheel
 		@${PIP} install -qUr requirements.txt
 
-build: deps aica_django/Dockerfile attacker/Dockerfile target/Dockerfile mongodb/Dockerfile ids/Dockerfile
+build: deps aica_django/Dockerfile attacker/Dockerfile target/Dockerfile ids/Dockerfile honeypot/Dockerfile
 		@docker-compose build
 
 test: build
+		@${YAMLLINT} docker-compose.yml
 		@find aica_django/ -name "*.py" -print0 | xargs -0 ${FLAKE}
 		@${BANDIT} -q -ll -ii -r aica_django/
 		@${SAFETY} check -r aica_django/requirements.txt --bare
-		@docker-compose run -e SKIP_TASKS=true --rm manager /opt/venv/bin/python3 manage.py test --noinput --failfast -v 3
+		@${SAFETY} check -r honeypot/requirements.txt --bare
+		@docker-compose run -e SKIP_TASKS=true --rm manager \
+		    /opt/venv/bin/python3 manage.py test --noinput --failfast -v 3
 
 start: build
 		@docker-compose up -d
