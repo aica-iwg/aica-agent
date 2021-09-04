@@ -50,7 +50,6 @@ logs:
 
 clean:
 		@docker-compose down -v --rmi all --remove-orphans
-		@sudo rm -Rf data
 		@find . -name ".py[co]" -delete
 		@rm -rf aica_django/db.sqlite3
 		@rm -rf $(BUILD_DIR)
