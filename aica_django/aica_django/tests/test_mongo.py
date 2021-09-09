@@ -2,21 +2,22 @@ import datetime
 import collections
 import os
 
-from pymongo.mongo_client import MongoClient
 from bson.objectid import ObjectId
 from django.test import TestCase
 from stix2 import Indicator
 from urllib.parse import quote_plus
 
+from aica_django.AicaMongo import AicaMongo
+
 
 class GenericMongoDbTestCase(TestCase):
 
     def setUp(self):
-        conn_str = f"mongodb://{quote_plus(str(os.getenv('MONGO_INITDB_ROOT_USER')))}:" \
-                   f"{quote_plus(str(os.getenv('MONGO_INITDB_ROOT_PASS')))}@" \
-                   f"{quote_plus(str(os.getenv('MONGO_SERVER')))}/?retryWrites=true&w=majority"
-        self.client = MongoClient(conn_str)
-        self.db = self.client["test_db"]
+        mongo_client = AicaMongo(user=quote_plus(str(os.getenv('MONGO_INITDB_ROOT_USER'))),
+                                 password=quote_plus(str(os.getenv('MONGO_INITDB_ROOT_PASS'))),
+                                 db="admin")
+        self.client = mongo_client.get_client_handle()
+        self.db = mongo_client.get_db_handle(db="test_db")
 
     def tearDown(self):
         self.client.drop_database("test_db")

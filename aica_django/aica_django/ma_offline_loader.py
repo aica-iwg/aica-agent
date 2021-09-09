@@ -11,12 +11,12 @@
 
 import os
 import yaml
+
 from celery.execute import send_task
 from celery.signals import worker_ready
 from celery.utils.log import get_task_logger
-from pymongo.mongo_client import MongoClient
-from urllib.parse import quote_plus
 
+from aica_django.AicaMongo import AicaMongo
 
 logger = get_task_logger(__name__)
 
@@ -28,12 +28,8 @@ def initialize(**kwargs):
         return
 
     # Load data from static files into MongoDB
-    mongo_conn = f"mongodb://{quote_plus(str(os.getenv('MONGO_INITDB_USER')))}:" \
-                 f"{quote_plus(str(os.getenv('MONGO_INITDB_PASS')))}@" \
-                 f"{quote_plus(str(os.getenv('MONGO_SERVER')))}/" \
-                 f"{quote_plus(str(os.getenv('MONGO_INITDB_DATABASE')))}?retryWrites=true&w=majority"
-    mongo_client = MongoClient(mongo_conn)
-    mongo_db = mongo_client[str(os.getenv('MONGO_INITDB_DATABASE'))]
+    mongo_client = AicaMongo()
+    mongo_db = mongo_client.get_db_handle()
 
     with open("response_actions.yml", "r") as actions_file:
         alert_actions = yaml.safe_load(actions_file)["responseActions"]["alerts"]
@@ -41,5 +37,3 @@ def initialize(**kwargs):
 
     # Start the persistent DB (or file) polling process
     send_task('ma_collaboration-poll_dbs')
-
-    mongo_client.close()

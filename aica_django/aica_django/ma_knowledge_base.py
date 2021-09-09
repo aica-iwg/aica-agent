@@ -16,21 +16,16 @@
 import os
 
 from celery.utils.log import get_task_logger
-from pymongo.mongo_client import MongoClient
-from urllib.parse import quote_plus
+
+from aica_django.AicaMongo import AicaMongo
 
 logger = get_task_logger(__name__)
 
 
 def query_action(alert_dict):
     print(f"Running {__name__}: query_action")
-
-    conn_str = f"mongodb://{quote_plus(str(os.getenv('MONGO_INITDB_USER')))}:" \
-               f"{quote_plus(str(os.getenv('MONGO_INITDB_PASS')))}@" \
-               f"{quote_plus(str(os.getenv('MONGO_SERVER')))}/" \
-               f"{quote_plus(str(os.getenv('MONGO_INITDB_DATABASE')))}?retryWrites=true&w=majority"
-    client = MongoClient(conn_str)
-    db = client[str(os.getenv('MONGO_INITDB_DATABASE'))]
+    mongo_client = AicaMongo()
+    mongo_db = mongo_client.get_db_handle()
 
     recommended_actions = []
     if alert_dict["event_type"] == "alert":
@@ -39,7 +34,7 @@ def query_action(alert_dict):
             {"$or": [{"signature_id": alert_dict["alert"]["signature_id"]},
                      {"signature_id": "*"}]}
         ]}
-        recommended_actions = db["alert_response_actions"].find(query)
+        recommended_actions = mongo_db["alert_response_actions"].find(query)
 
     return recommended_actions
 
