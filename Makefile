@@ -23,9 +23,9 @@ build: deps aica_django/Dockerfile attacker/Dockerfile target/Dockerfile ids/Doc
 		@docker-compose build
 
 test: build
-		@find . -name "*.yml" -print0 | xargs -0 ${YAMLLINT}
-		@find . -name "*.sh" -print0 | xargs -0 ${BASHLINT}
-		@find aica_django/ -name "*.py" -print0 | xargs -0 ${FLAKE}
+		@find . -name "*.yml" -exec ${YAMLLINT} {} \;
+		@find . -name "*.sh" -exec ${BASHLINT} {} \;
+		@find aica_django/ -name "*.py" -exec ${FLAKE} {} \;
 		@${BANDIT} -q -ll -ii -r aica_django/
 		@${SAFETY} check -r aica_django/requirements.txt --bare
 		@${SAFETY} check -r honeypot/requirements.txt --bare
