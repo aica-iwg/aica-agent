@@ -13,19 +13,33 @@
 # This information is intended to be stored in the Postgresql Database server attached to the manager, which will
 # require tables to be defined and created for each of the above.
 
+import os
+
 from celery.utils.log import get_task_logger
+from pymongo.mongo_client import MongoClient
+from urllib.parse import quote_plus
 
 logger = get_task_logger(__name__)
 
 
 def query_action(alert_dict):
-    # TODO: For now always tells to send to honeypot, full functionality would return list of options
     print(f"Running {__name__}: query_action")
-    print(alert_dict)
+
+    conn_str = f"mongodb://{quote_plus(str(os.getenv('MONGO_INITDB_USER')))}:" \
+               f"{quote_plus(str(os.getenv('MONGO_INITDB_PASS')))}@" \
+               f"{quote_plus(str(os.getenv('MONGO_SERVER')))}/" \
+               f"{quote_plus(str(os.getenv('MONGO_INITDB_DATABASE')))}?retryWrites=true&w=majority"
+    client = MongoClient(conn_str)
+    db = client[str(os.getenv('MONGO_INITDB_DATABASE'))]
 
     recommended_actions = []
     if alert_dict["event_type"] == "alert":
-        recommended_actions.append({"action": "honeypot"})
+        query = {"$and": [
+            {"event_type": "alert"},
+            {"$or": [{"signature_id": alert_dict["alert"]["signature_id"]},
+                     {"signature_id": "*"}]}
+        ]}
+        recommended_actions = db["alert_response_actions"].find(query)
 
     return recommended_actions
 

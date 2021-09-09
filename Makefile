@@ -5,6 +5,7 @@ PIP := ${VENV}/bin/pip
 FLAKE := ${VENV}/bin/flake8
 BANDIT := ${VENV}/bin/bandit
 SAFETY := ${VENV}/bin/safety
+BASHLINT := ${VENV}/bin/bashlint
 YAMLLINT := ${VENV}/bin/yamllint
 ACTIVATE := ${VENV}/bin/activate
 mkfile_path := $(abspath $(lastword $(MAKEFILE_LIST)))
@@ -22,7 +23,8 @@ build: deps aica_django/Dockerfile attacker/Dockerfile target/Dockerfile ids/Doc
 		@docker-compose build
 
 test: build
-		@${YAMLLINT} docker-compose.yml
+		@find . -name "*.yml" -print0 | xargs -0 ${YAMLLINT}
+		@find . -name "*.sh" -print0 | xargs -0 ${BASHLINT}
 		@find aica_django/ -name "*.py" -print0 | xargs -0 ${FLAKE}
 		@${BANDIT} -q -ll -ii -r aica_django/
 		@${SAFETY} check -r aica_django/requirements.txt --bare

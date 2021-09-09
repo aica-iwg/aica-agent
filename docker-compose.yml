@@ -6,16 +6,12 @@ services:
     build: ./aica_django
     container_name: 'manager'
     env_file:
-      - aica_django/.env
+      - 'aica_django/.env'
     command: sh /usr/local/bin/docker_entrypoint.sh
     tty: true
     volumes:
       - ./aica_django/docker_entrypoint.sh:/usr/local/bin/docker_entrypoint.sh
       - ids_log:/var/log/suricata
-    environment:
-      - DJANGO_SUPERUSER_USERNAME=django
-      - DJANGO_SUPERUSER_EMAIL=aica@anl.gov
-      - DJANGO_SUPERUSER_PASSWORD=django
     ports:
       - 5555:5555
       - 8000:8000
@@ -33,10 +29,8 @@ services:
     container_name: 'manager_db'
     volumes:
       - manager_db:/var/lib/postgresql/data
-    environment:
-      - POSTGRES_DB=postgres
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
+    env_file:
+      - 'aica_django/.env'
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 10s
@@ -70,6 +64,8 @@ services:
     build: ./target
     container_name: 'target'
     command: sh /usr/local/bin/docker_entrypoint.sh
+    sysctls:
+      - net.ipv4.conf.all.forwarding=1
     cap_add:
       - sys_nice
       - net_admin
@@ -96,12 +92,10 @@ services:
   manager_mongodb:
     image: mongo:4
     container_name: 'manager_mongodb'
-    environment:
-      - MONGO_INITDB_DATABASE:aica
-      - MONGO_INITDB_ROOT_USERNAME:aica_root
-      - MONGO_INITDB_ROOT_PASSWORD:A1c@2021!!
+    env_file:
+      - 'aica_django/.env'
     volumes:
-      - ./mongodb/init-mongo.js:/docker-entrypoint-initdb.d/init-mongo.js:ro
+      - ./mongodb/init-mongo.sh:/docker-entrypoint-initdb.d/init-mongo.sh
       - ./mongodb/docker_healthcheck.sh:/usr/local/bin/docker_healthcheck.sh
       - mongodb:/data/db
     ports:
