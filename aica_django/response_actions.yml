@@ -1,0 +1,6 @@
+---
+responseActions:
+  alerts:
+    - event_type: "alert"
+      signature_id: "*"
+      action: "honeypot"

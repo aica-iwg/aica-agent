@@ -13,19 +13,28 @@
 # This information is intended to be stored in the Postgresql Database server attached to the manager, which will
 # require tables to be defined and created for each of the above.
 
+import os
+
 from celery.utils.log import get_task_logger
+
+from aica_django.AicaMongo import AicaMongo
 
 logger = get_task_logger(__name__)
 
 
 def query_action(alert_dict):
-    # TODO: For now always tells to send to honeypot, full functionality would return list of options
     print(f"Running {__name__}: query_action")
-    print(alert_dict)
+    mongo_client = AicaMongo()
+    mongo_db = mongo_client.get_db_handle()
 
     recommended_actions = []
     if alert_dict["event_type"] == "alert":
-        recommended_actions.append({"action": "honeypot"})
+        query = {"$and": [
+            {"event_type": "alert"},
+            {"$or": [{"signature_id": alert_dict["alert"]["signature_id"]},
+                     {"signature_id": "*"}]}
+        ]}
+        recommended_actions = mongo_db["alert_response_actions"].find(query)
 
     return recommended_actions
 

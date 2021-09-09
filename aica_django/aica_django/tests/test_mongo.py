@@ -1,23 +1,29 @@
-from pymongo import MongoClient
+import datetime
+import collections
+import os
+
 from bson.objectid import ObjectId
 from django.test import TestCase
 from stix2 import Indicator
-import datetime
-import collections
+from urllib.parse import quote_plus
+
+from aica_django.AicaMongo import AicaMongo
 
 
 class GenericMongoDbTestCase(TestCase):
 
     def setUp(self):
-        self.client = MongoClient('manager_mongodb', 27017)
-        self.db = self.client["test_db"]
+        mongo_client = AicaMongo(user=quote_plus(str(os.getenv('MONGO_INITDB_ROOT_USER'))),
+                                 password=quote_plus(str(os.getenv('MONGO_INITDB_ROOT_PASS'))),
+                                 db="admin")
+        self.client = mongo_client.get_client_handle()
+        self.db = mongo_client.get_db_handle(db="test_db")
 
     def tearDown(self):
         self.client.drop_database("test_db")
         self.client.close()
 
-    def test_createDatabase(self):
-
+    def test_create_collection_and_insert(self):
         self.assertIsNotNone(self.db, 'database should not be null')
         collection = self.db['test-collection']
         post = {"author": "Mike",
@@ -31,14 +37,10 @@ class GenericMongoDbTestCase(TestCase):
         result = collection.delete_one({"author": "Mike"})
         self.assertEqual(1, result.deleted_count, 'should delete only one')
 
-    def test_running(self):
-        self.assertEqual(True, True)
-
     def test_storing_and_using_stix_objects(self):
         indicator2 = Indicator(type='indicator',
                                pattern_type="stix",
                                pattern="[file:hashes.md5 = 'd41d8cd98f00b204e9800998ecf8427e']")
-        print(indicator2.serialize(pretty=True))
 
         doc = collections.OrderedDict()
         doc['id'] = indicator2.id
