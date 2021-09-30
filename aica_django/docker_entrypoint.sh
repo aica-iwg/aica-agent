@@ -3,6 +3,10 @@
 cd /usr/src/app
 
 echo "Starting Celery workers and gunicorn"
+cat <<EOF > /etc/supervisor/conf.d/0_env.conf
+[supervisord]
+environment=MODE="${MODE}"
+EOF
 service supervisor start
 
 # Tell Celery to not run tasks on the following manage.py invocations
@@ -21,6 +25,6 @@ if [ "$DJANGO_SUPERUSER_USERNAME" ]; then
     /opt/venv/bin/python3 manage.py createsuperuser --noinput
 fi
 
-echo "Manager started"
+echo "Manager started in mode: ${MODE}"
 
 tail -f /dev/null
