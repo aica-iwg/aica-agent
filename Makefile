@@ -34,7 +34,7 @@ test: build
 		@${BANDIT} -q -ll -ii -r aica_django/
 		@${SAFETY} check -r aica_django/requirements.txt --bare
 		@${SAFETY} check -r honeypot/requirements.txt --bare
-		@docker-compose run -e SKIP_TASKS=true --rm manager \
+		@docker-compose -f docker-compose.yml -f docker-compose-${MODE}.yml run -e SKIP_TASKS=true --rm manager \
 		    /opt/venv/bin/python3 manage.py test --noinput --failfast -v 3
 
 start: build
@@ -47,17 +47,17 @@ rebuild: stop build start
 
 restart: stop start
 
-attacker-shell:
-		@docker-compose exec -u root attacker /bin/bash
+attacker-shell: check-env
+		@docker-compose -f docker-compose.yml -f docker-compose-${MODE}.yml exec -u root attacker /bin/bash
 
-target-shell:
-		@docker-compose exec -u root target /bin/bash
+target-shell: check-env
+		@docker-compose -f docker-compose.yml -f docker-compose-${MODE}.yml exec -u root target /bin/bash
 
-manager-shell:
-		@docker-compose exec -u root manager /bin/bash
+manager-shell: check-env
+		@docker-compose -f docker-compose.yml -f docker-compose-${MODE}.yml exec -u root manager /bin/bash
 
-logs:
-		@docker-compose logs -f
+logs: check-env
+		@docker-compose -f docker-compose.yml -f docker-compose-${MODE}.yml logs -f
 
 clean: check-env
 		@docker-compose -f docker-compose.yml -f docker-compose-${MODE}.yml down -v --rmi all --remove-orphans
