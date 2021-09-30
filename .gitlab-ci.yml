@@ -4,5 +4,7 @@
 image: python:latest
 
 test:
+  variables:
+    MODE: sim
   script:
     - make test; make clean
