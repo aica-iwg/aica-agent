@@ -11,6 +11,11 @@ ACTIVATE := ${VENV}/bin/activate
 mkfile_path := $(abspath $(lastword $(MAKEFILE_LIST)))
 mkfile_dir := $(dir $(mkfile_path))
 
+check-env:
+ifndef MODE
+		$(error MODE is undefined)
+endif
+
 ${ACTIVATE}: requirements.txt
 		@test -d ${VENV}/bin || python3 -m venv ${VENV}
 venv: ${ACTIVATE}
@@ -19,8 +24,8 @@ deps: requirements.txt venv
 		@${PIP} install -qU pip wheel
 		@${PIP} install -qUr requirements.txt
 
-build: deps aica_django/Dockerfile attacker/Dockerfile target/Dockerfile ids/Dockerfile honeypot/Dockerfile
-		@docker-compose build
+build: deps aica_django/Dockerfile attacker/Dockerfile target/Dockerfile ids/Dockerfile honeypot/Dockerfile check-env
+		@docker-compose -f docker-compose.yml -f docker-compose-${MODE}.yml build
 
 test: build
 		@find . -name "*.yml" -exec ${YAMLLINT} {} \;
@@ -33,10 +38,10 @@ test: build
 		    /opt/venv/bin/python3 manage.py test --noinput --failfast -v 3
 
 start: build
-		@docker-compose up -d
+		@docker-compose -f docker-compose.yml -f docker-compose-${MODE}.yml up -d
 
-stop:
-		@docker-compose down -v
+stop: check-env
+		@docker-compose -f docker-compose.yml -f docker-compose-${MODE}.yml down -v
 
 rebuild: stop build start
 
@@ -54,8 +59,8 @@ manager-shell:
 logs:
 		@docker-compose logs -f
 
-clean:
-		@docker-compose down -v --rmi all --remove-orphans
+clean: check-env
+		@docker-compose -f docker-compose.yml -f docker-compose-${MODE}.yml down -v --rmi all --remove-orphans
 		@find . -name ".py[co]" -delete
 		@rm -rf aica_django/db.sqlite3
 		@rm -rf $(BUILD_DIR)

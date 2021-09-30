@@ -3,6 +3,7 @@
 # database tables, or tasks called by Django REST endpoints. Outputs are likely to be called by the decision making
 # engine microagent.
 
+import os
 import json
 import subprocess
 
@@ -17,17 +18,24 @@ logger = get_task_logger(__name__)
 @task(name="ma_collaboration-poll_dbs")
 def poll_dbs():
     logger.info(f"Running {__name__}: poll_dbs")
-
+    mode = os.getenv("MODE")
+    
     # For now this is polling a file for demonstration purposes, can be extended later
-    file_path = "/var/log/suricata/eve.json"
-    f = subprocess.Popen(['tail', '-F', file_path], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    while True:
-        line = f.stdout.readline()
-        event_dict = json.loads(line)
-        if event_dict["event_type"] == "alert":
-            send_task('ma_decision_making_engine-handle_alert', [event_dict])
-        else:
-            logger.debug("Non-alert event ignored")
+    if mode == "sim":
+        file_path = "/var/log/suricata/eve.json"
+        f = subprocess.Popen(['tail', '-F', file_path], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        while True:
+            line = f.stdout.readline()
+            event_dict = json.loads(line)
+            if event_dict["event_type"] == "alert":
+                send_task('ma_decision_making_engine-handle_alert', [event_dict])
+            else:
+                logger.debug("Non-alert event ignored")
+    elif mode == "virt":
+        # TODO: Insert polling code for external DB in virtual environment
+        raise NotImplementedError("Virtualized mode has not yet been implemented")
+    else:
+        raise ValueError(f"Illegal mode value: {mode}")
 
 
 @task(name="ma_collaboration-redirect_to_honeypot_iptables")

@@ -3,6 +3,9 @@
 ---
 image: python:latest
 
+variables:
+  ENV: sim
+
 test:
   script:
     - make test; make clean
