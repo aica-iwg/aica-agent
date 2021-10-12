@@ -11,6 +11,9 @@ services:
   attacker:
     build: ./attacker
     container_name: 'attacker'
+    command: sh /usr/local/bin/docker_entrypoint.sh
+    ports:
+      - "2222:22"
     networks:
       - target
     tty: true
@@ -22,8 +25,7 @@ services:
     sysctls:
       - net.ipv4.conf.all.forwarding=1
     cap_add:
-      - sys_nice
-      - net_admin
+      - NET_ADMIN
     networks:
       - target
 
@@ -34,8 +36,7 @@ services:
     volumes:
       - ids_log:/var/log/suricata
     cap_add:
-      - sys_nice
-      - net_admin
+      - NET_ADMIN
     network_mode: 'service:target'
 
   honeypot:

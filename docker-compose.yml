@@ -12,8 +12,8 @@ services:
     volumes:
       - ./aica_django/docker_entrypoint.sh:/usr/local/bin/docker_entrypoint.sh
     ports:
-      - 5555:5555
-      - 8000:8000
+      - "5555:5555"
+      - "8000:8000"
     depends_on:
       - manager_db
       - manager_mq
@@ -42,8 +42,8 @@ services:
     image: rabbitmq:3-management
     container_name: 'manager_mq'
     ports:
-      - 5672:5672
-      - 15672:15672
+      - "5672:5672"
+      - "15672:15672"
     volumes:
       - manager_mq_data:/var/lib/rabbitmq
       - manager_mq_log:/var/log/rabbitmq
@@ -65,7 +65,7 @@ services:
       - ./mongodb/docker_healthcheck.sh:/usr/local/bin/docker_healthcheck.sh
       - mongodb:/data/db
     ports:
-      - 27017:27017
+      - "27017:27017"
     networks:
       - control
     healthcheck:

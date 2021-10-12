@@ -11,4 +11,6 @@ RUN chown -R root:root /root && \
   chmod 750 /root/.ssh && \
   chmod 600 /root/.ssh/authorized_keys
 
+COPY index.html /var/www/localhost/htdocs/
+COPY aica-nginx.conf /etc/nginx/http.d/default.conf
 COPY docker_entrypoint.sh /usr/local/bin/
