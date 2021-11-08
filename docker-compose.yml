@@ -26,8 +26,6 @@ services:
   manager_db:
     image: postgres:13-buster
     container_name: 'manager_db'
-    volumes:
-      - manager_db:/var/lib/postgresql/data
     env_file:
       - 'aica_django/.env'
     healthcheck:
@@ -44,9 +42,6 @@ services:
     ports:
       - "5672:5672"
       - "15672:15672"
-    volumes:
-      - manager_mq_data:/var/lib/rabbitmq
-      - manager_mq_log:/var/log/rabbitmq
     healthcheck:
       test: ["CMD-SHELL", "rabbitmq-diagnostics -q ping"]
       interval: 30s
@@ -63,7 +58,6 @@ services:
     volumes:
       - ./mongodb/init-mongo.sh:/docker-entrypoint-initdb.d/init-mongo.sh
       - ./mongodb/docker_healthcheck.sh:/usr/local/bin/docker_healthcheck.sh
-      - mongodb:/data/db
     ports:
       - "27017:27017"
     networks:
@@ -73,12 +67,6 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-
-volumes:
-  manager_db:
-  manager_mq_data:
-  manager_mq_log:
-  mongodb:
 
 networks:
   bridge:
