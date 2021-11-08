@@ -1,10 +1,32 @@
-# Official language image. Look for the different tagged releases at:
-# https://hub.docker.com/r/library/python/tags/
 ---
 image: python:latest
 
+stages:
+  - test
+  - deploy
+
 test:
+  stage: test
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
   variables:
     MODE: sim
   script:
     - make test; make clean
+
+deploy:
+  stage: deploy
+  image: alpine
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main"
+      allow_failure: true
+  before_script:
+    - apk add openssh-client
+    - eval $(ssh-agent -s)
+    - echo "$SSH_PRIVATE_KEY" | ssh-add -
+    - mkdir -p ~/.ssh
+    - chmod 700 ~/.ssh
+  script:
+    - |
+      ssh -o StrictHostKeyChecking=no ubuntu@3.230.52.90 
+      "git clone git@uriel.ics.muni.cz:aica/aica-prototype.git || cd aica-prototype && git pull && MODE=sim make rebuild"
