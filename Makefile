@@ -24,13 +24,15 @@ deps: requirements.txt venv
 		@${PIP} install -qU pip wheel
 		@${PIP} install -qUr requirements.txt
 
-build: deps aica_django/Dockerfile attacker/Dockerfile target/Dockerfile ids/Dockerfile honeypot/Dockerfile check-env
-		@docker-compose -f docker-compose.yml -f docker-compose-${MODE}.yml build
-
-test: build
+lint: deps
 		@find . -name "*.yml" -exec ${YAMLLINT} {} \;
 		@find . -name "*.sh" -exec ${BASHLINT} {} \;
 		@find aica_django/ -name "*.py" -exec ${FLAKE} {} \;
+
+build: lint aica_django/Dockerfile attacker/Dockerfile target/Dockerfile ids/Dockerfile honeypot/Dockerfile check-env
+		@docker-compose -f docker-compose.yml -f docker-compose-${MODE}.yml build
+
+test: build
 		@${BANDIT} -q -ll -ii -r aica_django/
 		@${SAFETY} check -r aica_django/requirements.txt --bare
 		@${SAFETY} check -r honeypot/requirements.txt --bare
