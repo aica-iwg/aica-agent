@@ -29,5 +29,6 @@ deploy:
   script:
     - |
       ssh -o StrictHostKeyChecking=no ubuntu@3.230.52.90 
-      "git clone git@uriel.ics.muni.cz:aica/aica-prototype.git 
-        || cd aica-prototype && git pull && MODE=sim make rebuild"
+      "(git -C aica-prototype pull || \
+         git clone git@uriel.ics.muni.cz:aica/aica-prototype.git) && \
+       cd aica-prototype && MODE=sim make rebuild"
