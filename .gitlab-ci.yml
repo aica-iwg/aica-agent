@@ -21,14 +21,14 @@ deploy:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main"
       allow_failure: true
   before_script:
-    - 'which ssh-agent || ( apk --update add openssh-client )'
+    - 'apk --update add openssh-client'
     - eval "$(ssh-agent -s)"
     - ssh-add <(echo "$SSH_PRIVATE_KEY" | base64 -d)
     - mkdir -p ~/.ssh
     - chmod 700 ~/.ssh
   script:
     - |
-      ssh -o StrictHostKeyChecking=no ubuntu@3.230.52.90 
-      "(git -C aica-prototype pull || \
-         git clone git@uriel.ics.muni.cz:aica/aica-prototype.git) && \
-       cd aica-prototype && MODE=sim make rebuild"
+      'ssh -o StrictHostKeyChecking=no ubuntu@3.230.52.90 
+       "(git -C aica-prototype pull || \
+          git clone git@uriel.ics.muni.cz:aica/aica-prototype.git) && \
+        cd aica-prototype && MODE=sim make rebuild"'
