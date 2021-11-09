@@ -12,23 +12,22 @@ test:
   variables:
     MODE: sim
   script:
-    - make lint && make test; make clean
+    - make lint && make security && make test; make clean
 
 deploy:
   stage: deploy
-  image: alpine
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main"
       allow_failure: true
   before_script:
-    - 'apk --update add openssh-client'
+    - which ssh-agent || sudo apt install openssh-client
     - eval "$(ssh-agent -s)"
     - ssh-add <(echo "$SSH_PRIVATE_KEY" | base64 -d)
     - mkdir -p ~/.ssh
     - chmod 700 ~/.ssh
   script:
     - |
-      'ssh -o StrictHostKeyChecking=no ubuntu@3.230.52.90 
+      ssh -o StrictHostKeyChecking=no ubuntu@3.230.52.90 
        "(git -C aica-prototype pull || \
           git clone git@uriel.ics.muni.cz:aica/aica-prototype.git) && \
-        cd aica-prototype && MODE=sim make rebuild"'
+        cd aica-prototype && MODE=sim make rebuild"

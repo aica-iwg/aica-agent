@@ -29,13 +29,15 @@ lint: deps
 		@find . -name "*.sh" -exec ${BASHLINT} {} \;
 		@find aica_django/ -name "*.py" -exec ${FLAKE} {} \;
 
-build: lint aica_django/Dockerfile attacker/Dockerfile target/Dockerfile ids/Dockerfile honeypot/Dockerfile check-env
-		@docker-compose -f docker-compose.yml -f docker-compose-${MODE}.yml build
-
-test: build
+security: deps
 		@${BANDIT} -q -ll -ii -r aica_django/
 		@${SAFETY} check -r aica_django/requirements.txt --bare
 		@${SAFETY} check -r honeypot/requirements.txt --bare
+
+build: lint security aica_django/Dockerfile attacker/Dockerfile target/Dockerfile ids/Dockerfile honeypot/Dockerfile check-env
+		@docker-compose -f docker-compose.yml -f docker-compose-${MODE}.yml build
+
+test: build
 		@docker-compose -f docker-compose.yml -f docker-compose-${MODE}.yml run -e SKIP_TASKS=true --rm manager \
 		    /opt/venv/bin/python3 manage.py test --noinput --failfast -v 3
 
