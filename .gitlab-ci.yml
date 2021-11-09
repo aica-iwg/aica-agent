@@ -26,8 +26,5 @@ deploy:
     - mkdir -p ~/.ssh
     - chmod 700 ~/.ssh
   script:
-    - |
-      ssh -o StrictHostKeyChecking=no ubuntu@3.230.52.90 
-       "(git -C aica-prototype pull || \
-          git clone git@uriel.ics.muni.cz:aica/aica-prototype.git) && \
-        cd aica-prototype && MODE=sim make rebuild"
+    - rsync -ae --delete ./ ubuntu@3.230.52.90:./aica-prototype 
+    - ssh -o StrictHostKeyChecking=no ubuntu@3.230.52.90 "cd aica-prototype && make rebuild"
