@@ -23,6 +23,20 @@ services:
       - control
       - target
 
+  visualization:
+    image: grafana/grafana:8.2.3
+    container_name: 'visualization'
+    env_file:
+      - 'aica_django/.env'
+    volumes:
+      - ./visualization/docker_entrypoint.sh:/usr/local/bin/docker_entrypoint.sh
+      - ./visualization/grafana.ini:/etc/grafana/grafana.ini
+      - ./visualization/datasources.yml:/etc/grafana/provisioning/datasources/datasources.yml
+    ports:
+      - "3000:3000"
+    networks:
+      - control
+
   manager_db:
     image: postgres:13-buster
     container_name: 'manager_db'
@@ -39,9 +53,8 @@ services:
   manager_mq:
     image: rabbitmq:3-management
     container_name: 'manager_mq'
-    ports:
-      - "5672:5672"
-      - "15672:15672"
+    volumes:
+      - ./manager_mq/enabled_plugins:/etc/rabbitmq/enabled_plugins
     healthcheck:
       test: ["CMD-SHELL", "rabbitmq-diagnostics -q ping"]
       interval: 30s
@@ -58,8 +71,6 @@ services:
     volumes:
       - ./mongodb/init-mongo.sh:/docker-entrypoint-initdb.d/init-mongo.sh
       - ./mongodb/docker_healthcheck.sh:/usr/local/bin/docker_healthcheck.sh
-    ports:
-      - "27017:27017"
     networks:
       - control
     healthcheck:
