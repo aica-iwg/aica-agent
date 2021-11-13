@@ -19,7 +19,7 @@ logger = get_task_logger(__name__)
 def poll_dbs():
     logger.info(f"Running {__name__}: poll_dbs")
     mode = os.getenv("MODE")
-    
+
     # For now this is polling a file for demonstration purposes, can be extended later
     if mode == "sim":
         file_path = "/var/log/suricata/eve.json"
