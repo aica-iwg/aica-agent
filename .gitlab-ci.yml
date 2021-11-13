@@ -1,33 +1,59 @@
 ---
-image: python:latest
-
 stages:
+  - pretest
+  - build 
   - test
   - deploy
+  - clean
 
-test:
-  stage: test
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+default:
+  image: python:3.6-alpine
+
+pretest:
+  stage: pretest 
+  except:
+    refs:
+      - main
   variables:
     MODE: sim
   script:
-    - make lint && make test; make clean
+    - make lint && make security
+
+build:
+  stage: build 
+  except:
+    refs:
+      - main
+  variables:
+    MODE: sim
+  script:
+    - make build
+
+test:
+  stage: test
+  except:
+    refs:
+      - main
+  variables:
+    MODE: sim
+  script:
+    - make test 
 
 deploy:
   stage: deploy
-  image: alpine
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main"
-      allow_failure: true
-  before_script:
-    - 'which ssh-agent || ( apk --update add openssh-client )'
-    - eval "$(ssh-agent -s)"
-    - echo "$SSH_PRIVATE_KEY" | tr -d '\r' | ssh-add - > /dev/null
-    - mkdir -p ~/.ssh
-    - chmod 700 ~/.ssh
+  only:
+    refs:
+      - main
   script:
-    - |
-      ssh -o StrictHostKeyChecking=no ubuntu@3.230.52.90 
-      "git clone git@uriel.ics.muni.cz:aica/aica-prototype.git 
-        || cd aica-prototype && git pull && MODE=sim make rebuild"
+    - rsync -ae "ssh -o StrictHostKeyChecking=no" --delete ./ $VISTA_AICA_USER@$VISTA_AICA_HOST:./aica-prototype 
+    - ssh -o StrictHostKeyChecking=no $VISTA_AICA_USER@$VISTA_AICA_HOST "cd aica-prototype && MODE=sim make rebuild&"
+
+clean:
+  stage: clean 
+  except:
+    refs:
+      - main
+  variables:
+    MODE: sim
+  script:
+    - make clean 
