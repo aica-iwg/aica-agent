@@ -29,7 +29,6 @@ services:
     env_file:
       - 'aica_django/.env'
     volumes:
-      - ./visualization/docker_entrypoint.sh:/usr/local/bin/docker_entrypoint.sh
       - ./visualization/grafana.ini:/etc/grafana/grafana.ini
       - ./visualization/datasources.yml:/etc/grafana/provisioning/datasources/datasources.yml
     ports:
