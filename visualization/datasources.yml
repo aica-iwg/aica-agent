@@ -1,0 +1,25 @@
+apiVersion: 1
+
+deleteDatasources:
+  - name: RabbitMQ
+    orgId: 1
+
+datasources:
+  - name: Manager
+    type: prometheus
+    uid: manager_django
+    url: http://manager:8000
+    basicAuth: false
+    version: 1
+    editable: false
+    jsonData:
+      httpMethod: GET
+  - name: RabbitMQ
+    type: prometheus
+    uid: manager_mq_rabbit
+    url: http://manager_mq:15692
+    basicAuth: false
+    version: 1
+    editable: false
+    jsonData:
+      httpMethod: GET
