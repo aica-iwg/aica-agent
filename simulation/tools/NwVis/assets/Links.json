@@ -1,0 +1,36 @@
+{
+  "Links":[
+    {
+      "src": "attacker",
+      "dest": "router"
+  },
+  {
+    "src": "server1",
+    "dest": "router"
+  },
+  {
+    "src": "server2",
+    "dest": "router"
+  },
+  {
+    "src": "pc1",
+    "dest": "router"
+  },
+  {
+    "src": "pc2",
+    "dest": "router"
+  },
+  {
+    "src": "honeypot",
+    "dest": "router"
+  },
+  {
+    "src": "defender",
+    "dest": "router"
+  },
+  {
+    "src": "ids",
+    "dest": "router"
+  }
+  ]}
+
