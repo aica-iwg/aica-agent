@@ -1,0 +1,55 @@
+---
+version: "3.8"
+
+services:
+  manager:
+    environment:
+      MODE: "emu"
+    volumes:
+      - ids_log:/var/log/suricata
+
+  attacker:
+    build: ./attacker
+    container_name: 'attacker'
+    command: sh /usr/local/bin/docker_entrypoint.sh
+    ports:
+      - "2222:22"
+    networks:
+      - target
+    tty: true
+
+  target:
+    build: ./target
+    container_name: 'target'
+    command: sh /usr/local/bin/docker_entrypoint.sh
+    sysctls:
+      - net.ipv4.conf.all.forwarding=1
+    cap_add:
+      - NET_ADMIN
+    networks:
+      - target
+
+  ids:
+    build: ./ids
+    container_name: 'ids'
+    command: sh /usr/local/bin/docker_entrypoint.sh
+    volumes:
+      - ids_log:/var/log/suricata
+    cap_add:
+      - NET_ADMIN
+    network_mode: 'service:target'
+
+  honeypot:
+    build: ./honeypot
+    container_name: 'honeypot'
+    command: /usr/bin/opencanaryd --dev
+    volumes:
+      - ./honeypot/opencanary.conf:/etc/opencanaryd/opencanary.conf
+    networks:
+      - target
+
+volumes:
+  ids_log:
+
+networks:
+  target:

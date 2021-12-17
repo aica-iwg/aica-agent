@@ -60,6 +60,9 @@ target-shell: check-env
 manager-shell: check-env
 		@docker-compose -f docker-compose.yml -f docker-compose-${MODE}.yml exec -u root manager /bin/bash
 
+simulation-shell: check-env
+		@docker-compose -f docker-compose.yml -f docker-compose-${MODE}.yml exec -u root simulation /bin/bash
+
 logs: check-env
 		@docker-compose -f docker-compose.yml -f docker-compose-${MODE}.yml logs -f
 

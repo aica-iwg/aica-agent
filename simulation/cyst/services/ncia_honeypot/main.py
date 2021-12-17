@@ -14,8 +14,10 @@ class LIHoneypot(ActiveService):
         pass
 
     def process_message(self, message: Message) -> Tuple[bool, int]:
-        self._env.create_response(message.cast_to(Request), Status(StatusOrigin.SERVICE, StatusValue.SUCCESS), session=message.session, auth=message.auth)
-        return True, 1
+        # Honeypot acts as a traffic processor, which does not pass message through
+        r = self._env.create_response(message.cast_to(Request), Status(StatusOrigin.SERVICE, StatusValue.SUCCESS), session=message.session, auth=message.auth)
+        self._env.send_message(r)
+        return False, 1
 
 
 def create_honeypot(msg: EnvironmentMessaging, res: EnvironmentResources, args: Optional[Dict[str, Any]]) -> ActiveService:

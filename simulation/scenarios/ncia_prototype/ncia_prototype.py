@@ -136,6 +136,8 @@ server2 = NodeConfig(
 # ----------------------------------------------------------------------------------------------------------------------
 honeypot = NodeConfig(
     active_services=[
+    ],
+    traffic_processors=[
         ActiveServiceConfig(
             type="ncia_honeypot",
             name="ncia_honeypot",
@@ -144,7 +146,6 @@ honeypot = NodeConfig(
             id="honeypot_service"
         )
     ],
-    traffic_processors=[],
     passive_services=[],
     shell="bash",
     interfaces=[
@@ -245,7 +246,10 @@ defender = NodeConfig(
             owner="bash",
             access_level=AccessLevel.LIMITED,
             id="defender_service",
-            configuration={"honeypot": "192.168.0.201"}
+            configuration={
+                "honeypot": "192.168.0.201",
+                "router": "192.168.0.1"
+            }
         )
     ],
     traffic_processors=[],
@@ -276,6 +280,15 @@ router = RouterConfig(
         InterfaceConfig(IPAddress("192.168.0.1"), IPNetwork("192.168.0.1/24"), index=6),
         InterfaceConfig(IPAddress("192.168.0.1"), IPNetwork("192.168.0.1/24"), index=7),
         InterfaceConfig(IPAddress("192.168.0.1"), IPNetwork("192.168.0.1/24"), index=8)
+    ],
+    traffic_processors=[
+        ActiveServiceConfig(
+            type="ncia_redirector",
+            name="ncia_redirector",
+            owner="bash",
+            access_level=AccessLevel.LIMITED,
+            id="redirector_service"
+        )
     ],
     id="router"
 )

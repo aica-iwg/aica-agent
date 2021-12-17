@@ -6,7 +6,6 @@ bandit
 flake8
 safety
 bashlint
-yamllint
 
 # Not required for build/test but helpful for IDE completion/debugging
 Django==3.2.6

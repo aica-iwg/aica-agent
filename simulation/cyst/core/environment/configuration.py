@@ -89,6 +89,7 @@ class Configurator:
     def _process_RouterConfig(self, cfg: RouterConfig):
         interface_ids = []
         route_ids = []
+        traffic_processor_ids = []
 
         for interface in cfg.interfaces:
             if isinstance(interface, str):
@@ -99,7 +100,14 @@ class Configurator:
         for route in cfg.routing_table:
             self._process_RouteConfig(route)
 
+        for service in cfg.traffic_processors:
+            if isinstance(service, str):
+                traffic_processor_ids.append(service)
+            else:
+                traffic_processor_ids.append(self._process_cfg_item(service))
+
         cfg.interfaces = interface_ids
+        cfg.traffic_processors = traffic_processor_ids
         self._routers.append(cfg)
         self._refs[cfg.id] = cfg
         return cfg.id
@@ -475,6 +483,14 @@ class Configurator:
                 route_obj = self._env.configuration.node.create_route(route.network, route.port, route.metric)
                 self._env.configuration.node.add_route(r, route_obj)
                 self._obj_refs[route.id] = route_obj
+
+            for service in router.traffic_processors:
+                service_cfg: ActiveServiceConfig = self._refs[service]
+                s = self._env.configuration.service.create_active_service(service_cfg.type, service_cfg.owner,
+                                                                          service_cfg.name, r, service_cfg.access_level,
+                                                                          service_cfg.configuration)
+                self._obj_refs[service_cfg.id] = s
+                self._env.configuration.node.add_traffic_processor(r, s.active_service)
 
             # TODO: Firewall
 

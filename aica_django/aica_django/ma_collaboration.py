@@ -21,7 +21,7 @@ def poll_dbs():
     mode = os.getenv("MODE")
 
     # For now this is polling a file for demonstration purposes, can be extended later
-    if mode == "sim":
+    if mode == "sim" or mode == "emu":
         file_path = "/var/log/suricata/eve.json"
         f = subprocess.Popen(['tail', '-F', file_path], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         while True:
@@ -40,25 +40,35 @@ def poll_dbs():
 
 @task(name="ma_collaboration-redirect_to_honeypot_iptables")
 def redirect_to_honeypot_iptables(attacker, target, timeout=300):
+    mode = os.getenv("MODE")
     logger.info(f"Running {__name__}: redirect_to_honeypot_iptables")
 
-    client = SSHClient()
-    client.load_system_host_keys()
-    client.set_missing_host_key_policy(AutoAddPolicy())
-    client.connect(target, username="root")
+    if mode == "emu":
+        client = SSHClient()
+        client.load_system_host_keys()
+        client.set_missing_host_key_policy(AutoAddPolicy())
+        client.connect(target, username="root")
 
-    command = f"ipset add honeypot [{attacker}] timeout {timeout}"
-    logger.debug(f"Sending command: {command}")
+        command = f"ipset add honeypot [{attacker}] timeout {timeout}"
+        logger.debug(f"Sending command: {command}")
 
-    # The following line has nosec as we've validated the input parameters above
-    stdin, stdout, stderr = client.exec_command(command)  # nosec
+        # The following line has nosec as we've validated the input parameters above
+        stdin, stdout, stderr = client.exec_command(command)  # nosec
 
-    output = stdout.readlines()
-    output = "".join(output)
-    logger.info(output)
+        output = stdout.readlines()
+        output = "".join(output)
+        logger.info(output)
 
-    output = stderr.readlines()
-    output = "".join(output)
-    logger.error(output)
+        output = stderr.readlines()
+        output = "".join(output)
+        logger.error(output)
 
-    client.close()
+        client.close()
+    elif mode == "sim":
+        # This is a rather crude mechanism, but we can afford it, because
+        # in the prototype demonstration, everything is sequential
+        file_path = "/var/log/suricata/response.json"
+        f = open(file_path, "w")
+        f.write("honeypot")
+        f.close()
+        logger.info("Honeypot redirect request to simulation written.")
