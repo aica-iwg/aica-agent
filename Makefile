@@ -1,7 +1,7 @@
 SHELL := /bin/bash
 BUILD_DIR := build
 VENV := $(BUILD_DIR)/venv
-PIP := ${VENV}/bin/pip
+PYTHON := ${VENV}/bin/python3
 FLAKE := ${VENV}/bin/flake8
 BANDIT := ${VENV}/bin/bandit
 SAFETY := ${VENV}/bin/safety
@@ -20,20 +20,24 @@ ${ACTIVATE}: requirements.txt
 		@test -d ${VENV}/bin || python3 -m venv ${VENV}
 venv: ${ACTIVATE}
 
-deps: requirements.txt venv
-		@${PIP} install -qU pip wheel
-		@${PIP} install -qUr requirements.txt
+deps: venv
+		@${PYTHON} -m pip install -qU pip wheel
+		@${PYTHON} -m pip install -qUr requirements.txt
 
-build: deps aica_django/Dockerfile attacker/Dockerfile target/Dockerfile ids/Dockerfile honeypot/Dockerfile check-env
-		@docker-compose -f docker-compose.yml -f docker-compose-${MODE}.yml build
+lint: deps
+		@${YAMLLINT} . 
+		@${BASHLINT} . 
+		@${FLAKE} aica_django/ 
 
-test: build
-		@find . -name "*.yml" -exec ${YAMLLINT} {} \;
-		@find . -name "*.sh" -exec ${BASHLINT} {} \;
-		@find aica_django/ -name "*.py" -exec ${FLAKE} {} \;
+security: deps
 		@${BANDIT} -q -ll -ii -r aica_django/
 		@${SAFETY} check -r aica_django/requirements.txt --bare
 		@${SAFETY} check -r honeypot/requirements.txt --bare
+
+build: check-env
+		@docker-compose -f docker-compose.yml -f docker-compose-${MODE}.yml build
+
+test: build
 		@docker-compose -f docker-compose.yml -f docker-compose-${MODE}.yml run -e SKIP_TASKS=true --rm manager \
 		    /opt/venv/bin/python3 manage.py test --noinput --failfast -v 3
 
@@ -55,6 +59,9 @@ target-shell: check-env
 
 manager-shell: check-env
 		@docker-compose -f docker-compose.yml -f docker-compose-${MODE}.yml exec -u root manager /bin/bash
+
+simulation-shell: check-env
+		@docker-compose -f docker-compose.yml -f docker-compose-${MODE}.yml exec -u root simulation /bin/bash
 
 logs: check-env
 		@docker-compose -f docker-compose.yml -f docker-compose-${MODE}.yml logs -f

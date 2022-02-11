@@ -1,0 +1,101 @@
+{
+    "classes": [
+        {
+            "label": "LogTest1", 
+            "name": "LogTest1",
+            "fields": [
+                {
+                    "name": "randomInfo",
+                    "label": "Random Info",
+                    "severity": "warn"
+                },
+                {
+                    "name": "foo",
+                    "severity": "error"
+                }
+            ]
+        },
+        {
+            "label": "Tool", 
+            "name": "Tool",
+            "fields": [
+                {
+                    "name": "name",
+                    "severity": "INFO"
+                }
+            ]
+        },
+        {
+            "label": "LogTest2", 
+            "name": "LogTest2",
+            "fields": [
+                {
+                    "name": "color",
+                    "label": "Color",
+                    "severity": "wArN"
+                },
+                {
+                    "name": "tool",
+                    "label": "Tool",
+                    "severity": "ErroR"
+                }
+            ]
+        },
+        {
+            "label": "Color", 
+            "name": "Color",
+            "fields": [
+                {
+                    "name": "name",
+                    "severity": "INFO"
+                }
+            ]
+        }
+    ],
+    "loggers": [
+        {
+            "name": "simple",
+            "format": "%(asctime)s %(message)s",
+            "severity": "info",
+            "classes": ["Tool", "Color"]
+        },
+        {
+            "name": "exclude",
+            "mode": "exclude",
+            "severity": "debug",
+            "functions": [
+                {
+                    "name": "e",
+                    "severity": "fatal"
+                }
+            ],
+            "classes": ["Tool"]
+        },
+        {
+            "name": "parent",
+            "mode": "include_selected",
+            "severity": "info",
+            "included_categories": ["message"],
+            "excluded_categories": ["internal"],
+            "functions": [
+                {
+                    "name": "LogTest1.test",
+                    "severity": "warn"
+                }
+            ],
+            "classes": ["LogTest1", "Tool"]
+        },
+        {
+            "name": "parent.child",
+            "severity": "info",
+            "output_file": "testlog.txt",
+            "functions": [
+                {
+                    "name": "LogTest2.__init__",
+                    "severity": "info"
+                }
+            ],
+            "classes": ["LogTest2", "Color" ]
+        }
+    ]
+}

@@ -35,7 +35,8 @@ maintainer approve your change.
 You will need to have Docker and Docker Compose installed on your system to run the AICA Django application. 
 
 This code should be run via the Makefile entrypoint. You will need to specify whether you want to start this in
-simulation mode or virtualized mode with the MODE environment variable (i.e., MODE should be either `sim` or `virt`).
+simulation mode, emulation mode, or virtualized mode with the MODE environment variable (i.e., MODE should be either 
+`sim`, `emu`, or `virt`). The virutalized mode is, however, only a stub and is meant for future expansion.
 You can use export to set this for your session, or specific it before each `make` command (like `MODE=sim make build`).
 
 When starting from scratch, run the following: `make build && make start`. Subsequently use `make stop` and `make start`
@@ -54,13 +55,15 @@ You can monitor the agent through several interfaces:
 * http://localhost:8000 will be the Django app, as defined in `aica_django/`.
 * http://localhost:5555 will be a Celery Flower instance, where you can monitor task execution
 * http://localhost:15672 will be a RabbitMQ admin console, where you can monitor the task queue
+* http://localhost:8080 will be a visualization of simulation run, if you run it in `sim` mode.
+* http://localhost:3000 will be a visualization of the emulated run, if you run it in `emu` mode. (login: admin/aica)
 
 <h3>Code in this repository</h3>
 
 The AICA agent is built as a Django project, and so the normal Django conventions are followed in the `aica_django/`
 directory. Tests should be added to `aica_django/aica_django/tests` and use Django testing conventions.
 
-Other top-level directories contain files for other containers in the simulated environment. They should contain at
+Other top-level directories contain files for other containers in the simulated or emulated environment. They should contain at
 least a `Dockerfile` and any files needed to be copied into the built container.
 
 <h4>Other files and what they do</h4>

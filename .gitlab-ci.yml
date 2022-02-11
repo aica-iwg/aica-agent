@@ -1,10 +1,59 @@
-# Official language image. Look for the different tagged releases at:
-# https://hub.docker.com/r/library/python/tags/
 ---
-image: python:latest
+stages:
+  - pretest
+  - build 
+  - test
+  - deploy
+  - clean
 
-test:
+default:
+  image: python:3.6-alpine
+
+pretest:
+  stage: pretest 
+  except:
+    refs:
+      - main
   variables:
     MODE: sim
   script:
-    - make test; make clean
+    - make lint && make security
+
+build:
+  stage: build 
+  except:
+    refs:
+      - main
+  variables:
+    MODE: sim
+  script:
+    - make build
+
+test:
+  stage: test
+  except:
+    refs:
+      - main
+  variables:
+    MODE: sim
+  script:
+    - make test 
+
+deploy:
+  stage: deploy
+  only:
+    refs:
+      - main
+  script:
+    - rsync -ae "ssh -o StrictHostKeyChecking=no" --delete ./ $VISTA_AICA_USER@$VISTA_AICA_HOST:./aica-prototype 
+    - ssh -o StrictHostKeyChecking=no $VISTA_AICA_USER@$VISTA_AICA_HOST "cd aica-prototype && MODE=sim make rebuild&"
+
+clean:
+  stage: clean 
+  except:
+    refs:
+      - main
+  variables:
+    MODE: sim
+  script:
+    - make clean 
