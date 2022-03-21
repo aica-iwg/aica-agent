@@ -49,7 +49,7 @@ RUN apt-get -y remove \
     apt-get -y autoremove && \
     apt-get -y clean
 
-COPY supervisor-celery.conf /etc/supervisor/conf.d
+COPY supervisor.conf /etc/supervisor/conf.d
 
 RUN mkdir -p /root/.ssh
 COPY manager_key.priv /root/.ssh/id_rsa
@@ -57,6 +57,9 @@ RUN chown -R root:root /root
 RUN chmod 700 /root/.ssh
 RUN chmod 600 /root/.ssh/id_rsa
 
-
 # copy project
 COPY . .
+
+COPY docker_entrypoint.sh /usr/local/bin/docker_entrypoint.sh
+RUN chmod +x /usr/local/bin/docker_entrypoint.sh
+ENTRYPOINT ["/usr/local/bin/docker_entrypoint.sh"]

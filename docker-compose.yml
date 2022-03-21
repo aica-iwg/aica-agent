@@ -7,12 +7,8 @@ services:
     container_name: 'manager'
     env_file:
       - 'aica_django/.env'
-    command: sh /usr/local/bin/docker_entrypoint.sh
     tty: true
-    volumes:
-      - ./aica_django/docker_entrypoint.sh:/usr/local/bin/docker_entrypoint.sh
     ports:
-      - "5555:5555"
       - "8000:8000"
     depends_on:
       - manager_db
@@ -24,13 +20,10 @@ services:
       - target
 
   visualization:
-    image: grafana/grafana:8.2.3
+    build: ./visualization
     container_name: 'visualization'
     env_file:
       - 'aica_django/.env'
-    volumes:
-      - ./visualization/grafana.ini:/etc/grafana/grafana.ini
-      - ./visualization/datasources.yml:/etc/grafana/provisioning/datasources/datasources.yml
     ports:
       - "3000:3000"
     networks:
