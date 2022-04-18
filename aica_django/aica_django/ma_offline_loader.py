@@ -1,13 +1,15 @@
-# This microagent is responsible for pulling in any external data relevant to decision making by the agent
-# and loading/sending it to the knowledge base microagent. Per the NCIA SOW this is to include the following undefined
-# capabilities:
+# This microagent is responsible for pulling in any external data relevant to decision
+# making by the agent and loading/sending it to the knowledge base microagent.
+#
+# Per the NCIA SOW this is to include the following undefined capabilities:
 #
 # * World Description
 # * Competence
 # * Purpose
 # * Behavior
 #
-# It is the initial script called when Celery is started and is responsible for launching other tasks.
+# It is the initial script called when Celery is started and is responsible for
+# launching other tasks.
 
 import os
 import yaml
@@ -36,4 +38,4 @@ def initialize(**kwargs):
         mongo_db["alert_response_actions"].insert_many(alert_actions)
 
     # Start the persistent DB (or file) polling process
-    send_task('ma_collaboration-poll_dbs')
+    send_task("ma_collaboration-poll_dbs")

@@ -1,7 +1,8 @@
-# This microagent is responsible for coordinating external inputs and outputs such as communication with other agents,
-# command and control, or human operators. As such, the input tasks here will likely consist of either polling of shared
-# database tables, or tasks called by Django REST endpoints. Outputs are likely to be called by the decision making
-# engine microagent.
+# This microagent is responsible for coordinating external inputs and outputs such
+# as communication with other agents, command and control, or human operators. As
+# such, the input tasks here will likely consist of either polling of shared
+# database tables, or tasks called by Django REST endpoints. Outputs are likely to
+# be called by the decision making engine microagent.
 
 import os
 import json
@@ -23,12 +24,14 @@ def poll_dbs():
     # For now this is polling a file for demonstration purposes, can be extended later
     if mode == "sim" or mode == "emu":
         file_path = "/var/log/suricata/eve.json"
-        f = subprocess.Popen(['tail', '-F', file_path], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        f = subprocess.Popen(
+            ["tail", "-F", file_path], stdout=subprocess.PIPE, stderr=subprocess.PIPE
+        )
         while True:
             line = f.stdout.readline()
             event_dict = json.loads(line)
             if event_dict["event_type"] == "alert":
-                send_task('ma_decision_making_engine-handle_alert', [event_dict])
+                send_task("ma_decision_making_engine-handle_alert", [event_dict])
             else:
                 logger.debug("Non-alert event ignored")
     elif mode == "virt":
