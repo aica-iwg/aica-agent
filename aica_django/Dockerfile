@@ -17,8 +17,7 @@ RUN apt-get -y update && \
         python3-pip \
         python3-wheel \
         python3-venv \
-        python3-setuptools  && \
-    apt-get -y install \
+        python3-setuptools \
         bash \
         cmake \
         libtool \
