@@ -1,5 +1,4 @@
 from django.test import TestCase
-from aica_django.ma_decision_making_engine import handle_alert
 
 
 class DecisionMakingEngineTestCase(TestCase):

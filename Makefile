@@ -4,6 +4,7 @@ VENV := $(BUILD_DIR)/venv
 PYTHON := ${VENV}/bin/python3
 FLAKE := ${VENV}/bin/flake8
 BANDIT := ${VENV}/bin/bandit
+BLACK := ${VENV}/bin/black
 SAFETY := ${VENV}/bin/safety
 BASHLINT := ${VENV}/bin/bashlint
 YAMLLINT := ${VENV}/bin/yamllint
@@ -25,7 +26,8 @@ deps: venv
 		@${PYTHON} -m pip install -qUr requirements.txt
 
 lint: deps
-		@${YAMLLINT} . 
+		@find . -name "*.yml" | grep -v venv | xargs ${YAMLLINT}
+		@${BLACK} aica_django/aica_django
 		@${BASHLINT} . 
 		@${FLAKE} aica_django/ 
 
