@@ -1,5 +1,5 @@
 """
-WSGI config for aica_django project.
+WSGI config for manager project.
 
 It exposes the WSGI callable as a module-level variable named ``application``.
 

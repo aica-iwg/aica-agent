@@ -5,8 +5,15 @@ cd /usr/src/app || exit 1
 echo "Starting Celery workers and gunicorn"
 cat <<EOF > /etc/supervisor/conf.d/0_env.conf
 [supervisord]
-environment=MODE="${MODE}"
+environment=
+  MODE="${MODE}",
+  MONGO_SERVER="${MONGO_SERVER}",
+  MONGO_SERVER_PORT="${MONGO_SERVER_PORT}",
+  MONGO_INITDB_DATABASE="${MONGO_INITDB_DATABASE}",
+  MONGO_INITDB_USER="${MONGO_INITDB_USER}",
+  MONGO_INITDB_PASS="${MONGO_INITDB_PASS}"
 EOF
+
 service supervisor start
 
 # Tell Celery to not run tasks on the following manage.py invocations

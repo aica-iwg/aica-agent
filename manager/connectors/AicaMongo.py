@@ -4,13 +4,15 @@ from urllib.parse import quote_plus
 
 
 class AicaMongo:
-    def __init__(self, host=None, port=27017, db=None, user=None, password=None):
-        host = host if host else quote_plus(str(os.getenv("MONGO_SERVER")))
-        db = db if db else quote_plus(str(os.getenv("MONGO_INITDB_DATABASE")))
-        user = user if user else quote_plus(str(os.getenv("MONGO_INITDB_USER")))
-        password = (
-            password if password else quote_plus(str(os.getenv("MONGO_INITDB_PASS")))
-        )
+    def __init__(self, user=None, password=None, db=None):
+        host = quote_plus(str(os.getenv("MONGO_SERVER")))
+        port = quote_plus(str(os.getenv("MONGO_SERVER_PORT")))
+        db = db if db \
+            else quote_plus(str(os.getenv("MONGO_INITDB_DATABASE")))
+        user = user if user \
+            else quote_plus(str(os.getenv("MONGO_INITDB_USER")))
+        password = password if password \
+            else quote_plus(str(os.getenv("MONGO_INITDB_PASS")))
 
         conn = (
             f"mongodb://{user}:{password}@{host}:{port}/"

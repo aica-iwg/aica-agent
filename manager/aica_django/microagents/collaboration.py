@@ -9,14 +9,14 @@ import json
 import subprocess
 
 from paramiko import SSHClient, AutoAddPolicy
-from celery.decorators import task
-from celery.execute import send_task
+from celery import current_app
+from celery.app import shared_task
 from celery.utils.log import get_task_logger
 
 logger = get_task_logger(__name__)
 
 
-@task(name="ma_collaboration-poll_dbs")
+@shared_task(name="ma-collaboration-poll_dbs")
 def poll_dbs():
     logger.info(f"Running {__name__}: poll_dbs")
     mode = os.getenv("MODE")
@@ -31,7 +31,9 @@ def poll_dbs():
             line = f.stdout.readline()
             event_dict = json.loads(line)
             if event_dict["event_type"] == "alert":
-                send_task("ma_decision_making_engine-handle_alert", [event_dict])
+                current_app.send_task(
+                    "ma-decision_making_engine-handle_alert", [event_dict]
+                )
             else:
                 logger.debug("Non-alert event ignored")
     elif mode == "virt":
@@ -41,7 +43,7 @@ def poll_dbs():
         raise ValueError(f"Illegal mode value: {mode}")
 
 
-@task(name="ma_collaboration-redirect_to_honeypot_iptables")
+@shared_task(name="ma-collaboration-redirect_to_honeypot_iptables")
 def redirect_to_honeypot_iptables(attacker, target, timeout=300):
     mode = os.getenv("MODE")
     logger.info(f"Running {__name__}: redirect_to_honeypot_iptables")

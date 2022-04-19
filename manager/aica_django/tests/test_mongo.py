@@ -7,7 +7,7 @@ from django.test import TestCase
 from stix2 import Indicator
 from urllib.parse import quote_plus
 
-from aica_django.AicaMongo import AicaMongo
+from connectors.AicaMongo import AicaMongo
 
 
 class GenericMongoDbTestCase(TestCase):

@@ -8,7 +8,7 @@
 # * Self-control
 # * Collaboration control
 
-from celery.decorators import task
+from celery.app import shared_task
 from celery.utils.log import get_task_logger
 from netifaces import interfaces, ifaddresses, AF_INET
 
@@ -18,12 +18,14 @@ logger = get_task_logger(__name__)
 def get_manager_ips():
     ip_list = []
     for interface in interfaces():
+        if AF_INET not in ifaddresses(interface):
+            continue
         for link in ifaddresses(interface)[AF_INET]:
             ip_list.append(link["addr"])
     return ip_list
 
 
-@task(name="ma_behavior_engine-query_rules")
+@shared_task(name="ma-behavior_engine-query_rules")
 def query_rules(alert_dict, candidate_action):
     print(f"Running {__name__}: query_rules")
 
