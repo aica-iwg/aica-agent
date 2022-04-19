@@ -1,5 +1,5 @@
 """
-ASGI config for aica_django project.
+ASGI config for manager project.
 
 It exposes the ASGI callable as a module-level variable named ``application``.
 

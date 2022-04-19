@@ -19,7 +19,7 @@
 
 from celery.utils.log import get_task_logger
 
-from aica_django.AicaMongo import AicaMongo
+from connectors.AicaMongo import AicaMongo
 
 logger = get_task_logger(__name__)
 

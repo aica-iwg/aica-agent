@@ -14,17 +14,18 @@
 # * Action activation
 
 import time
-from celery.decorators import task
-from celery.execute import send_task
+
+from celery import current_app
+from celery.app import shared_task
 from celery.utils.log import get_task_logger
 
-from aica_django.ma_knowledge_base import query_action
-from aica_django.ma_behaviour_engine import query_rules
+from aica_django.microagents.knowledge_base import query_action
+from aica_django.microagents.behaviour_engine import query_rules
 
 logger = get_task_logger(__name__)
 
 
-@task(name="ma_decision_making_engine-monitor")
+@shared_task(name="ma-decision_making_engine-monitor")
 def monitor():
     logger.info(f"Running {__name__}: monitor")
 
@@ -32,7 +33,7 @@ def monitor():
         time.sleep(1)
 
 
-@task(name="ma_decision_making_engine-handle_alert")
+@shared_task(name="ma-decision_making_engine-handle_alert")
 def handle_alert(alert_dict):
     logger.info(f"Running {__name__}:")
 
@@ -56,7 +57,7 @@ def handle_alert(alert_dict):
                 f"Redirecting traffic from {alert_dict['src_ip']} to "
                 f"{alert_dict['dest_ip']} to honeypot."
             )
-            send_task(
-                "ma_collaboration-redirect_to_honeypot_iptables",
+            current_app.send_task(
+                "ma-collaboration-redirect_to_honeypot_iptables",
                 [alert_dict["src_ip"], alert_dict["dest_ip"]],
             )

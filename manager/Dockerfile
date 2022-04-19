@@ -11,6 +11,7 @@ RUN apt-get -y update && \
     apt-get -y upgrade && \
     apt-get -y install apt-utils && \
     apt-get -y install \
+        nmap \
         supervisor \
         postgresql \
         python3 \
@@ -61,4 +62,5 @@ COPY . .
 
 COPY docker_entrypoint.sh /usr/local/bin/docker_entrypoint.sh
 RUN chmod +x /usr/local/bin/docker_entrypoint.sh
-ENTRYPOINT ["/usr/local/bin/docker_entrypoint.sh"]
+
+CMD /usr/local/bin/docker_entrypoint.sh

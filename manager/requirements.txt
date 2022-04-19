@@ -1,4 +1,4 @@
-Django==3.2.12
+Django==4.0.4
 amqp==5.0.6
 celery==5.1.2
 django-extensions==3.1.5
@@ -9,7 +9,9 @@ kombu==5.1.0
 neo4j==4.4.2
 netifaces==0.11.0
 paramiko==2.10.3
-psycopg2-binary==2.9.3 # Requires pg_config to be installed, libpq-dev in Linux, `brew install postgresql` on MacOS
+# psycopg2-binary requires pg_config to be installed:
+# libpq-dev in Linux, `brew install postgresql` on MacOS
+psycopg2-binary==2.9.3
 pymongo==4.1.1
 python-dotenv==0.20.0
 python3-nmap==1.5.1

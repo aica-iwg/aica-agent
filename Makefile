@@ -40,8 +40,9 @@ build: check-env
 		@docker-compose -f docker-compose.yml -f docker-compose-${MODE}.yml build
 
 test: build
-		@docker-compose -f docker-compose.yml -f docker-compose-${MODE}.yml run -e SKIP_TASKS=true --rm manager \
-		    /opt/venv/bin/python3 manage.py test --noinput --failfast -v 3
+		@docker-compose -f docker-compose.yml -f docker-compose-${MODE}.yml run \
+			-e SKIP_TASKS=true --rm manager /opt/venv/bin/python3 manage.py \
+			test --noinput --failfast -v 3
 
 start: build
 		@docker-compose -f docker-compose.yml -f docker-compose-${MODE}.yml up -d

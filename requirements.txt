@@ -8,6 +8,6 @@ flake8==4.0.1
 safety==1.10.3
 yamllint==1.26.3
 
-# Other requirements are in aica_django/requirements.txt (for the Manager container) and honey/requirements.txt
+# Other requirements are in manager/requirements.txt (for the Manager container) and honey/requirements.txt
 # (for the honeypot container). You might wish to install these in your IDE for completion/testing. If you do so,
 # ensure you have installed python3, python3-venv, python3-wheel, and libpq-dev/postgresql via your OS package manager.

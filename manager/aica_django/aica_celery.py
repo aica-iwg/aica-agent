@@ -1,7 +1,10 @@
 import os
+import time
 
 from celery import Celery
 from django.conf import settings
+
+from aica_django.microagents.offline_loader import initialize
 
 # Set the default Django settings module for the 'celery' program.
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "aica_django.settings")
@@ -21,8 +24,8 @@ app.conf.timezone = "UTC"
 # Set schedules for periodic jobs
 # (The following is an example, but this task is run from the monitor())
 # app.conf.beat_schedule = {
-#     'aica_django.ma_coloration.poll_dbs': {
-#         'task': 'aica_django.aica_django.ma_collaboration.poll_dbs',
+#     'aica_django.ma_collaboration.poll_dbs': {
+#         'task': 'aica_django.manager.ma_collaboration.poll_dbs',
 #         'schedule': 60.0,
 #         'args': ()
 #     },
