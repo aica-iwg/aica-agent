@@ -27,16 +27,15 @@ deps: venv
 
 lint: deps
 		@find . -name "*.yml" | grep -v venv | xargs ${YAMLLINT}
-		@${BLACK} aica_django/aica_django
-		@${BASHLINT} . 
-		@${FLAKE} aica_django/ 
+		@${BLACK} -q manager/
+		@${FLAKE} manager/
+		@find . -name "*.sh" | xargs ${BASHLINT}
 
 security: deps
-		@${BANDIT} -q -ll -ii -r aica_django/
-		@${SAFETY} check -r aica_django/requirements.txt --bare
-		@${SAFETY} check -r honeypot/requirements.txt --bare
+		@${BANDIT} -q -ll -ii -r manager/
+		@find . -name "requirements*.txt" | xargs printf -- '-r %s\n' | xargs ${SAFETY} check --bare
 
-build: check-env
+build: check-env lint security
 		@docker-compose -f docker-compose.yml -f docker-compose-${MODE}.yml build
 
 test: build
@@ -62,9 +61,6 @@ target-shell: check-env
 
 manager-shell: check-env
 		@docker-compose -f docker-compose.yml -f docker-compose-${MODE}.yml exec -u root manager /bin/bash
-
-simulation-shell: check-env
-		@docker-compose -f docker-compose.yml -f docker-compose-${MODE}.yml exec -u root simulation /bin/bash
 
 logs: check-env
 		@docker-compose -f docker-compose.yml -f docker-compose-${MODE}.yml logs -f

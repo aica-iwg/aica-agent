@@ -22,6 +22,7 @@ from connectors.AicaMongo import AicaMongo
 
 logger = get_task_logger(__name__)
 
+
 @worker_ready.connect
 def initialize(**kwargs):
     logger.info(f"Running {__name__}: initialize")
