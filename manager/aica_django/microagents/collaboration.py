@@ -69,11 +69,3 @@ def redirect_to_honeypot_iptables(attacker, target, timeout=300):
         logger.error(output)
 
         client.close()
-    elif mode == "sim":
-        # This is a rather crude mechanism, but we can afford it, because
-        # in the prototype demonstration, everything is sequential
-        file_path = "/var/log/suricata/response.json"
-        f = open(file_path, "w")
-        f.write("honeypot")
-        f.close()
-        logger.info("Honeypot redirect request to simulation written.")
