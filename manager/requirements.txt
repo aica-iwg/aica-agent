@@ -13,6 +13,7 @@ paramiko==2.10.3
 # libpq-dev in Linux, `brew install postgresql` on MacOS
 psycopg2-binary==2.9.3
 pymongo==4.1.1
+py2neo==2021.2.3
 python-dotenv==0.20.0
 python3-nmap==1.5.1
 pyyaml==6.0
