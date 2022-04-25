@@ -75,10 +75,13 @@ services:
       retries: 3
 
   manager_graphdb:
-    image: neo4j:4.4-community
+    build: manager_graphdb
     container_name: 'manager_graphdb'
     env_file:
       - 'manager/.env'
+    ports:
+      - "7474:7474"
+      - "7687:7687"
     networks:
       - control
 
