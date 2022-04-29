@@ -15,7 +15,7 @@ import os
 
 import nmap3
 
-from aica_django.converters.stix import nmap_to_stix, stix_to_neo
+from aica_django.converters.Knowledge import nmap_to_knowledge, knowledge_to_neo
 from celery.app import shared_task
 from celery.utils.log import get_task_logger
 from hashlib import sha256
@@ -29,7 +29,7 @@ def load():
     print(f"Running {__name__}: load")
 
 
-@shared_task(name="ma-online_learning-nmap-to-stix")
+@shared_task(name="ma-online_learning-nmap-to-knowledge")
 def network_scan(nmap_target, nmap_args="-O -Pn --osscan-limit --host-timeout=60"):
     hasher = sha256()
     hasher.update(nmap_target.encode("utf-8"))
@@ -46,12 +46,12 @@ def network_scan(nmap_target, nmap_args="-O -Pn --osscan-limit --host-timeout=60
 
     nmap = nmap3.Nmap()
     results = nmap.scan_top_ports(nmap_target, args=nmap_args)
-    scos, sdos, sros = nmap_to_stix(results)
-    stix_to_neo(
-        scos=scos,
-        sdos=sdos,
-        sros=sros,
-        neo_host=os.getenv("NEO4J_HOST"),
-        neo_user=os.getenv("NEO4J_USER"),
-        neo_password=os.getenv("NEO4J_PASSWORD"),
-    )
+    nodes, relations = nmap_to_knowledge(results)
+    if nodes or relations:
+        knowledge_to_neo(
+            nodes=nodes,
+            relations=relations,
+            neo_host=os.getenv("NEO4J_HOST"),
+            neo_user=os.getenv("NEO4J_USER"),
+            neo_password=os.getenv("NEO4J_PASSWORD"),
+        )

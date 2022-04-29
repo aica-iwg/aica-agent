@@ -1,11 +1,7 @@
 import os
 
-from py2neo import Graph, Node, NodeMatcher, Relationship, RelationshipMatcher
+from py2neo import Graph, Node, NodeMatcher, Relationship
 from urllib.parse import quote_plus
-
-
-def dict_to_cypher_string(input_dict):
-    return "{" + ",".join({f'{k}: "{v}"`' for k, v in input_dict.items()}) + "}"
 
 
 class AicaNeo4j:
@@ -15,30 +11,66 @@ class AicaNeo4j:
         user = user if user else quote_plus(str(os.getenv("NEO4J_USER")))
         password = password if password else quote_plus(str(os.getenv("NEO4J_PASS")))
         uri = f"bolt://{host}:{port}"
+
         self.graph = Graph(uri, auth=(user, password))
+        self.create_constraints()
+
+    def create_constraints(self):
+        infra_name = """CREATE CONSTRAINT infra_type_name IF NOT EXISTS
+                        FOR (n:infrastructure)
+                        REQUIRE n.name IS UNIQUE"""
+        self.graph.run(infra_name)
+
+        interface_mac = """CREATE CONSTRAINT macaddr_value IF NOT EXISTS
+                            FOR (n:`mac-addr`)
+                            REQUIRE n.name IS UNIQUE"""
+        self.graph.run(interface_mac)
+
+        interface_ipv4 = """CREATE CONSTRAINT ipv4_value IF NOT EXISTS
+                            FOR (n:`ipv4-addr`)
+                            REQUIRE n.name IS UNIQUE"""
+        self.graph.run(interface_ipv4)
+
+        domain_name = """CREATE CONSTRAINT domainname_value IF NOT EXISTS
+                        FOR (n:`domain-name`)
+                        REQUIRE n.name IS UNIQUE"""
+        self.graph.run(domain_name)
+
+        software_cpe = """CREATE CONSTRAINT software_cpe IF NOT EXISTS
+                            FOR (n:software)
+                            REQUIRE n.name IS UNIQUE"""
+        self.graph.run(software_cpe)
 
     def add_node(self, node_name, node_label, node_properties):
-        n = NodeMatcher(self.graph)
-        node = n.match(node_label, id=node_name).first()
-        if node:
-            node.update(**node_properties)
-            self.graph.push(node)
-        else:
-            a = Node(node_label, id=node_name, **node_properties)
-            self.graph.create(a)
+        if not node_properties:
+            node_properties = dict()
+
+        n = Node(node_label, id=node_name, **node_properties)
+        n.__primarylabel__ = node_label
+        n.__primarykey__ = "id"
+        self.graph.merge(n)
 
     def add_relation(
-        self, relation_label, node_a_name, node_b_name, relation_properties
+        self,
+        node_a_name,
+        node_a_label,
+        node_b_name,
+        node_b_label,
+        relation_label,
+        relation_properties,
     ):
-        n = NodeMatcher(self.graph)
-        node_a = n.match(node_a_name.split("--")[0], id=node_a_name).first()
-        node_b = n.match(node_b_name.split("--")[0], id=node_b_name).first()
+        if not relation_properties:
+            relation_properties = dict()
 
-        r = RelationshipMatcher(self.graph)
-        rel = r.match((node_a, node_b), r_type=relation_label).first()
-        if rel:
-            rel.update(**relation_properties)
-            self.graph.push(rel)
-        else:
+        n = NodeMatcher(self.graph)
+        node_a = n.match(node_a_label, id=node_a_name).first()
+        node_b = n.match(node_b_label, id=node_b_name).first()
+
+        if node_a and node_b:
             r = Relationship(node_a, relation_label, node_b, **relation_properties)
-            self.graph.create(r)
+            self.graph.merge(r, label=relation_label)
+        else:
+            raise ValueError(
+                f"Couldn't find {node_a_name} ({node_a}) "
+                f"or {node_b_name} ({node_b})"
+            )
