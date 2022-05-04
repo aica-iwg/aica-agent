@@ -1,46 +1,17 @@
 import logging
+import os
 import re
 import socket
+import uuid
 
-from aica_django.connectors.AicaNeo4j import AicaNeo4j
-
-# Try to keep these as minimal and orthogonal as possible
-defined_node_labels = [
-    "AutonomousSystemNumber",
-    "DNSRecord",
-    "Firmware",
-    "PhysicalLocation",
-    "Host",
-    "Identity",  # i.e., an actual human
-    "IPv4Address",
-    "IPv6Address",
-    "MACAddress",
-    "NetworkInterface",
-    "NetworkPort",
-    "Organization",  # e.g., corporation, agency
-    "Process",
-    "Subnet",
-    "Software",
-    "User",  # i.e., principal on a system
-    "Vendor",
-]
-defined_relation_labels = [
-    "connected-to",
-    "communicates-to",
-    "component-of",
-    "has-address",
-    "open-on",
-    "located-in",
-    "manufactures",
-    "member-of",
-    "resides-in",
-    "resolves-to",
-    "runs-on",
-    "used-by",
-    "works-in",
-]
+from aica_django.connectors.AicaNeo4j import (
+    AicaNeo4j,
+    defined_node_labels,
+    defined_relation_labels,
+)
 
 
+# TODO: Define subclasses for types above (important ones, anyway)
 class KnowledgeNode:
     name = None
     label = None
@@ -51,9 +22,11 @@ class KnowledgeNode:
             raise ValueError(f"Unsupported node label {label} for {name}")
 
         if type(label) != str or label == "":
-            raise ValueError(f"Label must be a string, not {type(label)}")
-        if type(name) != str or name == "":
-            raise ValueError(f"Name must be a string, not {type(name)}")
+            raise ValueError(f"Label must be a non-empty string, not {type(label)}")
+        if type(name) not in (str, int) or name == "":
+            raise ValueError(
+                f"Name must be a non-empty string or int, not {type(name)}"
+            )
         if values and type(values) != dict:
             raise ValueError(f"Values must be a dictionary, not {type(values)}")
 
@@ -66,6 +39,7 @@ class KnowledgeNode:
         self.values = values
 
 
+# TODO: Define subclasses for types above (important ones, anyway)
 class KnowledgeRelation:
     label = None
     source_node = None
@@ -105,7 +79,7 @@ def normalize_mac_addr(mac_addr):
     return re.sub(r"[^A-Fa-f\d]", "", mac_addr).lower()
 
 
-def nmap_to_knowledge(scan_results):
+def nmap_scan_to_knowledge(scan_results):
     if scan_results is None:
         logging.warning("Tried to convert empty scan results to STIX")
         return False
@@ -144,18 +118,9 @@ def nmap_to_knowledge(scan_results):
         nodes.append(target_host)
 
         # Add target NIC to target host
-        if scan_results[host]["macaddress"]:
-            mac_label = (
-                scan_results[host]["macaddress"]["addr"]
-                if "addr" in scan_results[host]["macaddress"]
-                else None
-            )
-            nic_label = f"{host}-{mac_label}"
-        else:
-            nic_label = host
         nic = KnowledgeNode(
             label="NetworkInterface",
-            name=nic_label,
+            name=str(uuid.uuid4()),
             values={"last_seen": scan_time},
         )
         nic_host_rel = KnowledgeRelation(
@@ -216,6 +181,8 @@ def nmap_to_knowledge(scan_results):
                 name=hostname["name"],
                 values={"type": hostname["type"], "value": hostname["name"]},
             )
+            domain_source_node = None
+            domain_target_node = None
             if hostname["type"] in ["A", "AAAA", "user"]:
                 domain_source_node = domain_name
                 domain_target_node = ipv4_addr
@@ -259,28 +226,188 @@ def nmap_to_knowledge(scan_results):
             if port["state"] == "open":
                 open_port = KnowledgeNode(
                     label="NetworkPort",
-                    name=f"{port['portid']}/{port['protocol']}",
+                    name=port["portid"],
                     values={
                         "port_number": port["portid"],
-                        "protocol": port["protocol"],
                         "service_name": port["service"]["name"],
                     },
                 )
+                protocol = KnowledgeNode(
+                    label="NetworkProtocol",
+                    name=port["protocol"],
+                )
+                port_proto_rel = KnowledgeRelation(
+                    label="is-type",
+                    source_node=open_port,
+                    target_node=protocol,
+                )
                 port_ip_rel = KnowledgeRelation(
-                    label="open-on",
+                    label="component-of",
                     source_node=open_port,
                     target_node=ipv4_addr,
-                    values={"last_seen": scan_time},
+                    values={"last_seen": scan_time, "status": "open"},
                 )
                 nodes.append(open_port)
-                relations.append(port_ip_rel)
+                relations.extend([port_ip_rel, port_proto_rel])
 
     return nodes, relations
 
 
-def knowledge_to_neo(
-    neo_host=None, neo_user=None, neo_password=None, nodes=None, relations=None
-):
+def suricata_alert_to_knowledge(alert):
+    nodes = []
+    relations = []
+
+    alert_obj = KnowledgeNode(
+        label="Alert",
+        name=str(uuid.uuid4()),
+        values={
+            "time_tripped": alert["timestamp"],
+            "flow_id": alert["flow_id"],
+        },
+    )
+    nodes.append(alert_obj)
+
+    alert_signature = KnowledgeNode(
+        label="AttackSignature",
+        name=f"Suricata {alert['alert']['gid']}: {alert['alert']['signature_id']}",
+        values={
+            "gid": alert["alert"]["gid"],
+            "signature_id": alert["alert"]["signature_id"],
+            "rev": alert["alert"]["rev"],
+            "signature": alert["alert"]["signature"],
+            "severity": alert["alert"]["severity"],
+            # "metadata": alert["alert"]["metadata"],
+        },
+    )
+    nodes.append(alert_signature)
+
+    alert_signature_rel = KnowledgeRelation(
+        label="is-type",
+        source_node=alert_obj,
+        target_node=alert_signature,
+    )
+    relations.append(alert_signature_rel)
+
+    alert_category = KnowledgeNode(
+        label="AttackSignatureCategory", name=alert["alert"]["category"]
+    )
+    nodes.append(alert_category)
+    alert_category_rel = KnowledgeRelation(
+        label="member-of",
+        source_node=alert_signature,
+        target_node=alert_category,
+    )
+    relations.append(alert_category_rel)
+
+    source_host = KnowledgeNode(
+        label="Host",
+        name=alert["src_ip"],
+    )
+    source_ip = KnowledgeNode(
+        label="IPv4Address",
+        name=alert["src_ip"],
+    )
+    source_ip_rel = KnowledgeRelation(
+        label="has-address",
+        source_node=source_host,
+        target_node=source_ip,
+    )
+    dest_host = KnowledgeNode(
+        label="Host",
+        name=alert["dest_ip"],
+    )
+    dest_ip = KnowledgeNode(
+        label="IPv4Address",
+        name=alert["dest_ip"],
+    )
+    dest_ip_rel = KnowledgeRelation(
+        label="has-address",
+        source_node=dest_host,
+        target_node=dest_ip,
+    )
+    nodes.extend([source_host, source_ip, dest_host, dest_ip])
+    relations.extend([source_ip_rel, dest_ip_rel])
+
+    source_port = KnowledgeNode(
+        label="NetworkPort",
+        name=alert["src_port"],
+        values={
+            "port_number": alert["src_port"],
+        },
+    )
+    dest_port = KnowledgeNode(
+        label="NetworkPort",
+        name=alert["dest_port"],
+        values={
+            "port_number": alert["dest_port"],
+        },
+    )
+    protocol = KnowledgeNode(
+        label="NetworkProtocol",
+        name=alert["proto"],
+    )
+    network_flow = KnowledgeNode(
+        label="NetworkTraffic",
+        name=str(uuid.uuid4()),
+        values={
+            "pkts_toserver": alert["flow"]["pkts_toserver"],
+            "pkts_toclient": alert["flow"]["pkts_toclient"],
+            "bytes_toserver": alert["flow"]["bytes_toserver"],
+            "bytes_toclient": alert["flow"]["bytes_toclient"],
+            "start": alert["flow"]["start"],
+        },
+    )
+    nodes.extend([network_flow, source_port, dest_port, protocol])
+
+    network_proto_rel = KnowledgeRelation(
+        label="is-type",
+        source_node=network_flow,
+        target_node=protocol,
+    )
+    src_port_ip_rel = KnowledgeRelation(
+        label="component-of",
+        source_node=source_port,
+        target_node=source_ip,
+    )
+    dest_port_ip_rel = KnowledgeRelation(
+        label="component-of",
+        source_node=dest_port,
+        target_node=dest_ip,
+    )
+    network_src_rel = KnowledgeRelation(
+        label="communicates-to",
+        source_node=source_port,
+        target_node=network_flow,
+    )
+    network_dest_rel = KnowledgeRelation(
+        label="communicates-to",
+        source_node=network_flow,
+        target_node=dest_port,
+    )
+    network_alert_rel = KnowledgeRelation(
+        label="triggered-by",
+        source_node=alert_obj,
+        target_node=network_flow,
+    )
+    relations.extend(
+        [
+            src_port_ip_rel,
+            dest_port_ip_rel,
+            network_src_rel,
+            network_dest_rel,
+            network_alert_rel,
+            network_proto_rel,
+        ]
+    )
+
+    return nodes, relations
+
+
+def knowledge_to_neo(nodes=None, relations=None):
+    neo_host = os.getenv("NEO4J_HOST")
+    neo_user = os.getenv("NEO4J_USER")
+    neo_password = os.getenv("NEO4J_PASSWORD")
+
     graph = AicaNeo4j(host=neo_host, user=neo_user, password=neo_password)
 
     for node in nodes:

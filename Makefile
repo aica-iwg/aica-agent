@@ -1,6 +1,7 @@
+export DOCKER_SCAN_SUGGEST := false
+
 SHELL := /bin/bash
-BUILD_DIR := build
-VENV := $(BUILD_DIR)/venv
+VENV := venv
 PYTHON := ${VENV}/bin/python3
 FLAKE := ${VENV}/bin/flake8
 BANDIT := ${VENV}/bin/bandit
@@ -69,4 +70,3 @@ clean: check-env
 		@docker-compose -f docker-compose.yml -f docker-compose-${MODE}.yml down -v --rmi all --remove-orphans
 		@find . -name ".py[co]" -delete
 		@rm -rf aica_django/db.sqlite3
-		@rm -rf $(BUILD_DIR)

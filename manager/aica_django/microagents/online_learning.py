@@ -11,11 +11,13 @@
 
 import fcntl
 import logging
-import os
 
 import nmap3
 
-from aica_django.converters.Knowledge import nmap_to_knowledge, knowledge_to_neo
+from aica_django.converters.Knowledge import (  # noqa: F401
+    nmap_scan_to_knowledge,
+    knowledge_to_neo,
+)
 from celery.app import shared_task
 from celery.utils.log import get_task_logger
 from hashlib import sha256
@@ -23,13 +25,7 @@ from hashlib import sha256
 logger = get_task_logger(__name__)
 
 
-@shared_task(name="ma-online-learning-load")
-def load():
-    # TODO
-    print(f"Running {__name__}: load")
-
-
-@shared_task(name="ma-online_learning-nmap-to-knowledge")
+@shared_task(name="ma-online_learning-network_scan")
 def network_scan(nmap_target, nmap_args="-O -Pn --osscan-limit --host-timeout=60"):
     hasher = sha256()
     hasher.update(nmap_target.encode("utf-8"))
@@ -45,13 +41,4 @@ def network_scan(nmap_target, nmap_args="-O -Pn --osscan-limit --host-timeout=60
             return False
 
     nmap = nmap3.Nmap()
-    results = nmap.scan_top_ports(nmap_target, args=nmap_args)
-    nodes, relations = nmap_to_knowledge(results)
-    if nodes or relations:
-        knowledge_to_neo(
-            nodes=nodes,
-            relations=relations,
-            neo_host=os.getenv("NEO4J_HOST"),
-            neo_user=os.getenv("NEO4J_USER"),
-            neo_password=os.getenv("NEO4J_PASSWORD"),
-        )
+    return nmap.scan_top_ports(nmap_target, args=nmap_args)

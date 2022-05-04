@@ -64,8 +64,8 @@ services:
     env_file:
       - 'manager/.env'
     volumes:
-      - ./mongodb/init-mongo.sh:/docker-entrypoint-initdb.d/init-mongo.sh
-      - ./mongodb/docker_healthcheck.sh:/usr/local/bin/docker_healthcheck.sh
+      - ./manager_mongodb/init-mongo.sh:/docker-entrypoint-initdb.d/init-mongo.sh
+      - ./manager_mongodb/docker_healthcheck.sh:/usr/local/bin/docker_healthcheck.sh
     networks:
       - control
     healthcheck:
@@ -81,6 +81,7 @@ services:
       - 'manager/.env'
     ports:
       - "7474:7474"
+      - "7687:7687"
     networks:
       - control
 

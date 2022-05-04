@@ -19,6 +19,7 @@ from celery import current_app
 from celery.app import shared_task
 from celery.utils.log import get_task_logger
 
+from aica_django.connectors.Honeypot import redirect_to_honeypot_iptables  # noqa: F401
 from aica_django.microagents.knowledge_base import query_action
 from aica_django.microagents.behaviour_engine import query_rules
 
@@ -33,9 +34,9 @@ def monitor():
         time.sleep(1)
 
 
-@shared_task(name="ma-decision_making_engine-handle_alert")
-def handle_alert(alert_dict):
-    logger.info(f"Running {__name__}:")
+@shared_task(name="ma-decision_making_engine-handle_suricata_alert")
+def handle_suricata_alert(alert_dict):
+    logger.info(f"Running {__name__}: handle_suricata_alert")
 
     # Query for recommendation from knowledge base
     recommended_actions = query_action(alert_dict)
@@ -58,6 +59,6 @@ def handle_alert(alert_dict):
                 f"{alert_dict['dest_ip']} to honeypot."
             )
             current_app.send_task(
-                "ma-collaboration-redirect_to_honeypot_iptables",
+                "redirect_to_honeypot_iptables",
                 [alert_dict["src_ip"], alert_dict["dest_ip"]],
             )
