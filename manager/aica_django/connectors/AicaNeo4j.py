@@ -3,6 +3,48 @@ import os
 from py2neo import Graph, Node, NodeMatcher, Relationship
 from urllib.parse import quote_plus
 
+# Try to keep these as minimal and orthogonal as possible
+defined_node_labels = [
+    "Alert",
+    "AttackSignature",
+    "AttackSignatureCategory",
+    "AutonomousSystemNumber",
+    "DNSRecord",
+    "Firmware",
+    "PhysicalLocation",
+    "Host",
+    "Identity",  # i.e., an actual human
+    "IPv4Address",
+    "IPv6Address",
+    "MACAddress",
+    "NetworkInterface",
+    "NetworkPort",
+    "NetworkProtocol",
+    "NetworkTraffic",
+    "Organization",  # e.g., corporation, agency
+    "Process",
+    "Subnet",
+    "Software",
+    "User",  # i.e., principal on a system
+    "Vendor",
+]
+defined_relation_labels = [
+    "connected-to",
+    "communicates-to",
+    "component-of",
+    "has-address",
+    "is-type",
+    "located-in",
+    "manufactures",
+    "member-of",
+    "resides-in",
+    "resolves-to",
+    "runs-on",
+    "triggered-by",
+    "used-by",
+    "works-in",
+]
+
 
 class AicaNeo4j:
     def __init__(self, host=None, user=None, password=None, port=7687):
@@ -13,33 +55,15 @@ class AicaNeo4j:
         uri = f"bolt://{host}:{port}"
 
         self.graph = Graph(uri, auth=(user, password))
-        self.create_constraints()
 
     def create_constraints(self):
-        infra_name = """CREATE CONSTRAINT infra_type_name IF NOT EXISTS
-                        FOR (n:infrastructure)
-                        REQUIRE n.name IS UNIQUE"""
-        self.graph.run(infra_name)
-
-        interface_mac = """CREATE CONSTRAINT macaddr_value IF NOT EXISTS
-                            FOR (n:`mac-addr`)
-                            REQUIRE n.name IS UNIQUE"""
-        self.graph.run(interface_mac)
-
-        interface_ipv4 = """CREATE CONSTRAINT ipv4_value IF NOT EXISTS
-                            FOR (n:`ipv4-addr`)
-                            REQUIRE n.name IS UNIQUE"""
-        self.graph.run(interface_ipv4)
-
-        domain_name = """CREATE CONSTRAINT domainname_value IF NOT EXISTS
-                        FOR (n:`domain-name`)
-                        REQUIRE n.name IS UNIQUE"""
-        self.graph.run(domain_name)
-
-        software_cpe = """CREATE CONSTRAINT software_cpe IF NOT EXISTS
-                            FOR (n:software)
-                            REQUIRE n.name IS UNIQUE"""
-        self.graph.run(software_cpe)
+        tx = self.graph.begin()
+        for label in defined_node_labels:
+            unique_id = f"""CREATE CONSTRAINT unique_id_{label} IF NOT EXISTS
+                            FOR (n:{label})
+                            REQUIRE n.id IS UNIQUE"""
+            tx.run(unique_id)
+        tx.commit()
 
     def add_node(self, node_name, node_label, node_properties):
         if not node_properties:

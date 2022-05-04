@@ -17,9 +17,15 @@
 # to the manager, which will require tables to be defined and created for each of the
 # above.
 
+from celery.app import shared_task
 from celery.utils.log import get_task_logger
 
-from connectors.AicaMongo import AicaMongo
+from aica_django.connectors.AicaMongo import AicaMongo
+from aica_django.converters.Knowledge import (
+    nmap_scan_to_knowledge,
+    suricata_alert_to_knowledge,
+    knowledge_to_neo,
+)
 
 logger = get_task_logger(__name__)
 
@@ -47,61 +53,15 @@ def query_action(alert_dict):
     return recommended_actions
 
 
-def query_world_model():
-    # TODO
-    print(f"Running {__name__}: query_world_model")
+@shared_task(name="ma-knowledge_base-record_nmap_scan")
+def record_nmap_scan(scan_dict):
+    logger.info(f"Running {__name__}: record_nmap_scan")
+    nodes, relations = nmap_scan_to_knowledge(scan_dict)
+    knowledge_to_neo(nodes=nodes, relations=relations)
 
 
-def inform_world_model():
-    # TODO
-    print(f"Running {__name__}: inform_world_model")
-
-
-def query_world_state():
-    # TODO
-    print(f"Running {__name__}: query_world_state")
-
-
-def inform_world_state():
-    # TODO
-    print(f"Running {__name__}: inform_world_state")
-
-
-def query_world_dynamics():
-    # TODO
-    print(f"Running {__name__}: query_world_dynamics")
-
-
-def inform_world_dynamics():
-    # TODO
-    print(f"Running {__name__}: inform_world_dynamics")
-
-
-def query_action_repertoire():
-    # TODO
-    print(f"Running {__name__}: query_action_repertoire")
-
-
-def inform_action_repertoire():
-    # TODO
-    print(f"Running {__name__}: inform_action_repertoire")
-
-
-def query_goals():
-    # TODO
-    print(f"Running {__name__}: query_goals")
-
-
-def inform_goals():
-    # TODO
-    print(f"Running {__name__}: inform_goals")
-
-
-def query_agent_parameters():
-    # TODO
-    print(f"Running {__name__}: query_agent_parameters")
-
-
-def inform_agent_parameters():
-    # TODO
-    print(f"Running {__name__}: inform_agent_parameters")
+@shared_task(name="ma-knowledge_base-record_suricata_alert")
+def record_suricata_alert(alert_dict):
+    logger.info(f"Running {__name__}: record_alert")
+    nodes, relations = suricata_alert_to_knowledge(alert_dict)
+    knowledge_to_neo(nodes=nodes, relations=relations)
