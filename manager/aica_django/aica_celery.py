@@ -17,13 +17,3 @@ app.config_from_object("django.conf:settings", namespace="CELERY")
 # Discover apps
 app.autodiscover_tasks(lambda: settings.INSTALLED_APPS)
 app.conf.timezone = "UTC"
-
-# Set schedules for periodic jobs
-# (The following is an example, but this task is run from the monitor())
-# app.conf.beat_schedule = {
-#     'aica_django.ma_collaboration.poll_dbs': {
-#         'task': 'aica_django.manager.ma_collaboration.poll_dbs',
-#         'schedule': 60.0,
-#         'args': ()
-#     },
-# }
