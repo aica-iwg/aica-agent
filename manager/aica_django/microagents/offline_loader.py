@@ -22,6 +22,7 @@ from py2neo import ConnectionUnavailable
 from aica_django.connectors.Suricata import poll_suricata_alerts
 from aica_django.connectors.AicaMongo import AicaMongo
 from aica_django.connectors.AicaNeo4j import AicaNeo4j
+from aica_django.microagents.online_learning import periodic_network_scan
 
 logger = get_task_logger(__name__)
 
@@ -53,5 +54,8 @@ def initialize(**kwargs):
         except ConnectionUnavailable:
             time.sleep(1)
 
-    # Start polling for IDS alerts
-    poll_suricata_alerts.delay()
+    # Start polling for IDS alerts in background
+    poll_suricata_alerts.apply_async()
+
+    # Start periodic network scans of local subnets in background
+    periodic_network_scan.apply_async()

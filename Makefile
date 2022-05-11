@@ -37,36 +37,36 @@ security: deps
 		@find . -name "requirements*.txt" | xargs printf -- '-r %s\n' | xargs ${SAFETY} check --bare
 
 build: check-env lint security
-		@docker-compose -f docker-compose.yml -f docker-compose-${MODE}.yml build
+		@docker compose -f docker-compose.yml -f docker-compose-${MODE}.yml build
 
 test: build
-		@docker-compose -f docker-compose.yml -f docker-compose-${MODE}.yml run \
+		@docker compose -f docker-compose.yml -f docker-compose-${MODE}.yml run \
 			-e SKIP_TASKS=true --rm manager /opt/venv/bin/python3 manage.py \
 			test --noinput --failfast -v 3
 
 start: build
-		@docker-compose -f docker-compose.yml -f docker-compose-${MODE}.yml up -d
+		@docker compose -f docker-compose.yml -f docker-compose-${MODE}.yml up -d
 
 stop: check-env
-		@docker-compose -f docker-compose.yml -f docker-compose-${MODE}.yml down -v
+		@docker compose -f docker-compose.yml -f docker-compose-${MODE}.yml down -v
 
 rebuild: stop build start
 
 restart: stop start
 
 attacker-shell: check-env
-		@docker-compose -f docker-compose.yml -f docker-compose-${MODE}.yml exec -u root attacker /bin/bash
+		@docker compose -f docker-compose.yml -f docker-compose-${MODE}.yml exec -u root attacker /bin/bash
 
 target-shell: check-env
-		@docker-compose -f docker-compose.yml -f docker-compose-${MODE}.yml exec -u root target /bin/bash
+		@docker compose -f docker-compose.yml -f docker-compose-${MODE}.yml exec -u root target /bin/bash
 
 manager-shell: check-env
-		@docker-compose -f docker-compose.yml -f docker-compose-${MODE}.yml exec -u root manager /bin/bash
+		@docker compose -f docker-compose.yml -f docker-compose-${MODE}.yml exec -u root manager /bin/bash
 
 logs: check-env
-		@docker-compose -f docker-compose.yml -f docker-compose-${MODE}.yml logs -f
+		@docker compose -f docker-compose.yml -f docker-compose-${MODE}.yml logs -f
 
 clean: check-env
-		@docker-compose -f docker-compose.yml -f docker-compose-${MODE}.yml down -v --rmi all --remove-orphans
+		@docker compose -f docker-compose.yml -f docker-compose-${MODE}.yml down -v --rmi all --remove-orphans
 		@find . -name ".py[co]" -delete
 		@rm -rf aica_django/db.sqlite3
