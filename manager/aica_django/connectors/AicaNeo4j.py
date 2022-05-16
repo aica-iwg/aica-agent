@@ -33,6 +33,7 @@ defined_relation_labels = [
     "communicates-to",
     "component-of",
     "has-address",
+    "has-port",
     "is-type",
     "located-in",
     "manufactures",

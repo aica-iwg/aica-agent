@@ -4,6 +4,7 @@ ENV PYTHONDONTWRITEBYTECODE 1
 ENV PYTHONIOENCODING UTF-8
 ENV PYTHONUNBUFFERED 1
 ENV CRYPTOGRAPHY_DONT_BUILD_RUST 1
+ENV DEBIAN_FRONTEND noninteractive
 
 WORKDIR /usr/src/app
 
@@ -23,11 +24,15 @@ RUN apt-get -y update && \
         cmake \
         libtool \
         autoconf \
+        fprobe \
         git \
         gcc \
         g++ \
         python3-dev \
-        musl-dev
+        musl-dev \
+        tcpdump \
+        net-tools \
+        vim
 
 COPY requirements.txt .
 
@@ -49,7 +54,8 @@ RUN apt-get -y remove \
     apt-get -y autoremove && \
     apt-get -y clean
 
-COPY supervisor.conf /etc/supervisor/conf.d
+COPY supervisor.conf /etc/supervisor/conf.d/
+COPY fprobe /etc/default/
 
 RUN mkdir -p /root/.ssh
 COPY manager_key.priv /root/.ssh/id_rsa
