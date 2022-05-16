@@ -22,6 +22,7 @@ from celery.utils.log import get_task_logger
 
 from aica_django.connectors.AicaMongo import AicaMongo
 from aica_django.converters.Knowledge import (
+    netflow_to_knowledge,
     nmap_scan_to_knowledge,
     suricata_alert_to_knowledge,
     knowledge_to_neo,
@@ -51,6 +52,13 @@ def query_action(alert_dict):
         recommended_actions = mongo_db["alert_response_actions"].find(query)
 
     return recommended_actions
+
+
+@shared_task(name="ma-knowledge_base-record_netflow")
+def record_netflow(flow_dict):
+    logger.info(f"Running {__name__}: record_netflow")
+    nodes, relations = netflow_to_knowledge(flow_dict)
+    knowledge_to_neo(nodes=nodes, relations=relations)
 
 
 @shared_task(name="ma-knowledge_base-record_nmap_scan")

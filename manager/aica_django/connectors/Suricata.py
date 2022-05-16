@@ -15,7 +15,7 @@ from celery.utils.log import get_task_logger
 logger = get_task_logger(__name__)
 
 
-@shared_task(name="poll_suricata_alerts")
+@shared_task(name="poll-suricata-alerts")
 def poll_suricata_alerts():
     logger.info(f"Running {__name__}: poll_dbs")
     mode = os.getenv("MODE")
