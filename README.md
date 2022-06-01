@@ -46,4 +46,4 @@ The AICA agent is built as a Django project, and so the normal Django convention
 
 <h4>Maintainers</h4>
 
-Currently the primary maintainer for this project is [mailto:bblakely@anl.gov](Benjamin Blakely), a cybersecurity and machine learning researcher at Argonne National Laboratory.
+Currently the primary maintainer for this project is [@bblakely-anl](https://github.com/bblakely-anl), a cybersecurity and machine learning researcher at Argonne National Laboratory.
