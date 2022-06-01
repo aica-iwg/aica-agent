@@ -22,6 +22,7 @@ from py2neo import ConnectionUnavailable
 from aica_django.connectors.AicaMongo import AicaMongo
 from aica_django.connectors.AicaNeo4j import AicaNeo4j
 from aica_django.connectors.Netflow import network_flow_capture
+from aica_django.connectors.Nginx import poll_nginx_accesslogs
 from aica_django.connectors.Nmap import periodic_network_scan
 from aica_django.connectors.Suricata import poll_suricata_alerts
 
@@ -60,6 +61,9 @@ def initialize(**kwargs):
 
     # Start periodic network scans of local subnets in background
     periodic_network_scan.apply_async()
+
+    # Start polling for Nginx access logs
+    poll_nginx_accesslogs.apply_async()
 
     # Start polling for IDS alerts in background
     poll_suricata_alerts.apply_async()

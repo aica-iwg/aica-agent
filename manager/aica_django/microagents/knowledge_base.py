@@ -23,6 +23,7 @@ from celery.utils.log import get_task_logger
 from aica_django.connectors.AicaMongo import AicaMongo
 from aica_django.converters.Knowledge import (
     netflow_to_knowledge,
+    nginx_accesslog_to_knowledge,
     nmap_scan_to_knowledge,
     suricata_alert_to_knowledge,
     knowledge_to_neo,
@@ -72,4 +73,11 @@ def record_nmap_scan(scan_dict):
 def record_suricata_alert(alert_dict):
     logger.info(f"Running {__name__}: record_alert")
     nodes, relations = suricata_alert_to_knowledge(alert_dict)
+    knowledge_to_neo(nodes=nodes, relations=relations)
+
+
+@shared_task(name="ma-knowledge_base-record_nginx_accesslog")
+def record_nginx_accesslog(log_dict):
+    logger.info(f"Running {__name__}: record_nginx_accesslog")
+    nodes, relations = nginx_accesslog_to_knowledge(log_dict)
     knowledge_to_neo(nodes=nodes, relations=relations)

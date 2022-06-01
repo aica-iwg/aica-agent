@@ -13,6 +13,7 @@ defined_node_labels = [
     "Firmware",
     "PhysicalLocation",
     "Host",
+    "HttpRequest",
     "Identity",  # i.e., an actual human
     "IPv4Address",
     "IPv6Address",

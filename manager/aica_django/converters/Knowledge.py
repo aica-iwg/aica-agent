@@ -1,3 +1,4 @@
+import dateparser
 import ipaddress
 import os
 import re
@@ -207,6 +208,92 @@ def netflow_to_knowledge(flow):
     return nodes, relations
 
 
+def nginx_accesslog_to_knowledge(log_dict):
+    nodes = []
+    relations = []
+
+    my_hostname = socket.gethostname()
+    my_ipv4 = KnowledgeNode(
+        label="IPv4Address",
+        name=socket.gethostbyname(my_hostname),
+        values={"value": socket.gethostbyname(my_hostname)},
+    )
+    nodes.append(my_ipv4)
+
+    request_time = dateparser.parse(log_dict["dateandtime"])
+
+    # Add requesting host
+    requesting_host = KnowledgeNode(
+        label="Host",
+        name=log_dict["src_ip"],
+        values={
+            "last_seen": request_time,
+        },
+    )
+    nodes.append(requesting_host)
+
+    # Add target NIC to target host
+    nic = KnowledgeNode(
+        label="NetworkInterface",
+        name=str(uuid.uuid4()),
+        values={"last_seen": request_time},
+    )
+    nodes.append(nic)
+    relations.append(
+        KnowledgeRelation(
+            label="component-of",
+            source_node=nic,
+            target_node=requesting_host,
+        )
+    )
+
+    ipv4_addr = KnowledgeNode(
+        label="IPv4Address",
+        name=log_dict["src_ip"],
+        values={"value": log_dict["src_ip"]},
+    )
+    nodes.append(ipv4_addr)
+    relations.append(
+        KnowledgeRelation(
+            label="has-address",
+            source_node=nic,
+            target_node=ipv4_addr,
+        )
+    )
+
+    http_request = KnowledgeNode(
+        label="HttpRequest",
+        name=str(uuid.uuid4()),
+        values={
+            "request_time": request_time,
+            "method": log_dict["method"],
+            "url": log_dict["url"],
+            "response_status": log_dict["statuscode"],
+            "bytes": log_dict["bytes_sent"],
+            "referer": log_dict["referer"],
+            "user_agent": log_dict["useragent"],
+        },
+    )
+    nodes.append(http_request)
+
+    relations.append(
+        KnowledgeRelation(
+            label="communicates-to",
+            source_node=ipv4_addr,
+            target_node=http_request,
+        )
+    )
+    relations.append(
+        KnowledgeRelation(
+            label="communicates-to",
+            source_node=http_request,
+            target_node=my_ipv4,
+        )
+    )
+
+    return nodes, relations
+
+
 def nmap_scan_to_knowledge(scan_results):
     nodes = []
     relations = []
@@ -328,11 +415,14 @@ def nmap_scan_to_knowledge(scan_results):
             )
 
         if len(scan_results[host]["osmatch"]) > 1:
-            os = scan_results[host]["osmatch"][0]
+            os_match = scan_results[host]["osmatch"][0]
             operating_system = KnowledgeNode(
                 label="Software",
-                name=os["cpe"] if os["cpe"] else os["name"],
-                values={"name": os["name"], "version": os["osclass"]["osgen"]},
+                name=os_match["cpe"] if os_match["cpe"] else os_match["name"],
+                values={
+                    "name": os_match["name"],
+                    "version": os_match["osclass"]["osgen"],
+                },
             )
             nodes.append(operating_system)
             relations.append(
@@ -343,8 +433,10 @@ def nmap_scan_to_knowledge(scan_results):
                 )
             )
 
-            if os["osclass"]["vendor"]:
-                os_vendor = KnowledgeNode(label="Vendor", name=os["osclass"]["vendor"])
+            if os_match["osclass"]["vendor"]:
+                os_vendor = KnowledgeNode(
+                    label="Vendor", name=os_match["osclass"]["vendor"]
+                )
                 nodes.append(os_vendor)
                 relations.append(
                     KnowledgeRelation(

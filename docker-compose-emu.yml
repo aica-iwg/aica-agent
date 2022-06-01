@@ -6,7 +6,8 @@ services:
     environment:
       MODE: "emu"
     volumes:
-      - ids_log:/var/log/suricata
+      - ids_suricata_log:/var/log/suricata
+      - target_nginx_log:/var/log/nginx
 
   attacker:
     build: ./attacker
@@ -22,6 +23,8 @@ services:
     build: ./target
     container_name: 'target'
     command: sh /usr/local/bin/docker_entrypoint.sh
+    volumes:
+      - target_nginx_log:/var/log/nginx
     sysctls:
       - net.ipv4.conf.all.forwarding=1
     cap_add:
@@ -34,7 +37,7 @@ services:
     container_name: 'ids'
     command: sh /usr/local/bin/docker_entrypoint.sh
     volumes:
-      - ids_log:/var/log/suricata
+      - ids_suricata_log:/var/log/suricata
     cap_add:
       - NET_ADMIN
     network_mode: 'service:target'
@@ -49,7 +52,8 @@ services:
       - target
 
 volumes:
-  ids_log:
+  ids_suricata_log:
+  target_nginx_log:
 
 networks:
   target:
