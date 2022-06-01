@@ -2,12 +2,6 @@ import os
 import json
 import subprocess
 
-from aica_django.microagents.knowledge_base import (  # noqa: F401
-    record_suricata_alert,
-)
-from aica_django.microagents.decision_making_engine import (  # noqa: F401
-    handle_suricata_alert,
-)
 from celery import current_app
 from celery.app import shared_task
 from celery.utils.log import get_task_logger
