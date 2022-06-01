@@ -1,3 +1,5 @@
+[![CI Test Action](https://github.com/aica-iwg/aica-agent/actions/workflows/makefile.yml/badge.svg)](https://github.com/aica-iwg/aica-agent/actions/workflows/makefile.yml)
+
 The intent of this project is to build on the ideas of the AICA framework as outlined in Theron et al at https://link.springer.com/content/pdf/10.1007%2F978-3-030-33432-1.pdf. This project will work towards a fully-functional agent with increasingly advanced capabilities that can be used in both research and production contexts.
 
 <h3>Building, Testing, and Sharing Changes</h3>
@@ -14,20 +16,20 @@ Once you have a passing build, you should commit your changes to a branch with a
 
 <h3>Running</h3>
 
-This code should be run via the Makefile entrypoint. You will need to specify whether you want to start this in emulation mode or virtualized mode with the MODE environment variable (i.e., MODE should be either `emu` or `virt`). The virutalized mode is, however, only a stub and is meant for future expansion. You can use export to set this for your session, or specific it before each `make` command (like `MODE=emu make build`).
+This code should be run via the Makefile. You will need to specify whether you want to start this in emulation mode or virtualized mode with the MODE environment variable (i.e., MODE should be either `emu` or `virt`). The virtualized mode is currently a stub and is meant for future expansion. You can use export to set this for your session, or specify it before each `make` command (like `MODE=emu make build`).
 
 When starting from scratch, run the following: `make build && make start`. Subsequently use `make stop` and `make start` (or `make restart`) to stop/start the containers and `make build` to build them again (`make rebuild` is a handy alias for stop/build/start). You can use `make clean` to clean up all container- and code-related files. 
 
-Once you have started the agent, for demonstration purposes you can use the various `make <system>-shell` commands (e.g., `make attacker-shell`) to open shells on various containers. You might wish, for example to start a shell on the attacker and nmap the `target` host. 
+Once you have started the agent, you can use the various `make <system>-shell` commands (e.g., `make attacker-shell`) to open shells on various containers. You might wish, for example, to start a shell on the attacker and nmap the `target` host. 
 
-You can view logs from the Dockerized containers with `make logs`. This will show all containers, so you might wish to pipe this to `grep`/`egrep` to include/exclude containers by name as desired. For example: `make logs | egrep ^(manager|manager_graphdb)`.
+You can view logs from the Dockerized containers with `make logs`. This will show all containers, so you might wish to pipe this to `grep`/`egrep` to include/exclude containers by name as desired. For example: `make logs | egrep ^(manager\b|manager_graphdb)`.
 
 You can monitor the agent through several interfaces:
 
 * [http://localhost:3000](): Grafana console 
 * [http://localhost:5555](): Celery Flower instance, where you can monitor task execution
 * [http://localhost:7474](): Neo4j web interface
-* [http://localhost:8000](): Django app, as defined in `aica_django/`.
+* [http://localhost:8000](): Django app, as defined in `manager/aica_django/`.
 * [http://localhost:15672](): RabbitMQ admin console, where you can monitor the task queue
 
 <h3>Code in this repository</h3>
@@ -46,4 +48,4 @@ The AICA agent is built as a Django project, and so the normal Django convention
 
 <h4>Maintainers</h4>
 
-Currently the primary/sole maintainer for this project is [mailto:bblakely@anl.gov](Benjamin Blakely), a cybersecurity and machine learning researcher at Argonne National Laboratory.
+Currently the primary maintainer for this project is [@bblakely-anl](https://github.com/bblakely-anl), a cybersecurity and machine learning researcher at Argonne National Laboratory.
