@@ -2,7 +2,7 @@
 
 **All Rights Reserved**
 
-**Software Name: Autonomous Intelligence Cyberdefense Agent (AICA)**
+**Software Name: Autonomous Intelligent Cyberdefense Agent (AICA)**
 
 **By: Argonne National Laboratory**
 
