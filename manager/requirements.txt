@@ -24,4 +24,4 @@ supervisor-stdout==0.1.1
 
 # 3.5 and above require Rust, which doesn't build in many environments.
 # 3.4 requires the CRYPTOGRAPHY_DONT_BUILD_RUST envvar to be set to avoid this dependency.
-cryptography==3.4.8
+cryptography==37.0.2
