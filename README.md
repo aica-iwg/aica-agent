@@ -1,3 +1,5 @@
+[![CI Test Action](https://github.com/aica-iwg/aica-agent/actions/workflows/makefile.yml/badge.svg)](https://github.com/aica-iwg/aica-agent/actions/workflows/makefile.yml)
+
 The intent of this project is to build on the ideas of the AICA framework as outlined in Theron et al at https://link.springer.com/content/pdf/10.1007%2F978-3-030-33432-1.pdf. This project will work towards a fully-functional agent with increasingly advanced capabilities that can be used in both research and production contexts.
 
 <h3>Building, Testing, and Sharing Changes</h3>
