@@ -1,0 +1,1422 @@
+[
+  {
+    "id": "fcc84f3d.be1f6",
+    "type": "modbus-read",
+    "z": "bbb5a507.9eeaf8",
+    "name": "Read Holding Registers",
+    "showStatusActivities": false,
+    "showErrors": false,
+    "unitid": "1",
+    "dataType": "HoldingRegister",
+    "adr": "1",
+    "quantity": "6",
+    "rate": "500",
+    "rateUnit": "ms",
+    "server": "4412ae43.cdf648",
+    "x": 165.1666717529297,
+    "y": 271.0000114440918,
+    "wires": [
+      [],
+      [
+        "660bb503.b22aec"
+      ]
+    ]
+  },
+  {
+    "id": "660bb503.b22aec",
+    "type": "function",
+    "z": "bbb5a507.9eeaf8",
+    "name": " Decode array",
+    "func": "//   The message returned from the read node is an\n// array as there could be multiple registers returned\n//   This reads the first value in the array.\ntank1Level = msg.payload.data[0]\ntank2Level = msg.payload.data[1]\ntank1Start = msg.payload.data[2]\ntank1Stop = msg.payload.data[3]\ntank2Start = msg.payload.data[4]\ntank2Stop = msg.payload.data[5]\n\nglobal.set(\"tank1Level\",tank1Level);\nglobal.set(\"tank2Level\",tank2Level);\nglobal.set(\"tank1Start\",tank1Start);\nglobal.set(\"tank1Stop\",tank1Stop);\nglobal.set(\"tank2Start\",tank2Start);\nglobal.set(\"tank2Stop\",tank2Stop);\n\ntank1HStp = (tank1Start - 15);\ntank1LStp = (tank1Stop + 15);\ntank2HStp = (tank1Start - 15);\ntank2LStp = (tank1Stop + 15);\n\nvar msg1 = { payload:tank1Level};\nvar msg2 = { payload:tank2Level};\nvar msg3 = { payload:tank1Start};\nvar msg4 = { payload:tank1Stop};\nvar msg5 = { payload:tank2Start};\nvar msg6 = { payload:tank2Stop};\nvar msg7 = { payload:tank1HStp};\nvar msg8 = { payload:tank1LStp};\nvar msg9 = { payload:tank2HStp};\nvar msg10 = { payload:tank2LStp};\n\n\n\n\nreturn [ msg1, msg2, msg3, msg4, msg5, msg6, msg7, msg8, msg9, msg10 ];\n",
+    "outputs": "10",
+    "noerr": 0,
+    "x": 189.95352172851562,
+    "y": 392.7841606140137,
+    "wires": [
+      [
+        "49c3c886.f87b8",
+        "55a1e5af.309f4c",
+        "e3a629eb.ea149",
+        "130b2744.d7a7e9"
+      ],
+      [
+        "a220c3a8.9f661",
+        "ba9b90ce.1265f",
+        "52d386d.840acf8",
+        "f4f81b9e.9ad468"
+      ],
+      [
+        "143d5853.9a45"
+      ],
+      [
+        "c4027384.f6e86"
+      ],
+      [
+        "d7218949.295b28"
+      ],
+      [
+        "50816a10.d0b244"
+      ],
+      [
+        "560d158e.ab437c"
+      ],
+      [
+        "4fb126cd.3aa7d"
+      ],
+      [
+        "b1be0261.faeee8"
+      ],
+      [
+        "b849217b.86a418"
+      ]
+    ]
+  },
+  {
+    "id": "720b3e7.a7278c",
+    "type": "modbus-server",
+    "z": "bbb5a507.9eeaf8",
+    "name": "Modbus Server",
+    "logEnabled": false,
+    "serverPort": "502",
+    "responseDelay": 100,
+    "delayUnit": "ms",
+    "coilsBufferSize": 1024,
+    "holdingBufferSize": 1024,
+    "inputBufferSize": 1024,
+    "discreteBufferSize": "1024",
+    "x": 322.16668701171875,
+    "y": 1242.000099658966,
+    "wires": [
+      [
+        "22edeef9.fe580a"
+      ],
+      [
+        "22edeef9.fe580a"
+      ],
+      [
+        "22edeef9.fe580a"
+      ]
+    ]
+  },
+  {
+    "id": "22edeef9.fe580a",
+    "type": "debug",
+    "z": "bbb5a507.9eeaf8",
+    "name": "",
+    "active": true,
+    "console": "false",
+    "complete": "false",
+    "x": 546.1666870117188,
+    "y": 1242.000099658966,
+    "wires": []
+  },
+  {
+    "id": "2f70edf9.23ebb2",
+    "type": "inject",
+    "z": "bbb5a507.9eeaf8",
+    "name": "",
+    "topic": "",
+    "payload": "",
+    "payloadType": "date",
+    "repeat": "",
+    "crontab": "",
+    "once": false,
+    "x": 133.16668701171875,
+    "y": 1242.000099658966,
+    "wires": [
+      [
+        "720b3e7.a7278c"
+      ]
+    ]
+  },
+  {
+    "id": "89dc5d01.48f748",
+    "type": "comment",
+    "z": "bbb5a507.9eeaf8",
+    "name": "Modbus Slave sim device",
+    "info": "",
+    "x": 161.86669731140137,
+    "y": 1199.0001020431519,
+    "wires": []
+  },
+  {
+    "id": "55a1e5af.309f4c",
+    "type": "ui_chart",
+    "z": "bbb5a507.9eeaf8",
+    "name": "Bar Chart",
+    "group": "9bd788a1.b5bb98",
+    "order": 3,
+    "width": "2",
+    "height": "4",
+    "label": "",
+    "chartType": "bar",
+    "legend": "false",
+    "xformat": "HH:mm:ss",
+    "interpolate": "linear",
+    "nodata": "",
+    "ymin": "0",
+    "ymax": "240",
+    "removeOlder": "10",
+    "removeOlderPoints": "",
+    "removeOlderUnit": "60",
+    "cutout": 0,
+    "colors": [
+      "#1f77b4",
+      "#aec7e8",
+      "#ff7f0e",
+      "#2ca02c",
+      "#98df8a",
+      "#d62728",
+      "#ff9896",
+      "#9467bd",
+      "#c5b0d5"
+    ],
+    "x": 512.8667678833008,
+    "y": 157.6000361442566,
+    "wires": [
+      [],
+      []
+    ]
+  },
+  {
+    "id": "49c3c886.f87b8",
+    "type": "ui_text",
+    "z": "bbb5a507.9eeaf8",
+    "group": "9bd788a1.b5bb98",
+    "order": 1,
+    "width": 0,
+    "height": 0,
+    "name": "",
+    "label": "Tank 1 Level",
+    "format": "{{msg.payload}}",
+    "layout": "row-spread",
+    "x": 521.8667678833008,
+    "y": 123.39996290206909,
+    "wires": []
+  },
+  {
+    "id": "ba9b90ce.1265f",
+    "type": "ui_chart",
+    "z": "bbb5a507.9eeaf8",
+    "name": "Trend",
+    "group": "7b6e0d6c.f51904",
+    "order": 2,
+    "width": "3",
+    "height": "4",
+    "label": "",
+    "chartType": "line",
+    "legend": "false",
+    "xformat": "HH:mm:ss",
+    "interpolate": "linear",
+    "nodata": "",
+    "ymin": "0",
+    "ymax": "240",
+    "removeOlder": "3",
+    "removeOlderPoints": "",
+    "removeOlderUnit": "60",
+    "cutout": 0,
+    "colors": [
+      "#1f77b4",
+      "#aec7e8",
+      "#ff7f0e",
+      "#2ca02c",
+      "#98df8a",
+      "#d62728",
+      "#ff9896",
+      "#9467bd",
+      "#c5b0d5"
+    ],
+    "x": 502.8667678833008,
+    "y": 303.866614818573,
+    "wires": [
+      [],
+      []
+    ]
+  },
+  {
+    "id": "a220c3a8.9f661",
+    "type": "ui_text",
+    "z": "bbb5a507.9eeaf8",
+    "group": "7b6e0d6c.f51904",
+    "order": 1,
+    "width": 0,
+    "height": 0,
+    "name": "",
+    "label": "Tank 2 Level",
+    "format": "{{msg.payload}}",
+    "layout": "row-spread",
+    "x": 520.8667678833008,
+    "y": 236.6665415763855,
+    "wires": []
+  },
+  {
+    "id": "4f5ef788.4e5fd8",
+    "type": "ui_text",
+    "z": "bbb5a507.9eeaf8",
+    "group": "912c5aef.7152f",
+    "order": 1,
+    "width": "3",
+    "height": "1",
+    "name": "",
+    "label": "Mode",
+    "format": "{{msg.payload}}",
+    "layout": "row-left",
+    "x": 508.20019149780273,
+    "y": 686.399896144867,
+    "wires": []
+  },
+  {
+    "id": "77748bba.cd8934",
+    "type": "ui_switch",
+    "z": "bbb5a507.9eeaf8",
+    "name": "",
+    "label": "Run",
+    "group": "912c5aef.7152f",
+    "order": 4,
+    "width": "3",
+    "height": "1",
+    "passthru": false,
+    "decouple": "false",
+    "topic": "",
+    "style": "",
+    "onvalue": "true",
+    "onvalueType": "bool",
+    "onicon": "",
+    "oncolor": "",
+    "offvalue": "false",
+    "offvalueType": "bool",
+    "officon": "",
+    "offcolor": "",
+    "x": 676.3998794555664,
+    "y": 410.8333811759949,
+    "wires": [
+      [
+        "a9f807ab.445d4"
+      ]
+    ]
+  },
+  {
+    "id": "e0707a69.906d2",
+    "type": "debug",
+    "z": "bbb5a507.9eeaf8",
+    "name": "",
+    "active": false,
+    "console": "false",
+    "complete": "false",
+    "x": 1134.115837097168,
+    "y": 543.7337260246277,
+    "wires": []
+  },
+  {
+    "id": "65e81333.7ce74c",
+    "type": "function",
+    "z": "bbb5a507.9eeaf8",
+    "name": "pump 1 simulator",
+    "func": "//   The message returned from the read node is an\n// array as there could be multiple registers returned\n//   This reads the first value in the array.\nvar tankLevel = global.get(\"tank1Level\");\nvar pumpStatus = global.get(\"pump1Status\");\nvar pump2Status = global.get(\"pump2Status\");\n\n\nif (pumpStatus === true && tankLevel < 240)\n{\n    if (pump2Status === true) \n    {\n        tankLevel = tankLevel + 1; \n        msg.payload = { value: tankLevel, \n        'fc': 6,\n        'unitid': 1, \n        'address': 1,\n        'quantity': 1 } \n        return msg\n    }\n    else\n    {\n        tankLevel = tankLevel + 6; \n        msg.payload = { value: tankLevel, \n        'fc': 6,\n        'unitid': 1, \n        'address': 1,\n        'quantity': 1 } \n        return msg\n    }\n}   \nelse if (pumpStatus === false && tankLevel > 4)\n{\n    if (pump2Status === true) \n    {\n        tankLevel = tankLevel + -6; \n        msg.payload = { value: tankLevel, \n        'fc': 6,\n        'unitid': 1, \n        'address': 1,\n        'quantity': 1 } \n        return msg \n    }\n    else\n    {\n        tankLevel = tankLevel + -2; \n        msg.payload = { value: tankLevel, \n        'fc': 6,\n        'unitid': 1, \n        'address': 1,\n        'quantity': 1 } \n        return msg \n    }\n    \n}\n",
+    "outputs": 1,
+    "noerr": 0,
+    "x": 299.23326110839844,
+    "y": 1080.3332905769348,
+    "wires": [
+      [
+        "1b900cb2.8100d3"
+      ]
+    ]
+  },
+  {
+    "id": "d160b042.20e8d",
+    "type": "inject",
+    "z": "bbb5a507.9eeaf8",
+    "name": "",
+    "topic": "",
+    "payload": "true",
+    "payloadType": "bool",
+    "repeat": "1",
+    "crontab": "",
+    "once": false,
+    "x": 122.39996337890625,
+    "y": 1095.9999165534973,
+    "wires": [
+      [
+        "65e81333.7ce74c",
+        "ee4bba80.dd2c1"
+      ]
+    ]
+  },
+  {
+    "id": "50db2e50.99014",
+    "type": "ui_switch",
+    "z": "bbb5a507.9eeaf8",
+    "name": "",
+    "label": "Mode",
+    "group": "912c5aef.7152f",
+    "order": 3,
+    "width": "3",
+    "height": "1",
+    "passthru": false,
+    "decouple": "true",
+    "topic": "",
+    "style": "",
+    "onvalue": "true",
+    "onvalueType": "bool",
+    "onicon": "",
+    "oncolor": "",
+    "offvalue": "false",
+    "offvalueType": "bool",
+    "officon": "",
+    "offcolor": "",
+    "x": 675.566535949707,
+    "y": 373.3334422111511,
+    "wires": [
+      [
+        "59532462.61a4f4"
+      ]
+    ]
+  },
+  {
+    "id": "e0574d1f.547848",
+    "type": "modbus-flex-write",
+    "z": "bbb5a507.9eeaf8",
+    "name": "",
+    "showStatusActivities": false,
+    "showErrors": false,
+    "server": "4412ae43.cdf648",
+    "x": 1119.3998947143555,
+    "y": 500.3335795402527,
+    "wires": [
+      [],
+      [
+        "e0707a69.906d2"
+      ]
+    ]
+  },
+  {
+    "id": "a9f807ab.445d4",
+    "type": "function",
+    "z": "bbb5a507.9eeaf8",
+    "name": "Coil 2",
+    "func": "msg.payload = { value: msg.payload, \n'fc': 5,\n'unitid': 1, \n'address': 2,\n'quantity': 1 } \nreturn msg",
+    "outputs": 1,
+    "noerr": 0,
+    "x": 805.3999099731445,
+    "y": 411.0001902580261,
+    "wires": [
+      [
+        "e0574d1f.547848"
+      ]
+    ]
+  },
+  {
+    "id": "59532462.61a4f4",
+    "type": "function",
+    "z": "bbb5a507.9eeaf8",
+    "name": "Coil 1",
+    "func": "msg.payload = { value: msg.payload, \n'fc': 5,\n'unitid': 1, \n'address': 1,\n'quantity': 1 } \nreturn msg",
+    "outputs": 1,
+    "noerr": 0,
+    "x": 805.566535949707,
+    "y": 373.3335032463074,
+    "wires": [
+      [
+        "e0574d1f.547848"
+      ]
+    ]
+  },
+  {
+    "id": "771f5b0.f3bdca4",
+    "type": "ui_switch",
+    "z": "bbb5a507.9eeaf8",
+    "name": "",
+    "label": "Run",
+    "group": "4025c129.a588a8",
+    "order": 4,
+    "width": "3",
+    "height": "1",
+    "passthru": false,
+    "decouple": "true",
+    "topic": "",
+    "style": "",
+    "onvalue": "true",
+    "onvalueType": "bool",
+    "onicon": "",
+    "oncolor": "",
+    "offvalue": "false",
+    "offvalueType": "bool",
+    "officon": "",
+    "offcolor": "",
+    "x": 672.566520690918,
+    "y": 573.6669383049011,
+    "wires": [
+      [
+        "3a9de7f6.babdb"
+      ]
+    ]
+  },
+  {
+    "id": "6a49013c.a9316",
+    "type": "ui_switch",
+    "z": "bbb5a507.9eeaf8",
+    "name": "",
+    "label": "Mode",
+    "group": "4025c129.a588a8",
+    "order": 3,
+    "width": "3",
+    "height": "1",
+    "passthru": false,
+    "decouple": "true",
+    "topic": "",
+    "style": "",
+    "onvalue": "true",
+    "onvalueType": "bool",
+    "onicon": "",
+    "oncolor": "",
+    "offvalue": "false",
+    "offvalueType": "bool",
+    "officon": "",
+    "offcolor": "",
+    "x": 671.7331771850586,
+    "y": 536.1669993400574,
+    "wires": [
+      [
+        "acc8b845.c10238"
+      ]
+    ]
+  },
+  {
+    "id": "3a9de7f6.babdb",
+    "type": "function",
+    "z": "bbb5a507.9eeaf8",
+    "name": "Coil 3",
+    "func": "msg.payload = { value: msg.payload, \n'fc': 5,\n'unitid': 1, \n'address': 4,\n'quantity': 1 } \nreturn msg",
+    "outputs": 1,
+    "noerr": 0,
+    "x": 802.5665512084961,
+    "y": 573.8337473869324,
+    "wires": [
+      [
+        "e0574d1f.547848"
+      ]
+    ]
+  },
+  {
+    "id": "acc8b845.c10238",
+    "type": "function",
+    "z": "bbb5a507.9eeaf8",
+    "name": "Coil 3",
+    "func": "msg.payload = { value: msg.payload, \n'fc': 5,\n'unitid': 1, \n'address': 3,\n'quantity': 1 } \nreturn msg",
+    "outputs": 1,
+    "noerr": 0,
+    "x": 801.7331771850586,
+    "y": 536.1671214103699,
+    "wires": [
+      [
+        "e0574d1f.547848"
+      ]
+    ]
+  },
+  {
+    "id": "6c0935f1.938834",
+    "type": "modbus-read",
+    "z": "bbb5a507.9eeaf8",
+    "name": "Read Coils",
+    "showStatusActivities": false,
+    "showErrors": false,
+    "unitid": "1",
+    "dataType": "Coil",
+    "adr": "1",
+    "quantity": "6",
+    "rate": "500",
+    "rateUnit": "ms",
+    "server": "4412ae43.cdf648",
+    "x": 131.90003967285156,
+    "y": 580.3333992958069,
+    "wires": [
+      [],
+      [
+        "a088702f.37e718"
+      ]
+    ]
+  },
+  {
+    "id": "a088702f.37e718",
+    "type": "function",
+    "z": "bbb5a507.9eeaf8",
+    "name": " Decode array",
+    "func": "// get the modbus values from the array\npump1Mode = msg.payload.data[0]\npump1Status = msg.payload.data[1]\npump2Mode = msg.payload.data[2]\npump2Status = msg.payload.data[3]\n\n//set global context variables for the simulator\nglobal.set(\"pump1Mode\",pump1Mode);\nglobal.set(\"pump1Status\",pump1Status);\nglobal.set(\"pump2Mode\",pump2Mode);\nglobal.set(\"pump2Status\",pump2Status);\n\n//Set up text for the statuses\nif (pump1Mode)\n    {\n    p1MText = 'Auto';\n    }\nelse\n    {\n    p1MText = 'Manual';\n    }\n    \nif (pump1Status)\n    {\n    p1SText = 'Running';\n    }\nelse\n    {\n    p1SText = 'Stopped';\n    }\n    \nif (pump2Mode)\n    {\n    p2MText = 'Auto';\n    }\nelse\n    {\n    p2MText = 'Manual';\n    }\n    \nif (pump2Status)\n    {\n    p2SText = 'Running';\n    }\nelse\n    {\n    p2SText = 'Stopped';\n    }\n    \n//set up the outgoing messages\nvar msg1 = { payload:p1MText};\nvar msg2 = { payload:p1SText};\nvar msg3 = { payload:p2MText};\nvar msg4 = { payload:p2SText};\nvar msg5 = { payload:pump1Mode};\nvar msg6 = { payload:pump1Status};\nvar msg7 = { payload:pump2Mode};\nvar msg8 = { payload:pump2Status};\n\n\n\nreturn [ msg1, msg2, msg3, msg4, msg5, msg6, msg7, msg8 ];\n",
+    "outputs": "8",
+    "noerr": 0,
+    "x": 176.68687438964844,
+    "y": 690.1175036430359,
+    "wires": [
+      [
+        "4f5ef788.4e5fd8"
+      ],
+      [
+        "44fdb46d.e824e4"
+      ],
+      [
+        "ffe7dba5.bf9d9"
+      ],
+      [
+        "1757e22b.08ba1e"
+      ],
+      [
+        "50db2e50.99014"
+      ],
+      [
+        "77748bba.cd8934"
+      ],
+      [
+        "6a49013c.a9316"
+      ],
+      [
+        "771f5b0.f3bdca4"
+      ]
+    ]
+  },
+  {
+    "id": "ffe7dba5.bf9d9",
+    "type": "ui_text",
+    "z": "bbb5a507.9eeaf8",
+    "group": "4025c129.a588a8",
+    "order": 1,
+    "width": "3",
+    "height": "1",
+    "name": "",
+    "label": "Mode",
+    "format": "{{msg.payload}}",
+    "layout": "row-spread",
+    "x": 506.5668296813965,
+    "y": 759.999993801117,
+    "wires": []
+  },
+  {
+    "id": "44fdb46d.e824e4",
+    "type": "ui_text",
+    "z": "bbb5a507.9eeaf8",
+    "group": "912c5aef.7152f",
+    "order": 2,
+    "width": "3",
+    "height": "1",
+    "name": "",
+    "label": "Status",
+    "format": "{{msg.payload}}",
+    "layout": "row-left",
+    "x": 507.5668296813965,
+    "y": 722.999993801117,
+    "wires": []
+  },
+  {
+    "id": "1757e22b.08ba1e",
+    "type": "ui_text",
+    "z": "bbb5a507.9eeaf8",
+    "group": "4025c129.a588a8",
+    "order": 2,
+    "width": "3",
+    "height": "1",
+    "name": "",
+    "label": "Status",
+    "format": "{{msg.payload}}",
+    "layout": "row-spread",
+    "x": 507.5668296813965,
+    "y": 797.999993801117,
+    "wires": []
+  },
+  {
+    "id": "8e10b238.58359",
+    "type": "comment",
+    "z": "bbb5a507.9eeaf8",
+    "name": "Level Simulator",
+    "info": "",
+    "x": 146.3999481201172,
+    "y": 1042.9999775886536,
+    "wires": []
+  },
+  {
+    "id": "4df0fc34.f79e34",
+    "type": "debug",
+    "z": "bbb5a507.9eeaf8",
+    "name": "",
+    "active": false,
+    "console": "false",
+    "complete": "false",
+    "x": 939.233341217041,
+    "y": 1047.666642665863,
+    "wires": []
+  },
+  {
+    "id": "1b900cb2.8100d3",
+    "type": "modbus-flex-write",
+    "z": "bbb5a507.9eeaf8",
+    "name": "",
+    "showStatusActivities": false,
+    "showErrors": true,
+    "server": "4412ae43.cdf648",
+    "x": 731.5174331665039,
+    "y": 1041.266496181488,
+    "wires": [
+      [],
+      [
+        "4df0fc34.f79e34"
+      ]
+    ]
+  },
+  {
+    "id": "66d4f093.f28ac",
+    "type": "function",
+    "z": "bbb5a507.9eeaf8",
+    "name": "pump 2 simulator",
+    "func": "//   The message returned from the read node is an\n// array as there could be multiple registers returned\n//   This reads the first value in the array.\nvar tank1Level = global.get(\"tank1Level\");\nvar tankLevel = global.get(\"tank2Level\");\nvar pumpStatus = global.get(\"pump2Status\");\n\n\nif (pumpStatus === true && tankLevel < 240 && tank1Level > 3)\n{\n    tankLevel = tankLevel + 6; \n    msg.payload = { value: tankLevel, \n    'fc': 6,\n    'unitid': 1, \n    'address': 2,\n    'quantity': 1 } \n    return msg \n}   \nelse if (pumpStatus === false && tankLevel > 0)\n{\n    tankLevel = tankLevel + -2; \n    msg.payload = { value: tankLevel, \n    'fc': 6,\n    'unitid': 1, \n    'address': 2,\n    'quantity': 1 } \n    return msg \n}",
+    "outputs": "1",
+    "noerr": 0,
+    "x": 473.2332763671875,
+    "y": 1119.3331379890442,
+    "wires": [
+      [
+        "1b900cb2.8100d3"
+      ]
+    ]
+  },
+  {
+    "id": "e3a629eb.ea149",
+    "type": "ui_chart",
+    "z": "bbb5a507.9eeaf8",
+    "name": "Trend",
+    "group": "9bd788a1.b5bb98",
+    "order": 2,
+    "width": "3",
+    "height": "4",
+    "label": "",
+    "chartType": "line",
+    "legend": "false",
+    "xformat": "HH:mm:ss",
+    "interpolate": "linear",
+    "nodata": "",
+    "ymin": "0",
+    "ymax": "240",
+    "removeOlder": "3",
+    "removeOlderPoints": "",
+    "removeOlderUnit": "60",
+    "cutout": 0,
+    "colors": [
+      "#1f77b4",
+      "#aec7e8",
+      "#ff7f0e",
+      "#2ca02c",
+      "#98df8a",
+      "#d62728",
+      "#ff9896",
+      "#9467bd",
+      "#c5b0d5"
+    ],
+    "x": 504.23340606689453,
+    "y": 191.3333125114441,
+    "wires": [
+      [],
+      []
+    ]
+  },
+  {
+    "id": "52d386d.840acf8",
+    "type": "ui_chart",
+    "z": "bbb5a507.9eeaf8",
+    "name": "Bar Chart",
+    "group": "7b6e0d6c.f51904",
+    "order": 3,
+    "width": "2",
+    "height": "4",
+    "label": "",
+    "chartType": "bar",
+    "legend": "false",
+    "xformat": "HH:mm:ss",
+    "interpolate": "linear",
+    "nodata": "",
+    "ymin": "0",
+    "ymax": "240",
+    "removeOlder": "10",
+    "removeOlderPoints": "",
+    "removeOlderUnit": "60",
+    "cutout": 0,
+    "colors": [
+      "#1f77b4",
+      "#aec7e8",
+      "#ff7f0e",
+      "#2ca02c",
+      "#98df8a",
+      "#d62728",
+      "#ff9896",
+      "#9467bd",
+      "#c5b0d5"
+    ],
+    "x": 512.2334060668945,
+    "y": 270.3333201408386,
+    "wires": [
+      [],
+      []
+    ]
+  },
+  {
+    "id": "143d5853.9a45",
+    "type": "ui_numeric",
+    "z": "bbb5a507.9eeaf8",
+    "name": "",
+    "label": "Start Setpoint",
+    "group": "912c5aef.7152f",
+    "order": 5,
+    "width": "0",
+    "height": "0",
+    "passthru": false,
+    "topic": "",
+    "format": "{{value}}",
+    "min": "0",
+    "max": "230",
+    "step": 1,
+    "x": 706.3999099731445,
+    "y": 445.666663646698,
+    "wires": [
+      [
+        "9697b148.83f408"
+      ]
+    ]
+  },
+  {
+    "id": "c4027384.f6e86",
+    "type": "ui_numeric",
+    "z": "bbb5a507.9eeaf8",
+    "name": "",
+    "label": "Stop Setpoint",
+    "group": "912c5aef.7152f",
+    "order": 6,
+    "width": "0",
+    "height": "0",
+    "passthru": false,
+    "topic": "",
+    "format": "{{value}}",
+    "min": "10",
+    "max": "240",
+    "step": 1,
+    "x": 707.2332382202148,
+    "y": 482.0000376701355,
+    "wires": [
+      [
+        "4e695501.48ccac"
+      ]
+    ]
+  },
+  {
+    "id": "d7218949.295b28",
+    "type": "ui_numeric",
+    "z": "bbb5a507.9eeaf8",
+    "name": "",
+    "label": "Start Setpoint",
+    "group": "4025c129.a588a8",
+    "order": 5,
+    "width": "0",
+    "height": "0",
+    "passthru": false,
+    "topic": "",
+    "format": "{{value}}",
+    "min": "0",
+    "max": "230",
+    "step": 1,
+    "x": 701.2332382202148,
+    "y": 610.3333506584167,
+    "wires": [
+      [
+        "ef212684.39b1f"
+      ]
+    ]
+  },
+  {
+    "id": "50816a10.d0b244",
+    "type": "ui_numeric",
+    "z": "bbb5a507.9eeaf8",
+    "name": "",
+    "label": "Stop Setpoint",
+    "group": "4025c129.a588a8",
+    "order": 6,
+    "width": "0",
+    "height": "0",
+    "passthru": false,
+    "topic": "",
+    "format": "{{value}}",
+    "min": "10",
+    "max": "240",
+    "step": 1,
+    "x": 702.0665512084961,
+    "y": 646.666663646698,
+    "wires": [
+      [
+        "218b0e82.825eb2"
+      ]
+    ]
+  },
+  {
+    "id": "9697b148.83f408",
+    "type": "function",
+    "z": "bbb5a507.9eeaf8",
+    "name": "Hld 3",
+    "func": "msg.payload = { value: msg.payload, \n'fc': 6,\n'unitid': 1, \n'address': 3,\n'quantity': 1 } \nreturn msg",
+    "outputs": 1,
+    "noerr": 0,
+    "x": 854.2332229614258,
+    "y": 446.3333811759949,
+    "wires": [
+      [
+        "e0574d1f.547848"
+      ]
+    ]
+  },
+  {
+    "id": "4e695501.48ccac",
+    "type": "function",
+    "z": "bbb5a507.9eeaf8",
+    "name": "Hld 4",
+    "func": "msg.payload = { value: msg.payload, \n'fc': 6,\n'unitid': 1, \n'address': 4,\n'quantity': 1 } \nreturn msg",
+    "outputs": 1,
+    "noerr": 0,
+    "x": 855.2332229614258,
+    "y": 482.33335065841675,
+    "wires": [
+      [
+        "e0574d1f.547848"
+      ]
+    ]
+  },
+  {
+    "id": "ef212684.39b1f",
+    "type": "function",
+    "z": "bbb5a507.9eeaf8",
+    "name": "Hld 5",
+    "func": "msg.payload = { value: msg.payload, \n'fc': 6,\n'unitid': 1, \n'address': 5,\n'quantity': 1 } \nreturn msg",
+    "outputs": 1,
+    "noerr": 0,
+    "x": 851.2332229614258,
+    "y": 610.3333506584167,
+    "wires": [
+      [
+        "e0574d1f.547848"
+      ]
+    ]
+  },
+  {
+    "id": "218b0e82.825eb2",
+    "type": "function",
+    "z": "bbb5a507.9eeaf8",
+    "name": "Hld 6",
+    "func": "msg.payload = { value: msg.payload, \n'fc': 6,\n'unitid': 1, \n'address': 6,\n'quantity': 1 } \nreturn msg",
+    "outputs": 1,
+    "noerr": 0,
+    "x": 852.2332229614258,
+    "y": 646.3333201408386,
+    "wires": [
+      [
+        "e0574d1f.547848"
+      ]
+    ]
+  },
+  {
+    "id": "ee4bba80.dd2c1",
+    "type": "delay",
+    "z": "bbb5a507.9eeaf8",
+    "name": "",
+    "pauseType": "delay",
+    "timeout": "300",
+    "timeoutUnits": "milliseconds",
+    "rate": "1",
+    "nbRateUnits": "1",
+    "rateUnits": "second",
+    "randomFirst": "1",
+    "randomLast": "5",
+    "randomUnits": "seconds",
+    "drop": false,
+    "x": 279.3999328613281,
+    "y": 1119.999855518341,
+    "wires": [
+      [
+        "66d4f093.f28ac"
+      ]
+    ]
+  },
+  {
+    "id": "f72dd87.4a3c7a8",
+    "type": "comment",
+    "z": "bbb5a507.9eeaf8",
+    "name": "Automatic Logic",
+    "info": "",
+    "x": 707.2333297729492,
+    "y": 728.3332133293152,
+    "wires": []
+  },
+  {
+    "id": "e13b9450.9ce78",
+    "type": "inject",
+    "z": "bbb5a507.9eeaf8",
+    "name": "",
+    "topic": "",
+    "payload": "true",
+    "payloadType": "bool",
+    "repeat": "1",
+    "crontab": "",
+    "once": false,
+    "x": 674.2333297729492,
+    "y": 779.3330912590027,
+    "wires": [
+      [
+        "d0e0405.d8a6cc",
+        "46e6edbe.12d92c"
+      ]
+    ]
+  },
+  {
+    "id": "d0e0405.d8a6cc",
+    "type": "function",
+    "z": "bbb5a507.9eeaf8",
+    "name": "pump 1 auto",
+    "func": "//   The message returned from the read node is an\n// array as there could be multiple registers returned\n//   This reads the first value in the array.\nvar tankLevel = global.get(\"tank1Level\");\nvar pumpMode = global.get(\"pump1Mode\");\nvar pumpStatus = global.get(\"pump1Status\");\nvar tankStart = global.get(\"tank1Start\");\nvar tankStop = global.get(\"tank1Stop\");\n\nif (pumpMode === true && pumpStatus === false && tankLevel <= tankStart)\n{\n    msg.payload = { value: true, \n    'fc': 5,\n    'unitid': 1, \n    'address': 2,\n    'quantity': 1 } \n    return msg\n}\nelse if (pumpMode === true && pumpStatus === true && tankLevel >= tankStop)\n{\n    msg.payload = { value: false, \n    'fc': 5,\n    'unitid': 1, \n    'address': 2,\n    'quantity': 1 } \n    return msg\n}",
+    "outputs": 1,
+    "noerr": 0,
+    "x": 842.2333297729492,
+    "y": 761.3330302238464,
+    "wires": [
+      [
+        "e0574d1f.547848"
+      ]
+    ]
+  },
+  {
+    "id": "46e6edbe.12d92c",
+    "type": "function",
+    "z": "bbb5a507.9eeaf8",
+    "name": "pump 2 auto",
+    "func": "//   The message returned from the read node is an\n// array as there could be multiple registers returned\n//   This reads the first value in the array.\nvar tankLevel = global.get(\"tank2Level\");\nvar pumpMode = global.get(\"pump2Mode\");\nvar pumpStatus = global.get(\"pump2Status\");\nvar tankStart = global.get(\"tank2Start\");\nvar tankStop = global.get(\"tank2Stop\");\n\n\nif (pumpMode === true && pumpStatus === false && tankLevel <= tankStart)\n{\n    msg.payload = { value: true, \n    'fc': 5,\n    'unitid': 1, \n    'address': 4,\n    'quantity': 1 } \n    return msg\n}\nelse if (pumpMode === true && pumpStatus === true && tankLevel >= tankStop)\n{\n    msg.payload = { value: false, \n    'fc': 5,\n    'unitid': 1, \n    'address': 4,\n    'quantity': 1 } \n    return msg\n}",
+    "outputs": 1,
+    "noerr": 0,
+    "x": 843.2333297729492,
+    "y": 796.6665263175964,
+    "wires": [
+      [
+        "e0574d1f.547848"
+      ]
+    ]
+  },
+  {
+    "id": "3ef0307a.718e88",
+    "type": "inject",
+    "z": "bbb5a507.9eeaf8",
+    "name": "",
+    "topic": "",
+    "payload": "true",
+    "payloadType": "bool",
+    "repeat": "",
+    "crontab": "",
+    "once": true,
+    "x": 122.4000244140625,
+    "y": 938.6667256355286,
+    "wires": [
+      [
+        "10682cef.4f3be3",
+        "a33c255f.ab5138"
+      ]
+    ]
+  },
+  {
+    "id": "97d4d6d6.f6064",
+    "type": "function",
+    "z": "bbb5a507.9eeaf8",
+    "name": "Startup Values",
+    "func": "msg.payload = { value:[false, false, false, false], \n'fc': 15, \n'unitid': 1, \n'address': 0, \n'quantity': 4 } \nreturn msg",
+    "outputs": 1,
+    "noerr": 0,
+    "x": 463.2333221435547,
+    "y": 939.3334126472473,
+    "wires": [
+      [
+        "1b900cb2.8100d3"
+      ]
+    ]
+  },
+  {
+    "id": "10682cef.4f3be3",
+    "type": "delay",
+    "z": "bbb5a507.9eeaf8",
+    "name": "",
+    "pauseType": "delay",
+    "timeout": "5",
+    "timeoutUnits": "seconds",
+    "rate": "1",
+    "nbRateUnits": "1",
+    "rateUnits": "second",
+    "randomFirst": "1",
+    "randomLast": "5",
+    "randomUnits": "seconds",
+    "drop": false,
+    "x": 281.40000915527344,
+    "y": 939.0000996589661,
+    "wires": [
+      [
+        "97d4d6d6.f6064"
+      ]
+    ]
+  },
+  {
+    "id": "2d547ec5.a27d52",
+    "type": "function",
+    "z": "bbb5a507.9eeaf8",
+    "name": "Startup Values",
+    "func": "msg.payload = { value:[180,180,150,200,150,200], \n'fc': 16, \n'unitid': 1, \n'address': 1, \n'quantity': 6 } \nreturn msg",
+    "outputs": 1,
+    "noerr": 0,
+    "x": 463.2333221435547,
+    "y": 975.3334126472473,
+    "wires": [
+      [
+        "1b900cb2.8100d3"
+      ]
+    ]
+  },
+  {
+    "id": "a33c255f.ab5138",
+    "type": "delay",
+    "z": "bbb5a507.9eeaf8",
+    "name": "",
+    "pauseType": "delay",
+    "timeout": "6",
+    "timeoutUnits": "seconds",
+    "rate": "1",
+    "nbRateUnits": "1",
+    "rateUnits": "second",
+    "randomFirst": "1",
+    "randomLast": "5",
+    "randomUnits": "seconds",
+    "drop": false,
+    "x": 281.40000915527344,
+    "y": 975.0000996589661,
+    "wires": [
+      [
+        "2d547ec5.a27d52"
+      ]
+    ]
+  },
+  {
+    "id": "55c22273.da3ae4",
+    "type": "comment",
+    "z": "bbb5a507.9eeaf8",
+    "name": "Read Me for Register Info",
+    "info": "Coils\n1 Pump 1 Mode\n2 pump 1 Run Status\n3 Pump 2 Mode\n4 Pump 2 Run Status\n\nHolding Registers\n40001 Tank 1 Level\n40002 Tank 1 Start Setpoint\n40003 Tank 1 Stop Setpoint\n40004 Tank 2 Level\n40005 Tank 2 Start Setpoint\n40006 Tank 2 Stop Setpoint\n",
+    "x": 164.7833709716797,
+    "y": 219.88337326049805,
+    "wires": []
+  },
+  {
+    "id": "56417c7f.53490c",
+    "type": "comment",
+    "z": "bbb5a507.9eeaf8",
+    "name": "Modbus read, write and dashboard icons",
+    "info": "\n",
+    "x": 217.06671142578125,
+    "y": 182.16669845581055,
+    "wires": []
+  },
+  {
+    "id": "39a0ce33.43792a",
+    "type": "comment",
+    "z": "bbb5a507.9eeaf8",
+    "name": "Startup Sim Values",
+    "info": "",
+    "x": 154.16668701171875,
+    "y": 905.5334248542786,
+    "wires": []
+  },
+  {
+    "id": "23512bab.734fac",
+    "type": "ui_text",
+    "z": "bbb5a507.9eeaf8",
+    "group": "9bd788a1.b5bb98",
+    "order": 6,
+    "width": 0,
+    "height": 0,
+    "name": "",
+    "label": "Tank 1",
+    "format": "{{msg.payload}}",
+    "layout": "row-spread",
+    "x": 937.4001960754395,
+    "y": 138.50008916854858,
+    "wires": []
+  },
+  {
+    "id": "130b2744.d7a7e9",
+    "type": "function",
+    "z": "bbb5a507.9eeaf8",
+    "name": "notification",
+    "func": "lvl = msg.payload\nmsg.topic = 'Tank 1 Alarm';\nvar tank1Alarm = global.get(\"tank1Alarm\");\nvar tank1Start = global.get(\"tank1Start\");\nvar tank1Stop = global.get(\"tank1Stop\");\n    \nif (lvl > (tank1Stop + 15))\n{\n    msg.payload = 'Tank 1 Level High Alarm';\n}\nelse if (lvl < (tank1Start - 15))\n{\n    msg.payload = 'Tank 1 Level Low Alarm'; \n}\nelse\n{\n      msg.payload = 'Tank 1 Alarm Clear';  \n}\n\nif (msg.payload != tank1Alarm)\n{\n    global.set(\"tank1Alarm\",msg.payload);\n    return msg;\n}",
+    "outputs": 1,
+    "noerr": 0,
+    "x": 763.6501350402832,
+    "y": 138.96670293807983,
+    "wires": [
+      [
+        "23512bab.734fac",
+        "389aabdc.4c980c"
+      ]
+    ]
+  },
+  {
+    "id": "1c93a739.018941",
+    "type": "ui_audio",
+    "z": "bbb5a507.9eeaf8",
+    "name": "",
+    "group": "34a91890.9fc56",
+    "voice": "1",
+    "always": "",
+    "x": 1081.9003067016602,
+    "y": 101.16671657562256,
+    "wires": []
+  },
+  {
+    "id": "6e205664.eb0258",
+    "type": "ui_text",
+    "z": "bbb5a507.9eeaf8",
+    "group": "7b6e0d6c.f51904",
+    "order": 6,
+    "width": 0,
+    "height": 0,
+    "name": "",
+    "label": "Tank 2",
+    "format": "{{msg.payload}}",
+    "layout": "row-spread",
+    "x": 937.9001541137695,
+    "y": 171.5667281150818,
+    "wires": []
+  },
+  {
+    "id": "f4f81b9e.9ad468",
+    "type": "function",
+    "z": "bbb5a507.9eeaf8",
+    "name": "notification",
+    "func": "lvl = msg.payload\nmsg.topic = 'Tank 2 Alarm';\nvar tank2Alarm = global.get(\"tank2Alarm\");\nvar tank2Start = global.get(\"tank2Start\");\nvar tank2Stop = global.get(\"tank2Stop\");\n    \nif (lvl > (tank2Stop + 15))    \n{\n    msg.payload = 'Tank 2 Level High Alarm';\n}\nelse if (lvl < (tank2Start - 15))\n{\n    msg.payload = 'Tank 2 Level Low Alarm'; \n}\nelse\n{\n      msg.payload = 'Tank 2 Alarm Clear';  \n}\n\nif (msg.payload != tank2Alarm)\n{\n    global.set(\"tank2Alarm\",msg.payload);\n    return msg;\n}",
+    "outputs": 1,
+    "noerr": 0,
+    "x": 762.1500930786133,
+    "y": 172.03334188461304,
+    "wires": [
+      [
+        "6e205664.eb0258",
+        "389aabdc.4c980c"
+      ]
+    ]
+  },
+  {
+    "id": "560d158e.ab437c",
+    "type": "ui_text",
+    "z": "bbb5a507.9eeaf8",
+    "group": "9bd788a1.b5bb98",
+    "order": 4,
+    "width": "3",
+    "height": "1",
+    "name": "",
+    "label": "Low Setpt",
+    "format": "{{msg.payload}}",
+    "layout": "row-left",
+    "x": 946.4002265930176,
+    "y": 205.00012731552124,
+    "wires": []
+  },
+  {
+    "id": "4fb126cd.3aa7d",
+    "type": "ui_text",
+    "z": "bbb5a507.9eeaf8",
+    "group": "9bd788a1.b5bb98",
+    "order": 5,
+    "width": "3",
+    "height": "1",
+    "name": "",
+    "label": "High Stpt",
+    "format": "{{msg.payload}} ",
+    "layout": "row-left",
+    "x": 945.5669441223145,
+    "y": 239.00012254714966,
+    "wires": []
+  },
+  {
+    "id": "b1be0261.faeee8",
+    "type": "ui_text",
+    "z": "bbb5a507.9eeaf8",
+    "group": "7b6e0d6c.f51904",
+    "order": 4,
+    "width": "3",
+    "height": "1",
+    "name": "",
+    "label": "Low Stpt",
+    "format": "{{msg.payload}}",
+    "layout": "row-left",
+    "x": 943.9002380371094,
+    "y": 273.00009870529175,
+    "wires": []
+  },
+  {
+    "id": "b849217b.86a418",
+    "type": "ui_text",
+    "z": "bbb5a507.9eeaf8",
+    "group": "7b6e0d6c.f51904",
+    "order": 5,
+    "width": "3",
+    "height": "1",
+    "name": "",
+    "label": "High Stpt",
+    "format": "{{msg.payload}} ",
+    "layout": "row-left",
+    "x": 943.0668334960938,
+    "y": 307.0000567436218,
+    "wires": []
+  },
+  {
+    "id": "61603830.6a2208",
+    "type": "comment",
+    "z": "bbb5a507.9eeaf8",
+    "name": "Alarming",
+    "info": "\n",
+    "x": 717.900276184082,
+    "y": 80.00004768371582,
+    "wires": []
+  },
+  {
+    "id": "696d50f6.b9a7f",
+    "type": "function",
+    "z": "bbb5a507.9eeaf8",
+    "name": "",
+    "func": "\nif (msg.payload == 1)\n{\n    global.set(\"enable\", 1);\n   // return msg;\n}\nelse\n{\n    global.set(\"enable\", 0);     \n}\n\n",
+    "outputs": 1,
+    "noerr": 0,
+    "x": 1072.166748046875,
+    "y": 63,
+    "wires": [
+      []
+    ]
+  },
+  {
+    "id": "1ef97daf.f77c42",
+    "type": "ui_switch",
+    "z": "bbb5a507.9eeaf8",
+    "name": "",
+    "label": "Enable Audio TTS",
+    "group": "34a91890.9fc56",
+    "order": 0,
+    "width": 0,
+    "height": 0,
+    "passthru": true,
+    "decouple": "false",
+    "topic": "EnableBtn",
+    "style": "",
+    "onvalue": "1",
+    "onvalueType": "num",
+    "onicon": "",
+    "oncolor": "",
+    "offvalue": "0",
+    "offvalueType": "num",
+    "officon": "",
+    "offcolor": "",
+    "x": 912.1668090820312,
+    "y": 63.09720230102539,
+    "wires": [
+      [
+        "696d50f6.b9a7f"
+      ]
+    ]
+  },
+  {
+    "id": "389aabdc.4c980c",
+    "type": "function",
+    "z": "bbb5a507.9eeaf8",
+    "name": "",
+    "func": "var enable = global.get(\"enable\");\n\nif (enable == 1)\n{\n    return msg;\n}\n\n",
+    "outputs": 1,
+    "noerr": 0,
+    "x": 950.1666564941406,
+    "y": 101.00002384185791,
+    "wires": [
+      [
+        "1c93a739.018941"
+      ]
+    ]
+  },
+  {
+    "id": "4412ae43.cdf648",
+    "type": "modbus-client",
+    "z": "",
+    "name": "local",
+    "clienttype": "tcp",
+    "bufferCommands": true,
+    "stateLogEnabled": false,
+    "tcpHost": "127.0.0.1",
+    "tcpPort": "502",
+    "tcpType": "DEFAULT",
+    "serialPort": "/dev/ttyUSB",
+    "serialType": "RTU-BUFFERD",
+    "serialBaudrate": "9600",
+    "serialDatabits": "8",
+    "serialStopbits": "1",
+    "serialParity": "none",
+    "serialConnectionDelay": "100",
+    "unit_id": "1",
+    "commandDelay": "1",
+    "clientTimeout": "1000",
+    "reconnectTimeout": "2000"
+  },
+  {
+    "id": "9bd788a1.b5bb98",
+    "type": "ui_group",
+    "z": "",
+    "name": "Tank 1",
+    "tab": "66634e5c.10174",
+    "order": 2,
+    "disp": true,
+    "width": "6"
+  },
+  {
+    "id": "7b6e0d6c.f51904",
+    "type": "ui_group",
+    "z": "",
+    "name": "Tank 2",
+    "tab": "66634e5c.10174",
+    "order": 4,
+    "disp": true,
+    "width": "6"
+  },
+  {
+    "id": "912c5aef.7152f",
+    "type": "ui_group",
+    "z": "",
+    "name": "Water Well",
+    "tab": "66634e5c.10174",
+    "order": 1,
+    "disp": true,
+    "width": "6"
+  },
+  {
+    "id": "4025c129.a588a8",
+    "type": "ui_group",
+    "z": "",
+    "name": "Transfer Pump",
+    "tab": "66634e5c.10174",
+    "order": 3,
+    "disp": true,
+    "width": "6"
+  },
+  {
+    "id": "34a91890.9fc56",
+    "type": "ui_group",
+    "z": "",
+    "name": "Alarming",
+    "tab": "66634e5c.10174",
+    "disp": true,
+    "width": "6"
+  },
+  {
+    "id": "66634e5c.10174",
+    "type": "ui_tab",
+    "z": "",
+    "name": "Water Utility",
+    "icon": "dashboard"
+  }
+]
