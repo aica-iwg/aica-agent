@@ -73,14 +73,15 @@ module.exports = {
     /** To password protect the Node-RED editor and admin API, the following
      * property can be used. See http://nodered.org/docs/security.html for details.
      */
-    //adminAuth: {
-    //    type: "credentials",
-    //    users: [{
-    //        username: "admin",
-    //        password: "$2a$08$zZWtXTja0fB1pzD4sHCMyOCMYz2Z6dNbM6tl8sJogENOMcxWV9DN.",
-    //        permissions: "*"
-    //    }]
-    //},
+    // admin:admin
+    adminAuth: {
+        type: "credentials",
+        users: [{
+            username: "admin",
+            password: "$2a$08$3LzYOzA.fnUkqYs/gxC1beNX42Qy1h/IT0l./OjIllwqaP8AbiX5u",
+            permissions: "*"
+        }]
+    },
 
     /** The following property can be used to enable HTTPS
      * This property can be either an object, containing both a (private) key
@@ -122,8 +123,9 @@ module.exports = {
      * The `pass` field is a bcrypt hash of the password.
      * See http://nodered.org/docs/security.html#generating-the-password-hash
      */
-    //httpNodeAuth: {user:"user",pass:"$2a$08$zZWtXTja0fB1pzD4sHCMyOCMYz2Z6dNbM6tl8sJogENOMcxWV9DN."},
-    //httpStaticAuth: {user:"user",pass:"$2a$08$zZWtXTja0fB1pzD4sHCMyOCMYz2Z6dNbM6tl8sJogENOMcxWV9DN."},
+    // Credential user:password - obviously this isn't for production
+    httpNodeAuth: {user:"user",pass:"$2a$08$4zRPSiJe6DV2GJuxtSpS9udIdLEpDPIGCqtW2.qaBVH/EjF19opV."},
+    httpStaticAuth: {user:"user",pass:"$2a$08$4zRPSiJe6DV2GJuxtSpS9udIdLEpDPIGCqtW2.qaBVH/EjF19opV."},
 
 /*******************************************************************************
  * Server Settings
@@ -249,12 +251,38 @@ module.exports = {
               * trace - record very detailed logging + debug + info + warn + error + fatal errors
               * off - turn off all logging (doesn't affect metrics or audit)
               */
-             level: "info",
+             level: "off",
              /** Whether or not to include metric events in the log output */
              metrics: false,
              /** Whether or not to include audit events in the log output */
-             audit: false
-         }
+             audit: true
+         },
+         myCustomLogger: {
+            level: 'debug',
+            audit: true,
+            handler: function() {
+                // Called when the logger is initialised
+                var fs = require('fs')
+                
+                // Return the logging function
+                return function(msg) {
+                    var message = {
+                        '@tags': ['node-red'],
+                        '@fields': msg,
+                        '@timestamp': (new Date(msg.timestamp)).toISOString()
+                    }
+                    
+                    fs.appendFile('/data/node-red-audit.log', JSON.stringify(message)+"\n", err => {
+                        if (err) {
+                          console.error(err)
+                          return
+                        }
+                        //done!
+                      })
+                    console.log(msg.timestamp, msg.event);
+                }
+            }
+        }
      },
 
      /** Context Storage
