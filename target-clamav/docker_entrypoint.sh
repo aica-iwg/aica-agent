@@ -6,6 +6,8 @@ ipset create honeypot hash:ip hashsize 4096 timeout 300
 iptables-legacy -t nat -A PREROUTING -m set --match-set honeypot src -j DNAT --to-destination `dig +short honeypot`
 
 echo "root:targetrootpassword" | chpasswd
+echo "appuser:appuser" | chpasswd
+
 /usr/sbin/sshd -ef /etc/ssh/sshd_config
 
 nginx -g "daemon off;"
