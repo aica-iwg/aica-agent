@@ -34,7 +34,7 @@ lint: deps
 
 security: deps
 		@${BANDIT} -q -ll -ii -r manager/
-		@find . -name "requirements*.txt" | xargs printf -- '-r %s\n' | xargs ${SAFETY} check --bare
+		@find . -name "requirements*.txt" | xargs printf -- '-r %s\n' | xargs ${SAFETY} check --bare -i 49256 # 49256 is a known flower vuln w/o a patch available yet
 
 build: check-env lint security
 		@docker compose -f docker-compose.yml -f docker-compose-${MODE}.yml build
