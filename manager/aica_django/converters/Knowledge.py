@@ -642,6 +642,121 @@ def suricata_alert_to_knowledge(alert):
     return nodes, relations
 
 
+def antivirus_alert_to_knowledge(alert):
+    nodes = []
+    relations = []
+
+    alert_obj = KnowledgeNode(
+        label="Alert",
+        name=str(uuid.uuid4()),
+        values={
+            "date": alert["date"],
+            # "flow_id": alert["flow_id"],
+        },
+    )
+    nodes.append(alert_obj)
+
+    alert_signature = KnowledgeNode(
+        label="AttackSignature",
+        name=f"AV -> {alert['path']}: {alert['sig']}",
+        values={
+            "signature": alert["sig"],
+            # "metadata": alert["alert"]["metadata"],
+        },
+    )
+    nodes.append(alert_signature)
+
+    relations.append(
+        KnowledgeRelation(
+            label="is-type",
+            source_node=alert_obj,
+            target_node=alert_signature,
+        )
+    )
+
+    path = KnowledgeNode(
+        label="FilePath",
+        name=f'path: {alert["path"]}',
+        values={
+            "path": alert["path"],
+        },
+    )
+    nodes.append(path)
+
+    hostname = KnowledgeNode(
+        label="Host",
+        name=alert["hostname"],
+    )
+    nodes.append(hostname)
+
+    ip_addr = KnowledgeNode(
+        label="IPv4Address",
+        name=alert["ip_addr"],
+    )
+    nodes.append(ip_addr)    
+
+    relations.append(
+        KnowledgeRelation(
+            label="triggered-by",
+            source_node=alert_obj,
+            target_node=path,
+        )
+    )
+
+    relations.append(
+        KnowledgeRelation(
+            label="stored-on",
+            source_node=path,
+            target_node=hostname,
+        )
+    )
+
+    relations.append(
+        KnowledgeRelation(
+            label="has-address",
+            source_node=hostname,
+            target_node=ip_addr,
+        )
+    )
+
+    if alert["vt_crit"] != "Not Available":
+        malicious_conf = KnowledgeNode(
+            label="VTMaliciousConfidence",
+            name=str(alert["vt_crit"]),
+            values={
+                "malicious confidence": alert["vt_crit"],
+            },
+        )
+        nodes.append(malicious_conf)
+
+        md5sum = KnowledgeNode(
+            label="Checksum",
+            name=alert["md5sum"],
+            values={
+                "md5sum": alert["md5sum"],
+            },
+        )
+        nodes.append(md5sum)
+
+        relations.append(
+            KnowledgeRelation(
+                label="has-attribute",
+                source_node=alert_signature,
+                target_node=malicious_conf,
+            )
+        )
+
+        relations.append(
+            KnowledgeRelation(
+                label="has-attribute",
+                source_node=alert_signature,
+                target_node=md5sum,
+            )
+        )
+
+    return nodes, relations
+
+
 def knowledge_to_neo(nodes=None, relations=None):
     neo_host = os.getenv("NEO4J_HOST")
     neo_user = os.getenv("NEO4J_USER")

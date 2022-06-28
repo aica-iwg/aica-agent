@@ -85,15 +85,6 @@ services:
     networks:
       - control
 
-  node_red_target:
-    build: node_red_target
-    container_name: 'node_red_target'
-    ports:
-      - '1880:1880'
-      - '502:502'
-    networks:
-      - target
-
 networks:
   bridge:
   control:

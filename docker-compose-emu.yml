@@ -8,6 +8,7 @@ services:
     volumes:
       - ids_suricata_log:/var/log/suricata
       - target_nginx_log:/var/log/nginx
+      - av_clamav_log:/var/log/clamav
 
   attacker:
     build: ./attacker
@@ -22,13 +23,25 @@ services:
   target:
     build: ./target
     container_name: 'target'
-    command: sh /usr/local/bin/docker_entrypoint.sh
+    command: >
+          sh -c "supervisord -c /etc/supervisord.conf &&
+          sh /usr/local/bin/docker_entrypoint.sh"
     volumes:
       - target_nginx_log:/var/log/nginx
+      - av_clamav_log:/var/log/clamav
     sysctls:
       - net.ipv4.conf.all.forwarding=1
     cap_add:
-      - NET_ADMIN
+      - SYS_ADMIN # Previously NET_ADMIN, has to be SYS because fanotify 
+    networks:
+      - target
+    
+  node_red_target:
+    build: ./node_red_target
+    container_name: 'node_red_target'
+    ports:
+      - '1880:1880'
+      - '502:502'
     networks:
       - target
 
@@ -54,6 +67,7 @@ services:
 volumes:
   ids_suricata_log:
   target_nginx_log:
+  av_clamav_log:
 
 networks:
   target:

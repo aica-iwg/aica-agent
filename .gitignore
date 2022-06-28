@@ -11,3 +11,6 @@ data
 # Need to use real malware to test antivirus, appending .malz to any potentially malicious file
 # and placing it in the gitignore so it doesn't accidentally get pushed
 *.malz
+
+# API Keys
+.env.secret 
