@@ -30,7 +30,7 @@ def get_vt_report(md5: str):
         client = vt.Client(VT_API_KEY)
         file = client.get_object(f"/files/{md5}")
         conf = malicious_confidence(file.last_analysis_results)
-        return conf, file.last_analysis_results
+        return conf, file
     except Exception:
         return "Not Available", None
 
@@ -47,9 +47,12 @@ def parse_line(line):
         event_dict["path"] = info[0].strip()
         event_dict["sig"] = re.search(r"^[^\(]*", info[1]).group(0).strip()
         event_dict["md5sum"] = md5sum
-        vt_crit, report = get_vt_report(md5sum)
 
+        # Processing VirusTotal info
+        vt_crit, report = get_vt_report(md5sum)
         event_dict["vt_crit"] = vt_crit
+        event_dict["vt_sig"] = report.popular_threat_classification['suggested_threat_label']
+        event_dict["ssdeep"] = report.ssdeep
 
     else:
         event_dict["event_type"] = "non-alert"
@@ -77,7 +80,7 @@ def poll_antivirus_alerts():
             with open('/var/log/clamav/hostinfo.txt', 'r') as filp:
                 ip_address, hostname = filp.read().strip().split(',')
         except FileNotFoundError:
-            ip_address, hostname = "Error"
+            ip_address, hostname = "Error", "Error"
 
         while True:
             line = f.stdout.readline()

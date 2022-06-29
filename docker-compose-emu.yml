@@ -24,8 +24,7 @@ services:
     build: ./target
     container_name: 'target'
     command: >
-          sh -c "supervisord -c /etc/supervisord.conf &&
-          sh /usr/local/bin/docker_entrypoint.sh"
+          sh -c "supervisord -c /etc/supervisord.conf"
     volumes:
       - target_nginx_log:/var/log/nginx
       - av_clamav_log:/var/log/clamav

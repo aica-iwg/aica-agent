@@ -656,15 +656,25 @@ def antivirus_alert_to_knowledge(alert):
     )
     nodes.append(alert_obj)
 
-    alert_signature = KnowledgeNode(
-        label="AttackSignature",
-        name=f"AV -> {alert['path']}: {alert['sig']}",
-        values={
-            "signature": alert["sig"],
-            # "metadata": alert["alert"]["metadata"],
-        },
-    )
-    nodes.append(alert_signature)
+    if alert["vt_crit"] == "Not Available":
+        alert_signature = KnowledgeNode(
+            label="AttackSignature",
+            name=f"{alert['path']}: {alert['sig']}",
+            values={
+                "signature": alert["sig"],
+                # "metadata": alert["alert"]["metadata"],
+            },
+        )
+        nodes.append(alert_signature)
+    else:
+        alert_signature = KnowledgeNode(
+            label="AttackSignature",
+            name=f"{alert['path']}: {alert['sig']}",
+            values={
+                "SupposedName": alert["vt_sig"],
+            },
+        )
+        nodes.append(alert_signature)
 
     relations.append(
         KnowledgeRelation(
@@ -719,6 +729,23 @@ def antivirus_alert_to_knowledge(alert):
         )
     )
 
+    md5sum = KnowledgeNode(
+        label="Checksum",
+            name=alert["md5sum"],
+            values={
+                "md5sum": alert["md5sum"],
+            },
+        )
+    nodes.append(md5sum)
+
+    relations.append(
+        KnowledgeRelation(
+            label="has-attribute",
+            source_node=alert_signature,
+            target_node=md5sum,
+        )
+    )
+
     if alert["vt_crit"] != "Not Available":
         malicious_conf = KnowledgeNode(
             label="VTMaliciousConfidence",
@@ -729,15 +756,6 @@ def antivirus_alert_to_knowledge(alert):
         )
         nodes.append(malicious_conf)
 
-        md5sum = KnowledgeNode(
-            label="Checksum",
-            name=alert["md5sum"],
-            values={
-                "md5sum": alert["md5sum"],
-            },
-        )
-        nodes.append(md5sum)
-
         relations.append(
             KnowledgeRelation(
                 label="has-attribute",
@@ -746,11 +764,20 @@ def antivirus_alert_to_knowledge(alert):
             )
         )
 
+        ssdeep = KnowledgeNode(
+            label="Checksum",
+            name=alert["ssdeep"],
+            values={
+                "ssdeep": alert["ssdeep"],
+            },
+        )
+        nodes.append(md5sum)
+
         relations.append(
             KnowledgeRelation(
                 label="has-attribute",
                 source_node=alert_signature,
-                target_node=md5sum,
+                target_node=ssdeep,
             )
         )
 
