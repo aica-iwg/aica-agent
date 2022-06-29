@@ -2,7 +2,7 @@ FROM alpine:3
 USER root
 # Install iptables for forwarding (enabled in entrypoint since RO here)
 RUN apk update && apk upgrade && \
-    apk add openssh iptables ipset nginx bind-tools bash vim zip
+    apk add openssh iptables ipset nginx bind-tools bash vim zip wget
 
 # Clam AV
 RUN apk --no-cache add clamav-daemon freshclam clamav-libunrar supervisor clamav
