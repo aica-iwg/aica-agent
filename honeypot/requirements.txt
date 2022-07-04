@@ -1,4 +1,4 @@
 scapy==2.4.5
 pcapy==0.11.4
-opencanary==0.6.3
+opencanary==0.7.1
 markupsafe==2.0.1  # https://github.com/pallets/markupsafe/issues/284
