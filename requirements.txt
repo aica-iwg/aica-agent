@@ -3,7 +3,7 @@
 # build/test dependencies
 bandit==1.7.4
 bashlint==0.1.1
-black==22.3.0
+black==22.6.0
 flake8==4.0.1
 safety==1.10.3
 yamllint==1.26.3
