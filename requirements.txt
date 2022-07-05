@@ -5,9 +5,10 @@ bandit==1.7.4
 bashlint==0.1.1
 black==22.6.0
 flake8==4.0.1
-safety==1.10.3
+safety==2.0.0
 yamllint==1.26.3
 
-# Other requirements are in manager/requirements.txt (for the Manager container) and honey/requirements.txt
-# (for the honeypot container). You might wish to install these in your IDE for completion/testing. If you do so,
-# ensure you have installed python3, python3-venv, python3-wheel, and libpq-dev/postgresql via your OS package manager.
+# Other requirements are in manager/requirements.txt (for the Manager container) and
+# honeypot/requirements.txt(for the honeypot container). You might wish to install these
+# in your IDE for completion/testing. If you do so, ensure you have installed python3,
+# python3-venv, python3-wheel, and libpq-dev/postgresql via your OS package manager.
