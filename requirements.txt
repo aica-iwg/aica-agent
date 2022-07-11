@@ -6,7 +6,7 @@ bashlint==0.1.1
 black==22.6.0
 flake8==4.0.1
 safety==2.0.0
-yamllint==1.26.3
+yamllint==1.27.1
 
 # Other requirements are in manager/requirements.txt (for the Manager container) and
 # honeypot/requirements.txt(for the honeypot container). You might wish to install these
