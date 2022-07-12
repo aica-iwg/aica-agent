@@ -12,4 +12,5 @@ echo "$(hostname),$(hostname -i)" > /var/log/clamav/hostinfo.txt
 
 /usr/sbin/sshd -ef /etc/ssh/sshd_config
 
+supervisord -c /etc/supervisord.conf &
 nginx -g "daemon off;"

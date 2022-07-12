@@ -29,14 +29,9 @@ RUN sed -i 's/^Foreground .*$/Foreground true/g' /etc/clamav/clamd.conf && \
 RUN freshclam
 RUN addgroup -S appuser && adduser -D -s /bin/bash appuser -G appuser 
 
-# The malware.zip.malz is a zip archive that is not in the repo that is used to generate
-# clamav logs. Please remove a line containing that file name if you see it.
 RUN mkdir /run/clamav && mkdir /root/quarantine && \
     chown root:root /run/clamav && chown root:root /root/quarantine && \
-    chown appuser:appuser /opt/test-files/malware.zip.malz /opt/test-files/eicar.com && \
-    chmod +x /usr/local/bin/docker_entrypoint.sh /usr/local/bin/clamonacc.sh
+    chown appuser:appuser /opt/test-files/avtest.sh /opt/test-files/eicar.com && \
+    chmod +x /usr/local/bin/docker_entrypoint.sh /usr/local/bin/clamonacc.sh /opt/test-files/avtest.sh
 
 COPY etc /etc/
-
-# Only uncomment when using the build-docker.sh script
-# CMD ["sh", "-c", "supervisord -c /etc/supervisord.conf && sh /usr/local/bin/docker_entrypoint.sh"]

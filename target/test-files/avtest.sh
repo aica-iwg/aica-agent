@@ -6,9 +6,12 @@ then
     wget https://secure.eicar.org/eicar.com.txt -O /tmp/cutekittens2.com.txt
     wget https://secure.eicar.org/eicar_com.zip -O /home/appuser/epicfile3.zip
 
-    cp /opt/test-files/malware.zip.malz /tmp/malware.zip.malz
+    # TODO: Replace this part with something that can use the malwarebazaar API (or some equivalent) to download stuff instead
+    #       I haven't really done it because ClamAV only uses signatures, so we could be pulling a lot of unknown
+    #       stuff which isn't useful. Good reference: https://github.com/Squiblydoo/bazaarShopper
+    cp /opt/test-files/malware.zip /tmp/malware.zip
     cd /tmp
-    unzip -P infected malware.zip.malz
+    unzip -P infected malware.zip
 
     head *.malz
 fi

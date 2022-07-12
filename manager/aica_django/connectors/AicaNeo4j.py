@@ -9,7 +9,6 @@ defined_node_labels = [
     "AttackSignature",
     "AttackSignatureCategory",
     "AutonomousSystemNumber",
-    "Checksum",
     "DNSRecord",
     "FilePath",
     "Firmware",
@@ -30,7 +29,6 @@ defined_node_labels = [
     "Software",
     "User",  # i.e., principal on a system
     "Vendor",
-    "VTMaliciousConfidence", # should this be generalized?
 ]
 defined_relation_labels = [
     "connected-to",
@@ -38,7 +36,6 @@ defined_relation_labels = [
     "component-of",
     "has-address",
     "has-port",
-    "has-attribute",
     "is-type",
     "located-in",
     "manufactures",

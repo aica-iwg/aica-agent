@@ -646,35 +646,52 @@ def antivirus_alert_to_knowledge(alert):
     nodes = []
     relations = []
 
-    alert_obj = KnowledgeNode(
-        label="Alert",
-        name=str(uuid.uuid4()),
-        values={
-            "date": alert["date"],
-            # "flow_id": alert["flow_id"],
-        },
-    )
-    nodes.append(alert_obj)
-
+    # The if statement is here for error handling the case where the VirusTotal 
+    # data isn't properly stored in the alert object and we get the "Not Available" 
+    # as specified in the Antivirus.py file. Otherwise, we'd have a bunch of errors 
+    # showing up anytime an API key was wrong or the VT servers go down
     if alert["vt_crit"] == "Not Available":
+        alert_obj = KnowledgeNode(
+            label="Alert",
+            name=str(uuid.uuid4()),
+            values={
+                "date": alert["date"],
+            },
+        )
+        nodes.append(alert_obj)
+
         alert_signature = KnowledgeNode(
             label="AttackSignature",
             name=f"{alert['path']}: {alert['sig']}",
             values={
-                "signature": alert["sig"],
-                # "metadata": alert["alert"]["metadata"],
+                "AVSignature": alert["sig"],
+                "md5sum": alert["md5sum"],
             },
         )
         nodes.append(alert_signature)
+
     else:
+        alert_obj = KnowledgeNode(
+            label="Alert",
+            name=str(uuid.uuid4()),
+            values={
+                "date": alert["date"],
+                "vt_malicious_confidence": alert["vt_crit"],
+            },
+        )
+        nodes.append(alert_obj)
+
         alert_signature = KnowledgeNode(
             label="AttackSignature",
             name=f"{alert['path']}: {alert['sig']}",
             values={
-                "SupposedName": alert["vt_sig"],
+                "VTSuggestedLabel": alert["vt_sig"],
+                "md5": alert["md5sum"],
+                "ssdeep": alert["ssdeep"]
             },
         )
         nodes.append(alert_signature)
+
 
     relations.append(
         KnowledgeRelation(
@@ -686,10 +703,7 @@ def antivirus_alert_to_knowledge(alert):
 
     path = KnowledgeNode(
         label="FilePath",
-        name=f'path: {alert["path"]}',
-        values={
-            "path": alert["path"],
-        },
+        name=alert["path"],
     )
     nodes.append(path)
 
@@ -728,58 +742,6 @@ def antivirus_alert_to_knowledge(alert):
             target_node=ip_addr,
         )
     )
-
-    md5sum = KnowledgeNode(
-        label="Checksum",
-            name=alert["md5sum"],
-            values={
-                "md5sum": alert["md5sum"],
-            },
-        )
-    nodes.append(md5sum)
-
-    relations.append(
-        KnowledgeRelation(
-            label="has-attribute",
-            source_node=alert_signature,
-            target_node=md5sum,
-        )
-    )
-
-    if alert["vt_crit"] != "Not Available":
-        malicious_conf = KnowledgeNode(
-            label="VTMaliciousConfidence",
-            name=str(alert["vt_crit"]),
-            values={
-                "malicious confidence": alert["vt_crit"],
-            },
-        )
-        nodes.append(malicious_conf)
-
-        relations.append(
-            KnowledgeRelation(
-                label="has-attribute",
-                source_node=alert_signature,
-                target_node=malicious_conf,
-            )
-        )
-
-        ssdeep = KnowledgeNode(
-            label="Checksum",
-            name=alert["ssdeep"],
-            values={
-                "ssdeep": alert["ssdeep"],
-            },
-        )
-        nodes.append(md5sum)
-
-        relations.append(
-            KnowledgeRelation(
-                label="has-attribute",
-                source_node=alert_signature,
-                target_node=ssdeep,
-            )
-        )
 
     return nodes, relations
 
