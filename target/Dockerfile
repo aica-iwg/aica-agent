@@ -34,4 +34,6 @@ RUN mkdir /run/clamav && mkdir /root/quarantine && \
     chown appuser:appuser /opt/test-files/avtest.sh /opt/test-files/eicar.com && \
     chmod +x /usr/local/bin/docker_entrypoint.sh /usr/local/bin/clamonacc.sh /opt/test-files/avtest.sh
 
-COPY etc /etc/
+COPY etc/clamav /etc/clamav/
+COPY etc/supervisor.d /etc/supervisor.d/
+COPY etc/supervisord.conf /etc/supervisord.conf
