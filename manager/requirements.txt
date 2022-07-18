@@ -9,7 +9,7 @@ gunicorn==20.1.0
 kombu==5.2.4
 neo4j==4.4.5
 netaddr==0.8.0
-netflow==0.11.0
+netflow==0.11.2
 netifaces==0.11.0
 paramiko==2.11.0
 # psycopg2-binary requires pg_config to be installed:
