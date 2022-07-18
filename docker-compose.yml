@@ -88,9 +88,10 @@ services:
   node_red_target:
     build: node_red_target
     container_name: 'node_red_target'
+    env_file:
+      - 'node_red_target/.env'
     ports:
       - '1880:1880'
-      - '502:502'
     networks:
       - target
 
