@@ -22,3 +22,4 @@ python3-nmap==1.5.4
 pyyaml==6.0
 sqlalchemy==1.4.39
 supervisor-stdout==0.1.1
+vt-py==0.14.0

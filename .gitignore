@@ -6,3 +6,7 @@ __pycache__
 .pytest_cache
 db.sqlite3
 data
+.vscode
+
+# API Keys
+.env.secret 

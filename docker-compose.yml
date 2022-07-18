@@ -7,6 +7,7 @@ services:
     container_name: 'manager'
     env_file:
       - 'manager/.env'
+      - 'manager/.env.secret' # This is where any API keys should go
     tty: true
     ports:
       - "8000:8000" # Django frontend

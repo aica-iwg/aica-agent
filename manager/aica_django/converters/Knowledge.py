@@ -642,6 +642,110 @@ def suricata_alert_to_knowledge(alert):
     return nodes, relations
 
 
+def antivirus_alert_to_knowledge(alert):
+    nodes = []
+    relations = []
+
+    # The if statement is here for error handling the case where the VirusTotal 
+    # data isn't properly stored in the alert object and we get the "Not Available" 
+    # as specified in the Antivirus.py file. Otherwise, we'd have a bunch of errors 
+    # showing up anytime an API key was wrong or the VT servers go down
+    if alert["vt_crit"] == "Not Available":
+        alert_obj = KnowledgeNode(
+            label="Alert",
+            name=str(uuid.uuid4()),
+            values={
+                "date": alert["date"],
+            },
+        )
+        nodes.append(alert_obj)
+
+        alert_signature = KnowledgeNode(
+            label="AttackSignature",
+            name=f"{alert['path']}: {alert['sig']}",
+            values={
+                "AVSignature": alert["sig"],
+                "md5sum": alert["md5sum"],
+            },
+        )
+        nodes.append(alert_signature)
+
+    else:
+        alert_obj = KnowledgeNode(
+            label="Alert",
+            name=str(uuid.uuid4()),
+            values={
+                "date": alert["date"],
+                "vt_malicious_confidence": alert["vt_crit"],
+            },
+        )
+        nodes.append(alert_obj)
+
+        alert_signature = KnowledgeNode(
+            label="AttackSignature",
+            name=f"{alert['path']}: {alert['sig']}",
+            values={
+                "VTSuggestedLabel": alert["vt_sig"],
+                "md5": alert["md5sum"],
+                "ssdeep": alert["ssdeep"]
+            },
+        )
+        nodes.append(alert_signature)
+
+
+    relations.append(
+        KnowledgeRelation(
+            label="is-type",
+            source_node=alert_obj,
+            target_node=alert_signature,
+        )
+    )
+
+    path = KnowledgeNode(
+        label="FilePath",
+        name=alert["path"],
+    )
+    nodes.append(path)
+
+    hostname = KnowledgeNode(
+        label="Host",
+        name=alert["hostname"],
+    )
+    nodes.append(hostname)
+
+    ip_addr = KnowledgeNode(
+        label="IPv4Address",
+        name=alert["ip_addr"],
+    )
+    nodes.append(ip_addr)    
+
+    relations.append(
+        KnowledgeRelation(
+            label="triggered-by",
+            source_node=alert_obj,
+            target_node=path,
+        )
+    )
+
+    relations.append(
+        KnowledgeRelation(
+            label="stored-on",
+            source_node=path,
+            target_node=hostname,
+        )
+    )
+
+    relations.append(
+        KnowledgeRelation(
+            label="has-address",
+            source_node=hostname,
+            target_node=ip_addr,
+        )
+    )
+
+    return nodes, relations
+
+
 def knowledge_to_neo(nodes=None, relations=None):
     neo_host = os.getenv("NEO4J_HOST")
     neo_user = os.getenv("NEO4J_USER")
