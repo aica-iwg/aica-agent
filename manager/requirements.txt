@@ -15,7 +15,7 @@ paramiko==2.11.0
 # psycopg2-binary requires pg_config to be installed:
 # libpq-dev in Linux, `brew install postgresql` on MacOS
 psycopg2-binary==2.9.3
-pymongo==4.1.1
+pymongo==4.2.0
 py2neo==2021.2.3
 python-dotenv==0.20.0
 python3-nmap==1.5.4
