@@ -1,0 +1,15 @@
+---
+name: aica
+channels:
+  - conda-forge
+  - fastai
+dependencies:
+  - python=3.9
+  - black=22.6.0
+  - flake8=5.0.4
+  - safety=2.1.1
+  - yamllint=1.27.1
+  - pip
+  - pip:
+      - bandit==1.7.4
+      - bashlint==0.1.1

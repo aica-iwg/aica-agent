@@ -20,16 +20,6 @@ services:
       - control
       - target
 
-  visualization:
-    build: ./visualization
-    container_name: 'visualization'
-    env_file:
-      - 'manager/.env'
-    ports:
-      - "3000:3000"
-    networks:
-      - control
-
   manager_db:
     image: postgres:13-buster
     container_name: 'manager_db'

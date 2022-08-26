@@ -1,15 +1,7 @@
 export DOCKER_SCAN_SUGGEST := false
 
 SHELL := /bin/bash
-VENV := venv
-PYTHON := ${VENV}/bin/python3
-FLAKE := ${VENV}/bin/flake8
-BANDIT := ${VENV}/bin/bandit
-BLACK := ${VENV}/bin/black
-SAFETY := ${VENV}/bin/safety
-BASHLINT := ${VENV}/bin/bashlint
-YAMLLINT := ${VENV}/bin/yamllint
-ACTIVATE := ${VENV}/bin/activate
+CONDA := conda run --no-capture-output -n aica
 mkfile_path := $(abspath $(lastword $(MAKEFILE_LIST)))
 mkfile_dir := $(dir $(mkfile_path))
 
@@ -18,23 +10,18 @@ ifndef MODE
 		$(error MODE is undefined)
 endif
 
-${ACTIVATE}: requirements.txt
-		@test -d ${VENV}/bin || python3 -m venv ${VENV}
-venv: ${ACTIVATE}
+deps: environment.yml
+		@conda env update -f environment.yml
 
-deps: venv
-		@${PYTHON} -m pip install -qU pip wheel
-		@${PYTHON} -m pip install -qUr requirements.txt
+lint:
+		@${CONDA} black -q manager/
+		@${CONDA} flake8 manager/
+		@find . -name "*.yml" | grep -v venv | xargs ${CONDA} yamllint
+		@find . -name "*.sh" | xargs ${CONDA} bashlint
 
-lint: deps
-		@find . -name "*.yml" | grep -v venv | xargs ${YAMLLINT}
-		@${BLACK} -q manager/
-		@${FLAKE} manager/
-		@find . -name "*.sh" | xargs ${BASHLINT}
-
-security: deps
-		@${BANDIT} -q -ll -ii -r manager/
-		@find . -name "requirements*.txt" | xargs printf -- '-r %s\n' | xargs ${SAFETY} check -i 49256 # 49256 is a known flower vuln w/o a patch available yet
+security:
+		@${CONDA} bandit -q -ll -ii -r manager/
+		@find . -name "requirements*.txt" | xargs printf -- '-r %s\n' | xargs ${CONDA} safety check -i 49256 # 49256 is a known flower vuln w/o a patch available yet
 
 build: check-env lint security
 		@docker compose -f docker-compose.yml -f docker-compose-${MODE}.yml build

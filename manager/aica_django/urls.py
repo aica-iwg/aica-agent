@@ -21,5 +21,4 @@ admin.autodiscover()
 urlpatterns = [
     re_path("admin/", admin.site.urls),
     re_path("", include("aica_manager.urls")),
-    re_path("", include("django_prometheus.urls")),
 ]
