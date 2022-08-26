@@ -21,4 +21,4 @@ jobs:
         python-version: ${{ matrix.python-version }}
       
     - name: Run tests
-      run:  make deps && make test
+      run:  make deps && make build && make test
