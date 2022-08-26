@@ -26,7 +26,7 @@ security:
 build: check-env lint security
 		@docker compose -f docker-compose.yml -f docker-compose-${MODE}.yml build
 
-test: build
+test:
 		@docker compose -f docker-compose.yml -f docker-compose-${MODE}.yml run \
 			-e SKIP_TASKS=true --rm manager /opt/venv/bin/python3 manage.py \
 			test --noinput --failfast -v 3
