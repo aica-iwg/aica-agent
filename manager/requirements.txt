@@ -6,7 +6,7 @@ django-extensions==3.2.0
 flower==1.2.0
 gunicorn==20.1.0
 kombu==5.2.4
-neo4j==4.4.5
+neo4j==4.4.6
 netaddr==0.8.0
 netflow==0.11.2
 netifaces==0.11.0
@@ -16,7 +16,7 @@ paramiko==2.11.0
 psycopg2-binary==2.9.3
 pymongo==4.2.0
 py2neo==2021.2.3
-python-dotenv==0.20.0
+python-dotenv==0.21.0
 python3-nmap==1.5.4
 pyyaml==6.0
 sqlalchemy==1.4.40
