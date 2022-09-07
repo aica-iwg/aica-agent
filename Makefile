@@ -13,20 +13,20 @@ endif
 deps: environment.yml
 		@conda env update -f environment.yml
 
-lint:
+lint: deps
 		@${CONDA} black -q manager/
 		@${CONDA} flake8 manager/
 		@find . -name "*.yml" | grep -v venv | xargs ${CONDA} yamllint
 		@find . -name "*.sh" | xargs ${CONDA} bashlint
 
-security:
+security: deps
 		@${CONDA} bandit -q -ll -ii -r manager/
 		@find . -name "requirements*.txt" | xargs printf -- '-r %s\n' | xargs ${CONDA} safety check -i 49256 # 49256 is a known flower vuln w/o a patch available yet
 
-build: check-env lint security
+build: deps check-env lint security
 		@docker compose -f docker-compose.yml -f docker-compose-${MODE}.yml build
 
-test:
+test: check-env deps
 		@docker compose -f docker-compose.yml -f docker-compose-${MODE}.yml run \
 			-e SKIP_TASKS=true --rm manager /opt/venv/bin/python3 manage.py \
 			test --noinput --failfast -v 3
