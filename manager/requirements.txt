@@ -1,4 +1,4 @@
-Django==4.0.7
+Django==4.1.1
 amqp==5.1.1
 celery==5.2.7
 dateparser==1.1.1
@@ -6,7 +6,7 @@ django-extensions==3.2.1
 flower==1.2.0
 gunicorn==20.1.0
 kombu==5.2.4
-neo4j==4.4.6
+neo4j==5.0.0
 netaddr==0.8.0
 netflow==0.11.2
 netifaces==0.11.0
