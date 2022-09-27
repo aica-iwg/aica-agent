@@ -13,8 +13,11 @@ endif
 deps: environment.yml
 		@conda env update -f environment.yml
 
-lint: deps
+black: $(shell find manager -type f -name *.py)
 		@${CONDA} black -q manager/
+
+lint: deps
+		@${CONDA} black --check --diff -q manager/
 		@${CONDA} flake8 manager/
 		@find . -name "*.yml" | grep -v venv | xargs ${CONDA} yamllint
 		@find . -name "*.sh" | xargs ${CONDA} bashlint
