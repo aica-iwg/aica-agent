@@ -12,9 +12,12 @@ services:
       - "8000:8000" # Django frontend
       - "5555:5555" # Celery Flower
     depends_on:
-      - manager_db
-      - manager_mq
-      - manager_mongodb
+      manager_db:
+        condition: service_healthy
+      manager_mq:
+        condition: service_healthy
+      manager_mongodb:
+        condition: service_healthy
     networks:
       - bridge
       - control
