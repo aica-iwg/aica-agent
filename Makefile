@@ -16,9 +16,6 @@ deps: environment.yml
 black: $(shell find manager -type f -name *.py)
 		@${CONDA} black -q manager/
 
-black: deps
-		@${BLACK} -q manager/
-
 lint: deps
 		@${CONDA} black --check --diff -q manager/
 		@${CONDA} flake8 manager/
