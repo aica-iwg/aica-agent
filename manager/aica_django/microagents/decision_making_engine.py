@@ -62,3 +62,13 @@ def handle_suricata_alert(alert_dict):
                 "redirect_to_honeypot_iptables",
                 [alert_dict["src_ip"], alert_dict["dest_ip"]],
             )
+
+
+@shared_task(name="ma-decision_making_engine-handle_antivirus_alert")
+def handle_antivirus_alert(alert_dict):
+    logger.info(
+        f"""Running {__name__}: handle_antivirus_alert\n
+    DEBUG: Placeholder until action is implemented"""
+    )
+
+    # TODO: Implement some response
