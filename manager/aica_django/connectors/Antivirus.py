@@ -37,7 +37,7 @@ def get_vt_report(md5: str):
 # ClamAV logs are not in json, so we'll need to format them into something like that
 def parse_line(line):
     event_dict = {}
-    line = line.decode('utf-8')
+    line = line.decode("utf-8")
     if "FOUND" in line:
         md5sum = re.search(r"(([a-f0-9]{32}))(?=:)", line).group(0).strip()
         info = line.split("->")[1].strip().split(": ")
@@ -51,7 +51,9 @@ def parse_line(line):
         vt_crit, report = get_vt_report(md5sum)
         if report is not None:
             event_dict["vt_crit"] = vt_crit
-            event_dict["vt_sig"] = report.popular_threat_classification['suggested_threat_label']
+            event_dict["vt_sig"] = report.popular_threat_classification[
+                "suggested_threat_label"
+            ]
             event_dict["ssdeep"] = report.ssdeep
 
     else:
@@ -77,16 +79,16 @@ def poll_antivirus_alerts():
         # Current janky solution to try and get the ip address from the target
         # TODO: Make this better
         try:
-            with open('/var/log/clamav/hostinfo.txt', 'r') as filp:
-                ip_address, hostname = filp.read().strip().split(',')
+            with open("/var/log/clamav/hostinfo.txt", "r") as filp:
+                ip_address, hostname = filp.read().strip().split(",")
         except FileNotFoundError:
             ip_address, hostname = "Error", "Error"
 
         while True:
             line = f.stdout.readline()
             event_dict = parse_line(line)
-            event_dict['ip_addr'] = ip_address
-            event_dict['hostname'] = hostname
+            event_dict["ip_addr"] = ip_address
+            event_dict["hostname"] = hostname
             event_dict = json.loads(json.dumps(event_dict))
             if event_dict["event_type"] == "alert":
                 current_app.send_task(

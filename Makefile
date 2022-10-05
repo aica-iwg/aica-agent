@@ -26,9 +26,12 @@ deps: venv
 		@${PYTHON} -m pip install -qU pip wheel
 		@${PYTHON} -m pip install -qUr requirements.txt
 
+black: deps
+		@${BLACK} -q manager/
+
 lint: deps
 		@find . -name "*.yml" | grep -v venv | xargs ${YAMLLINT}
-		@${BLACK} -q manager/
+		@${BLACK} --check -q manager/
 		@${FLAKE} manager/
 		@find . -name "*.sh" | xargs ${BASHLINT}
 

@@ -646,9 +646,9 @@ def antivirus_alert_to_knowledge(alert):
     nodes = []
     relations = []
 
-    # The if statement is here for error handling the case where the VirusTotal 
-    # data isn't properly stored in the alert object and we get the "Not Available" 
-    # as specified in the Antivirus.py file. Otherwise, we'd have a bunch of errors 
+    # The if statement is here for error handling the case where the VirusTotal
+    # data isn't properly stored in the alert object and we get the "Not Available"
+    # as specified in the Antivirus.py file. Otherwise, we'd have a bunch of errors
     # showing up anytime an API key was wrong or the VT servers go down
     if alert["vt_crit"] == "Not Available":
         alert_obj = KnowledgeNode(
@@ -687,11 +687,10 @@ def antivirus_alert_to_knowledge(alert):
             values={
                 "VTSuggestedLabel": alert["vt_sig"],
                 "md5": alert["md5sum"],
-                "ssdeep": alert["ssdeep"]
+                "ssdeep": alert["ssdeep"],
             },
         )
         nodes.append(alert_signature)
-
 
     relations.append(
         KnowledgeRelation(
@@ -717,7 +716,7 @@ def antivirus_alert_to_knowledge(alert):
         label="IPv4Address",
         name=alert["ip_addr"],
     )
-    nodes.append(ip_addr)    
+    nodes.append(ip_addr)
 
     relations.append(
         KnowledgeRelation(
