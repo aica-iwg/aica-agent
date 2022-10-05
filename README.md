@@ -6,9 +6,9 @@ The intent of this project is to build on the ideas of the AICA framework as out
 
 It is important to ensure your main branch is up-to-date before each working session, and you should commit your changes incrementally and often to ensure minimal divergence and chance of merge conflicts. Changes should be "intact" functionally (i.e., don't submit partially-completed work) and keep the main repository in a working state. This means you should think about functionality in the smallest possible chunks to keep your contributed work up to date.
 
-Your host system will need to have a few things: Docker (installed from Docker itself, not your built-in distribution manager to ensure you get an up-to-date version), Docker Compose (installed with Docker in Windows, MacOS but needs to be separately installed in Linux), python3, python3-venv, build-essential (or the equivalent or your platform; `make` should be sufficient but you may need other build tools depending on pip's wheel support in your environment), and if there is not a cryptography wheel available from `pip` for your operating system, you will also need libssl-dev, libffi-dev, and python-dev. See full requirements for building each Docker container in the respective `requirements.txt` files (the `requirements.txt` at the root is for development/test purposes).
+Your host system will need to have a few things: Conda, Docker (installed from Docker itself, not your built-in distribution manager to ensure you get an up-to-date version), Docker Compose (installed with Docker in Windows, MacOS but needs to be separately installed in Linux), and `make`. See full requirements for building each Docker container in the respective `requirements.txt` files (the `requirements.txt` at the root is for development/test purposes).
 
-You can bootstrap your environment with `make deps`, which will call `make venv`. Note that this will use the `venv/` path in your project directly, which might overlap/conflict with your IDE.
+You can bootstrap your environment with `make deps`, which will create a conda environment for building and testing. 
 
 Changes must be pushed to a branch and PR'ed to main. Before pushing your changes, you should first locally execute a `make test` and ensure it completes successfully. If it does not, either fix the issues or propose exclusions to the relevant test areas (will be subject to peer review).
 
@@ -26,7 +26,6 @@ You can view logs from the Dockerized containers with `make logs`. This will sho
 
 You can monitor the agent through several interfaces:
 
-* [http://localhost:3000](): Grafana console 
 * [http://localhost:5555](): Celery Flower instance, where you can monitor task execution
 * [http://localhost:7474](): Neo4j web interface
 * [http://localhost:8000](): Django app, as defined in `manager/aica_django/`.
@@ -40,10 +39,10 @@ The AICA agent is built as a Django project, and so the normal Django convention
 
 * `Makefile` is the primary entry point for this code. It should include test entrypoints as well as entrypoints.
 * `.dockerignore` tells Docker what <em>not</em> to copy into container contexts
+* `environment.yml` contains Conda environment specification for build/test. 
 * `.gitignore` tells git which files to never check into the repository.
 * `.yamllint` configures the YAML lint that runs at build/test time
 * `docker-compose.yml`  is the YAML file instructing docker-compose how to create the necessary containers and networks for the agent. The additional `docker-compose-emu.yml` and `docker-compose-virt.yml` have addition definitions intended for those modes only and are additionally invoked in the `Makefile` based on the MODE environmental variable.
-* `requirements.txt` contains all external Python dependencies required for the dev environment.
 * `setup.cfg` contains settings to control programs such as flake8. 
 
 <h4>Maintainers</h4>
