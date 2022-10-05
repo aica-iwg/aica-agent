@@ -12,23 +12,16 @@ services:
       - "8000:8000" # Django frontend
       - "5555:5555" # Celery Flower
     depends_on:
-      - manager_db
-      - manager_mq
-      - manager_mongodb
+      manager_db:
+        condition: service_healthy
+      manager_mq:
+        condition: service_healthy
+      manager_mongodb:
+        condition: service_healthy
     networks:
       - bridge
       - control
       - target
-
-  visualization:
-    build: ./visualization
-    container_name: 'visualization'
-    env_file:
-      - 'manager/.env'
-    ports:
-      - "3000:3000"
-    networks:
-      - control
 
   manager_db:
     image: postgres:13-buster

@@ -497,7 +497,6 @@ def suricata_alert_to_knowledge(alert):
             "rev": alert["alert"]["rev"],
             "signature": alert["alert"]["signature"],
             "severity": alert["alert"]["severity"],
-            # "metadata": alert["alert"]["metadata"],
         },
     )
     nodes.append(alert_signature)

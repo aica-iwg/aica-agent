@@ -6,6 +6,6 @@ TARGET_IP_ESC=`echo $TARGET_IP | sed s/'\.'/'\\\.'/g`
 sed -i 's/HOME_NET: "\[192\.168\.0\.0\/16,10\.0\.0\.0\/8,172\.16\.0\.0\/12\]"/HOME_NET: "\['${TARGET_IP_ESC}'\/32\]"/' \
   /etc/suricata/suricata.yaml
 
-# Restart Suricata
-pkill -f "suricata"
+# Start Suricata
+#pkill -f "suricata"
 suricata --af-packet -i eth0 host ${TARGET_IP}

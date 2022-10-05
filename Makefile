@@ -1,15 +1,7 @@
 export DOCKER_SCAN_SUGGEST := false
 
 SHELL := /bin/bash
-VENV := venv
-PYTHON := ${VENV}/bin/python3
-FLAKE := ${VENV}/bin/flake8
-BANDIT := ${VENV}/bin/bandit
-BLACK := ${VENV}/bin/black
-SAFETY := ${VENV}/bin/safety
-BASHLINT := ${VENV}/bin/bashlint
-YAMLLINT := ${VENV}/bin/yamllint
-ACTIVATE := ${VENV}/bin/activate
+CONDA := conda run --no-capture-output -n aica
 mkfile_path := $(abspath $(lastword $(MAKEFILE_LIST)))
 mkfile_dir := $(dir $(mkfile_path))
 
@@ -18,31 +10,26 @@ ifndef MODE
 		$(error MODE is undefined)
 endif
 
-${ACTIVATE}: requirements.txt
-		@test -d ${VENV}/bin || python3 -m venv ${VENV}
-venv: ${ACTIVATE}
+deps: environment.yml
+		@conda env update -f environment.yml
 
-deps: venv
-		@${PYTHON} -m pip install -qU pip wheel
-		@${PYTHON} -m pip install -qUr requirements.txt
-
-black: deps
-		@${BLACK} -q manager/
+black: $(shell find manager -type f -name *.py)
+		@${CONDA} black -q manager/
 
 lint: deps
-		@find . -name "*.yml" | grep -v venv | xargs ${YAMLLINT}
-		@${BLACK} --check -q manager/
-		@${FLAKE} manager/
-		@find . -name "*.sh" | xargs ${BASHLINT}
+		@${CONDA} black --check --diff -q manager/
+		@${CONDA} flake8 manager/
+		@find . -name "*.yml" | grep -v venv | xargs ${CONDA} yamllint
+		@find . -name "*.sh" | xargs ${CONDA} bashlint
 
 security: deps
-		@${BANDIT} -q -ll -ii -r manager/
-		@find . -name "requirements*.txt" | xargs printf -- '-r %s\n' | xargs ${SAFETY} check -i 49256 # 49256 is a known flower vuln w/o a patch available yet
+		@${CONDA} bandit -q -ll -ii -r manager/
+		@find . -name "requirements*.txt" | xargs printf -- '-r %s\n' | xargs ${CONDA} safety check -i 49256 # 49256 is a known flower vuln w/o a patch available yet
 
-build: check-env lint security
+build: deps check-env lint security
 		@docker compose -f docker-compose.yml -f docker-compose-${MODE}.yml build
 
-test: build
+test: check-env deps
 		@docker compose -f docker-compose.yml -f docker-compose-${MODE}.yml run \
 			-e SKIP_TASKS=true --rm manager /opt/venv/bin/python3 manage.py \
 			test --noinput --failfast -v 3
