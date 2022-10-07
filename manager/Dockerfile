@@ -1,4 +1,4 @@
-FROM python:3-buster
+FROM python:3.9-bullseye
 
 ENV PYTHONDONTWRITEBYTECODE 1
 ENV PYTHONIOENCODING UTF-8
@@ -7,7 +7,9 @@ ENV DEBIAN_FRONTEND noninteractive
 
 WORKDIR /usr/src/app
 
-RUN apt-get -y update && \
+RUN --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
+    --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    apt-get -y update && \
     apt-get -y upgrade && \
     apt-get -y install apt-utils && \
     apt-get -y install \
@@ -21,6 +23,7 @@ RUN apt-get -y update && \
         python3-setuptools \
         bash \
         cmake \
+        libgeos-dev \
         libtool \
         autoconf \
         fprobe \

@@ -9,4 +9,4 @@ data
 .vscode
 
 # API Keys
-.env.secret 
+.env.local

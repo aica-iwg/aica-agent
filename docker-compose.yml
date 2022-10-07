@@ -7,6 +7,7 @@ services:
     container_name: 'manager'
     env_file:
       - 'manager/.env'
+      - 'manager/.env.local'
     tty: true
     ports:
       - "8000:8000" # Django frontend
@@ -24,48 +25,43 @@ services:
       - target
 
   manager_db:
-    image: postgres:13-buster
+    image: postgres:13.8-bullseye
     container_name: 'manager_db'
     env_file:
       - 'manager/.env'
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 10s
-      timeout: 5s
+      timeout: 10s
       retries: 5
     networks:
       - control
 
   manager_mq:
-    image: rabbitmq:3-management
+    image: rabbitmq:3.11-management-alpine
     container_name: 'manager_mq'
     volumes:
       - ./manager_mq/enabled_plugins:/etc/rabbitmq/enabled_plugins
-    ports:
-      - "15672:15672" # RabbitMQ Management
     healthcheck:
       test: ["CMD-SHELL", "rabbitmq-diagnostics -q ping"]
-      interval: 30s
+      interval: 10s
       timeout: 10s
-      retries: 3
+      retries: 5
     networks:
       - control
 
   manager_mongodb:
-    image: mongo:4
+    build: manager_mongodb
     container_name: 'manager_mongodb'
     env_file:
       - 'manager/.env'
-    volumes:
-      - ./manager_mongodb/init-mongo.sh:/docker-entrypoint-initdb.d/init-mongo.sh
-      - ./manager_mongodb/docker_healthcheck.sh:/usr/local/bin/docker_healthcheck.sh
     networks:
       - control
     healthcheck:
-      test: ["CMD-SHELL", "docker_healthcheck.sh"]
-      interval: 30s
+      test: ["CMD-SHELL", "mongosh --quiet --eval 'db.runCommand({ping: 1})'"]
+      interval: 10s
       timeout: 10s
-      retries: 3
+      retries: 5
 
   manager_graphdb:
     build: manager_graphdb
@@ -73,8 +69,7 @@ services:
     env_file:
       - 'manager/.env'
     ports:
-      - "7474:7474"
-      - "7687:7687"
+      - "7474:7474"  # Neo4j web GUI
     networks:
       - control
 
