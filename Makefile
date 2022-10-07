@@ -1,4 +1,5 @@
 export DOCKER_SCAN_SUGGEST := false
+export DOCKER_BUILDKIT := 1
 
 SHELL := /bin/bash
 CONDA := conda run --no-capture-output -n aica
@@ -24,7 +25,7 @@ lint: deps
 
 security: deps
 		@${CONDA} bandit -q -ll -ii -r manager/
-		@find . -name "requirements*.txt" | xargs printf -- '-r %s\n' | xargs ${CONDA} safety check -i 49256 # 49256 is a known flower vuln w/o a patch available yet
+		@find . -name "requirements*.txt" | xargs printf -- '-r %s\n' | xargs ${CONDA} safety check
 
 build: deps check-env lint security
 		@docker compose -f docker-compose.yml -f docker-compose-${MODE}.yml build

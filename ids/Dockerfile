@@ -1,7 +1,9 @@
-FROM alpine:3
+FROM alpine:3.16
 
 RUN apk update && apk upgrade && \
-    apk add bind-tools bash suricata
+    apk add bind-tools bash suricata syslog-ng
+
+COPY aica-syslog.conf /etc/syslog-ng/conf.d/aica-syslog.conf
 
 RUN suricata-update update-sources && \
     suricata-update enable-source et/open && \

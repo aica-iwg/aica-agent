@@ -1,5 +1,7 @@
 import dateparser
+import datetime
 import ipaddress
+import logging
 import os
 import re
 import socket
@@ -90,7 +92,9 @@ def netflow_to_knowledge(flow):
     protocol = KnowledgeNode(
         label="NetworkProtocol",
         name=flow["PROTO"],
-        values={"value": flow["PROTO"]},
+        values={
+            "protocol": flow["PROTO"],
+        },
     )
     nodes.append(protocol)
 
@@ -99,13 +103,17 @@ def netflow_to_knowledge(flow):
     source_addr = KnowledgeNode(
         label="IPv4Address",
         name=ipv4_src_addr,
-        values={"value": ipv4_src_addr},
+        values={
+            "ipv4_address": ipv4_src_addr,
+        },
     )
     nodes.append(source_addr)
     source_port = KnowledgeNode(
         label="NetworkPort",
         name=f"{ipv4_src_addr}:{flow['SRC_PORT']}",
-        values={"value": flow["SRC_PORT"]},
+        values={
+            "port": flow["SRC_PORT"],
+        },
     )
     nodes.append(source_port)
     relations.append(
@@ -119,7 +127,10 @@ def netflow_to_knowledge(flow):
     source_host = KnowledgeNode(
         label="Host",
         name=ipv4_src_addr,
-        values={"value": ipv4_src_addr},
+        values={
+            "last_seen": flow["LAST_SWITCHED"],
+            "ipv4_address": ipv4_src_addr,
+        },
     )
     nodes.append(source_host)
     relations.append(
@@ -136,13 +147,17 @@ def netflow_to_knowledge(flow):
     dest_addr = KnowledgeNode(
         label="IPv4Address",
         name=ipv4_dst_addr,
-        values={"value": ipv4_dst_addr},
+        values={
+            "ipv4_address": ipv4_dst_addr,
+        },
     )
     nodes.append(dest_addr)
     dest_port = KnowledgeNode(
         label="NetworkPort",
         name=f"{ipv4_dst_addr}:{flow['DST_PORT']}",
-        values={"value": flow["DST_PORT"]},
+        values={
+            "port": flow["DST_PORT"],
+        },
     )
     nodes.append(dest_port)
     relations.append(
@@ -157,7 +172,10 @@ def netflow_to_knowledge(flow):
         dest_host = KnowledgeNode(
             label="Host",
             name=ipv4_dst_addr,
-            values={"value": ipv4_dst_addr},
+            values={
+                "ipv4_address": ipv4_dst_addr,
+                "last_seen": flow["LAST_SWITCHED"],
+            },
         )
         nodes.append(dest_host)
         relations.append(
@@ -212,15 +230,24 @@ def nginx_accesslog_to_knowledge(log_dict):
     nodes = []
     relations = []
 
+    # dateparser can't seem to handle this format
+    request_time = datetime.datetime.strptime(
+        log_dict["dateandtime"], "%d/%b/%Y:%H:%M:%S %z"
+    )
+    if not request_time:
+        logging.error(f"Couldn't parse timestamp {log_dict['dateandtime']}")
+        return None, None
+
+    request_time = int(request_time.timestamp())
     my_hostname = socket.gethostname()
     my_ipv4 = KnowledgeNode(
         label="IPv4Address",
         name=socket.gethostbyname(my_hostname),
-        values={"value": socket.gethostbyname(my_hostname)},
+        values={
+            "ipv4_address": socket.gethostbyname(my_hostname),
+        },
     )
     nodes.append(my_ipv4)
-
-    request_time = dateparser.parse(log_dict["dateandtime"])
 
     # Add requesting host
     requesting_host = KnowledgeNode(
@@ -228,6 +255,7 @@ def nginx_accesslog_to_knowledge(log_dict):
         name=log_dict["src_ip"],
         values={
             "last_seen": request_time,
+            "ipv4_address": log_dict["src_ip"],
         },
     )
     nodes.append(requesting_host)
@@ -236,7 +264,9 @@ def nginx_accesslog_to_knowledge(log_dict):
     nic = KnowledgeNode(
         label="NetworkInterface",
         name=str(uuid.uuid4()),
-        values={"last_seen": request_time},
+        values={
+            "last_seen": request_time,
+        },
     )
     nodes.append(nic)
     relations.append(
@@ -250,7 +280,9 @@ def nginx_accesslog_to_knowledge(log_dict):
     ipv4_addr = KnowledgeNode(
         label="IPv4Address",
         name=log_dict["src_ip"],
-        values={"value": log_dict["src_ip"]},
+        values={
+            "ipv4_address": log_dict["src_ip"],
+        },
     )
     nodes.append(ipv4_addr)
     relations.append(
@@ -298,7 +330,7 @@ def nmap_scan_to_knowledge(scan_results):
     nodes = []
     relations = []
 
-    scan_time = scan_results["runtime"]["time"]
+    scan_time = int(dateparser.parse(scan_results["runtime"]["time"]).timestamp())
 
     # Not needed and make iteration below messy
     del scan_results["stats"]
@@ -308,7 +340,9 @@ def nmap_scan_to_knowledge(scan_results):
     my_ipv4 = KnowledgeNode(
         label="IPv4Address",
         name=socket.gethostbyname(my_hostname),
-        values={"value": socket.gethostbyname(my_hostname)},
+        values={
+            "ipv4_address": socket.gethostbyname(my_hostname),
+        },
     )
     nodes.append(my_ipv4)
 
@@ -347,7 +381,9 @@ def nmap_scan_to_knowledge(scan_results):
         ipv4_addr = KnowledgeNode(
             label="IPv4Address",
             name=host,
-            values={"value": host},
+            values={
+                "ipv4_address": host,
+            },
         )
         nodes.append(ipv4_addr)
         relations.append(
@@ -363,7 +399,9 @@ def nmap_scan_to_knowledge(scan_results):
             mac_addr = KnowledgeNode(
                 label="MACAddress",
                 name=scan_results[host]["macaddress"]["addr"],
-                values={"value": scan_results[host]["macaddress"]["addr"]},
+                values={
+                    "mac_address": scan_results[host]["macaddress"]["addr"],
+                },
             )
             nodes.append(mac_addr)
             relations.append(
@@ -379,7 +417,9 @@ def nmap_scan_to_knowledge(scan_results):
                 nic_manufacturer = KnowledgeNode(
                     label="Vendor",
                     name=f"{scan_results[host]['macaddress']['vendor']}",
-                    values={"vendor": scan_results[host]["macaddress"]["vendor"]},
+                    values={
+                        "vendor": scan_results[host]["macaddress"]["vendor"],
+                    },
                 )
                 nodes.append(nic_manufacturer)
                 relations.append(
@@ -394,7 +434,10 @@ def nmap_scan_to_knowledge(scan_results):
             domain_name = KnowledgeNode(
                 label="DNSRecord",
                 name=hostname["name"],
-                values={"type": hostname["type"], "value": hostname["name"]},
+                values={
+                    "dns_type": hostname["type"],
+                    "dns_record": hostname["name"],
+                },
             )
             nodes.append(domain_name)
 
@@ -435,7 +478,11 @@ def nmap_scan_to_knowledge(scan_results):
 
             if os_match["osclass"]["vendor"]:
                 os_vendor = KnowledgeNode(
-                    label="Vendor", name=os_match["osclass"]["vendor"]
+                    label="Vendor",
+                    name=os_match["osclass"]["vendor"],
+                    values={
+                        "vendor": os_match["osclass"]["vendor"],
+                    },
                 )
                 nodes.append(os_vendor)
                 relations.append(
@@ -452,7 +499,7 @@ def nmap_scan_to_knowledge(scan_results):
                     label="NetworkPort",
                     name=f"{host}:{port['portid']}",
                     values={
-                        "port_number": port["portid"],
+                        "port": port["portid"],
                         "service_name": port["service"]["name"],
                     },
                 )
@@ -460,6 +507,9 @@ def nmap_scan_to_knowledge(scan_results):
                 protocol = KnowledgeNode(
                     label="NetworkProtocol",
                     name=port["protocol"],
+                    values={
+                        "protocol": port["protocol"],
+                    },
                 )
                 nodes.append(protocol)
                 relations.append(
@@ -497,6 +547,7 @@ def suricata_alert_to_knowledge(alert):
             "rev": alert["alert"]["rev"],
             "signature": alert["alert"]["signature"],
             "severity": alert["alert"]["severity"],
+            "timestamp": alert["timestamp"],
         },
     )
     nodes.append(alert_signature)
@@ -510,7 +561,11 @@ def suricata_alert_to_knowledge(alert):
     )
 
     alert_category = KnowledgeNode(
-        label="AttackSignatureCategory", name=alert["alert"]["category"]
+        label="AttackSignatureCategory",
+        name=alert["alert"]["category"],
+        values={
+            "category": alert["alert"]["category"],
+        },
     )
     nodes.append(alert_category)
     relations.append(
@@ -524,11 +579,18 @@ def suricata_alert_to_knowledge(alert):
     source_host = KnowledgeNode(
         label="Host",
         name=alert["src_ip"],
+        values={
+            "last_seen": alert["timestamp"],
+            "ipv4_address": alert["src_ip"],
+        },
     )
     nodes.append(source_host)
     source_ip = KnowledgeNode(
         label="IPv4Address",
         name=alert["src_ip"],
+        values={
+            "ipv4_address": alert["src_ip"],
+        },
     )
     nodes.append(source_ip)
     relations.append(
@@ -541,11 +603,18 @@ def suricata_alert_to_knowledge(alert):
     dest_host = KnowledgeNode(
         label="Host",
         name=alert["dest_ip"],
+        values={
+            "last_seen": alert["timestamp"],
+            "ipv4_address": alert["dest_ip"],
+        },
     )
     nodes.append(dest_host)
     dest_ip = KnowledgeNode(
         label="IPv4Address",
         name=alert["dest_ip"],
+        values={
+            "ipv4_address": alert["dest_ip"],
+        },
     )
     nodes.append(dest_ip)
 
@@ -561,7 +630,7 @@ def suricata_alert_to_knowledge(alert):
         label="NetworkPort",
         name=f"{alert['src_ip']}:{alert['src_port']}",
         values={
-            "port_number": alert["src_port"],
+            "port": alert["src_port"],
         },
     )
     nodes.append(source_port)
@@ -570,7 +639,7 @@ def suricata_alert_to_knowledge(alert):
         label="NetworkPort",
         name=f"{alert['dest_ip']}:{alert['dest_port']}",
         values={
-            "port_number": alert["dest_port"],
+            "port": alert["dest_port"],
         },
     )
     nodes.append(dest_port)
@@ -578,6 +647,9 @@ def suricata_alert_to_knowledge(alert):
     protocol = KnowledgeNode(
         label="NetworkProtocol",
         name=alert["proto"],
+        values={
+            "protocol": alert["proto"],
+        },
     )
     nodes.append(protocol)
 
@@ -589,7 +661,7 @@ def suricata_alert_to_knowledge(alert):
             "pkts_toclient": alert["flow"]["pkts_toclient"],
             "bytes_toserver": alert["flow"]["bytes_toserver"],
             "bytes_toclient": alert["flow"]["bytes_toclient"],
-            "start": alert["flow"]["start"],
+            "start": int(dateparser.parse(alert["flow"]["start"]).timestamp()),
             "source": "suricata",
         },
     )
@@ -648,7 +720,7 @@ def antivirus_alert_to_knowledge(alert):
     # The if statement is here for error handling the case where the VirusTotal
     # data isn't properly stored in the alert object and we get the "Not Available"
     # as specified in the Antivirus.py file. Otherwise, we'd have a bunch of errors
-    # showing up anytime an API key was wrong or the VT servers go down
+    # showing up anytime an API key was invalid or the VT servers are unavailable
     if alert["vt_crit"] == "Not Available":
         alert_obj = KnowledgeNode(
             label="Alert",
@@ -711,12 +783,6 @@ def antivirus_alert_to_knowledge(alert):
     )
     nodes.append(hostname)
 
-    ip_addr = KnowledgeNode(
-        label="IPv4Address",
-        name=alert["ip_addr"],
-    )
-    nodes.append(ip_addr)
-
     relations.append(
         KnowledgeRelation(
             label="triggered-by",
@@ -730,14 +796,6 @@ def antivirus_alert_to_knowledge(alert):
             label="stored-on",
             source_node=path,
             target_node=hostname,
-        )
-    )
-
-    relations.append(
-        KnowledgeRelation(
-            label="has-address",
-            source_node=hostname,
-            target_node=ip_addr,
         )
     )
 

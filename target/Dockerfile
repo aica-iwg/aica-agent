@@ -10,11 +10,14 @@ RUN chown -R root:root /root && \
   chmod 750 /root/.ssh && \
   chmod 600 /root/.ssh/authorized_keys
 
+RUN wget https://secure.eicar.org/eicar.com.txt -O /tmp/eica.com.txt
+
 COPY clamonacc.sh /usr/local/bin
 COPY etc/clamav /etc/clamav/
-# this is to bootstrap the virus definitions, as trying to start clamd without
+
+# This is to bootstrap the virus definitions, as trying to start clamd without
 # any just causes the process to die, upon the container starting it updates
-# these immediately again
+# these immediately again.
 RUN sed -i 's/^Foreground .*$/Foreground true/g' /etc/clamav/clamd.conf && \
     sed -i 's/^Foreground .*$/Foreground true/g' /etc/clamav/freshclam.conf && \
     freshclam && \
