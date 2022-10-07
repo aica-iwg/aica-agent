@@ -5,30 +5,33 @@ services:
   manager:
     environment:
       MODE: "emu"
-    volumes:
-      - ids_suricata_log:/var/log/suricata
-      - target_nginx_log:/var/log/nginx
 
   attacker:
-    build: ./attacker
+    build: attacker
     container_name: 'attacker'
     command: sh /usr/local/bin/docker_entrypoint.sh
-    ports:
-      - "2222:22"
     networks:
       - target
     tty: true
 
   target:
-    build: ./target
+    build: target
     container_name: 'target'
     command: sh /usr/local/bin/docker_entrypoint.sh
-    volumes:
-      - target_nginx_log:/var/log/nginx
     sysctls:
       - net.ipv4.conf.all.forwarding=1
     cap_add:
-      - NET_ADMIN
+      - NET_ADMIN  # For iptables/ipset
+      - SYS_ADMIN  # For ClamAV on-access scanning (fanotify)
+    networks:
+      - target
+
+  honeypot:
+    build: honeypot
+    container_name: 'honeypot'
+    command: /usr/bin/opencanaryd --dev
+    volumes:
+      - ./honeypot/opencanary.conf:/etc/opencanaryd/opencanary.conf
     networks:
       - target
 
@@ -46,24 +49,55 @@ services:
     build: ./ids
     container_name: 'ids'
     command: sh /usr/local/bin/docker_entrypoint.sh
-    volumes:
-      - ids_suricata_log:/var/log/suricata
     cap_add:
       - NET_ADMIN
     network_mode: 'service:target'
 
-  honeypot:
-    build: ./honeypot
-    container_name: 'honeypot'
-    command: /usr/bin/opencanaryd --dev
-    volumes:
-      - ./honeypot/opencanary.conf:/etc/opencanaryd/opencanary.conf
+  elasticsearch:
+    build: elasticsearch
+    container_name: "elasticsearch"
+    # Required so that ES generates an acceptable SAN in its HTTPS Cert
+    hostname: "elasticsearch"
+    environment:
+      - node.name=elasticsearch
+      - cluster.name=aica
+      - discovery.type=single-node
+      - ELASTIC_PASSWORD=aicaelastic
+      - xpack.security.enabled=true
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+    healthcheck:
+      test: ["CMD-SHELL",
+              "curl --insecure -u elastic:aicaelastic -s -X GET 'http://localhost:9200/_cluster/health?pretty' 
+              | grep '\"status\" : \"green\"'"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
     networks:
-      - target
+      - control
 
-volumes:
-  ids_suricata_log:
-  target_nginx_log:
+  siem:
+    build: siem
+    container_name: 'siem'
+    env_file:
+      manager/.env
+    depends_on:
+      manager_mongodb:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
+    networks:
+      - control
+      - target
+    ports:
+      - "9000:9000"  # Graylog web GUI
 
 networks:
   target:

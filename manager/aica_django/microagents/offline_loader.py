@@ -25,6 +25,7 @@ from aica_django.connectors.Netflow import network_flow_capture
 from aica_django.connectors.Nginx import poll_nginx_accesslogs
 from aica_django.connectors.Nmap import periodic_network_scan
 from aica_django.connectors.Suricata import poll_suricata_alerts
+from aica_django.connectors.Antivirus import poll_antivirus_alerts
 
 logger = get_task_logger(__name__)
 
@@ -67,3 +68,6 @@ def initialize(**kwargs):
 
     # Start polling for IDS alerts in background
     poll_suricata_alerts.apply_async()
+
+    # Start polling for AV alerts in background
+    poll_antivirus_alerts.apply_async()

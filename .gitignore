@@ -7,3 +7,6 @@ __pycache__
 db.sqlite3
 data
 .vscode
+
+# API Keys
+.env.local
