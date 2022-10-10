@@ -22,7 +22,7 @@ nginx_regex = (
 
 
 @shared_task(name="poll-nginx-accesslogs")
-def poll_nginx_accesslogs(frequency=30):
+def poll_nginx_accesslogs(frequency: int = 30) -> None:
     logger.info(f"Running {__name__}: poll_nginx_accesslogs")
     matcher = re.compile(nginx_regex)
 

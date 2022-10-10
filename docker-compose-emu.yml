@@ -23,14 +23,16 @@ services:
     cap_add:
       - NET_ADMIN  # For iptables/ipset
       - SYS_ADMIN  # For ClamAV on-access scanning (fanotify)
-    network_mode: 'service:ids'
+    networks:
+      - target
 
   node_red_target:
     build: node_red_target
     container_name: 'node_red_target'
     env_file:
       - 'node_red_target/.env'
-    network_mode: 'service:ids'
+    networks:
+      - target
 
   honeypot:
     build: honeypot
@@ -47,8 +49,7 @@ services:
     command: sh /usr/local/bin/docker_entrypoint.sh
     cap_add:
       - NET_ADMIN
-    networks:
-      - target
+    network_mode: 'service:target'
 
   elasticsearch:
     build: elasticsearch

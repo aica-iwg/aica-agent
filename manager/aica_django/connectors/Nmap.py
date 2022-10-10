@@ -1,12 +1,12 @@
 import fcntl
 import logging
-import netifaces
-import nmap3
+import netifaces  # type: ignore
+import nmap3  # type: ignore
 import os
 import re
 import time
 from hashlib import sha256
-from netaddr import IPAddress
+from netaddr import IPAddress  # type: ignore
 
 from celery import shared_task
 from celery.utils.log import get_task_logger
@@ -15,7 +15,7 @@ logger = get_task_logger(__name__)
 
 
 @shared_task(name="periodic-network-scan")
-def periodic_network_scan(nmap_target=None, nmap_args=None):
+def periodic_network_scan(nmap_target: str = None, nmap_args: str = None) -> None:
     logger.info(f"Running {__name__}: periodic-network-scan")
     while True:
         if nmap_args:
@@ -23,11 +23,13 @@ def periodic_network_scan(nmap_target=None, nmap_args=None):
         else:
             network_scan(nmap_target)
 
-        time.sleep(int(os.getenv("NETWORK_SCAN_INTERVAL_MINUTES")) * 60)
+        time.sleep(int(os.getenv("NETWORK_SCAN_INTERVAL_MINUTES") or 0) * 60)
 
 
 @shared_task(name="network-scan")
-def network_scan(nmap_target=None, nmap_args="-O -Pn --osscan-limit --host-timeout=30"):
+def network_scan(
+    nmap_target: str = None, nmap_args: str = "-O -Pn --osscan-limit --host-timeout=30"
+) -> dict:
     targets = []
     if not nmap_target:
         # Scan apparently local subnet(s)
@@ -58,7 +60,7 @@ def network_scan(nmap_target=None, nmap_args="-O -Pn --osscan-limit --host-timeo
                     "Couldn't obtain lock to run nmap scan of target, "
                     "existing scan in-progress?"
                 )
-                return False
+                return {}
 
         nmap = nmap3.Nmap()
         logging.debug(f"Scanning {target} with {nmap_args}")

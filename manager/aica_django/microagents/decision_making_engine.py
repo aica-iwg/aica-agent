@@ -27,7 +27,7 @@ logger = get_task_logger(__name__)
 
 
 @shared_task(name="ma-decision_making_engine-monitor")
-def monitor():
+def monitor() -> None:
     logger.info(f"Running {__name__}: monitor")
 
     while True:
@@ -35,7 +35,7 @@ def monitor():
 
 
 @shared_task(name="ma-decision_making_engine-handle_suricata_alert")
-def handle_suricata_alert(alert_dict):
+def handle_suricata_alert(alert_dict: dict) -> bool:
     logger.info(f"Running {__name__}: handle_suricata_alert")
 
     # Query for recommendation from knowledge base
@@ -62,13 +62,16 @@ def handle_suricata_alert(alert_dict):
                 "redirect_to_honeypot_iptables",
                 [alert_dict["src_ip"], alert_dict["dest_ip"]],
             )
+            return True
+
+    return False
 
 
 @shared_task(name="ma-decision_making_engine-handle_antivirus_alert")
-def handle_antivirus_alert(alert_dict):
-    logger.info(
-        f"""Running {__name__}: handle_antivirus_alert\n
-    DEBUG: Placeholder until action is implemented"""
-    )
+def handle_antivirus_alert(alert_dict: dict) -> bool:
+    logger.info(f"Running {__name__}: handle_antivirus_alert")
 
     # TODO: Implement some response
+    logger.info(alert_dict)
+
+    return False

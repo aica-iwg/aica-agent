@@ -5,18 +5,29 @@ import os
 import re
 import requests
 import time
-import vt
+import vt  # type: ignore
 
 from celery import current_app
 from celery.app import shared_task
 from celery.utils.log import get_task_logger
+from typing import Tuple, NamedTuple, Dict, Any
 
 from aica_django.connectors.Graylog import Graylog
 
 logger = get_task_logger(__name__)
 
 
-def malicious_confidence(vt_results):
+clam_parser = re.compile(
+    r"^(\S+)\s+clamav\:([^-]+) -> ([^:]+): ([^(]+)\(([a-f0-9]+):\d+\) FOUND"
+)
+
+
+class VTTuple(NamedTuple):
+    popular_threat_classification: dict
+    ssdeep: str
+
+
+def malicious_confidence(vt_results: dict) -> float:
     """Determine malicious confidence from a VT API Report"""
     # Credit: HuskyHacks and mttaggart
     # (https://github.com/mttaggart/blue-jupyter/blob/main/utils/malware.py)
@@ -25,16 +36,16 @@ def malicious_confidence(vt_results):
         malicious = list(filter(lambda d: d is not None, dispositions))
         return round(len(malicious) / len(dispositions) * 100, 2)
     except KeyError:
-        return None
+        return 0
 
 
-def get_vt_report(md5: str):
+def get_vt_report(md5: str) -> Tuple[float, VTTuple]:
     vt_api_key = os.getenv("VT_API_KEY")
     if not vt_api_key:
         logging.error(
             "Missing VT_API_KEY environment variable, not able to lookup VirusTotal information"
         )
-        return "Not Available", None
+        return -1, VTTuple(popular_threat_classification={}, ssdeep="")
     else:
         client = vt.Client(vt_api_key)
         file = client.get_object(f"/files/{md5}")
@@ -43,40 +54,41 @@ def get_vt_report(md5: str):
         return conf, file
 
 
-# ClamAV logs are not in json, so we'll need to format them into something like that
-def parse_line(line):
-    event_dict = {}
+# ClamAV logs are not in json, so we need to format them into something like that
+def parse_line(line: str) -> dict:
+    event_dict = Dict[str, Any]()
 
     if "FOUND" in line:
-        event_dict["hostname"] = re.search(r"^\S+", line).group(0).strip()
-        md5sum = re.search(r"(([a-f0-9]{32}))(?=:)", line).group(0).strip()
-        info = line.split("->")[1].strip().split(": ")
         event_dict["event_type"] = "alert"
-        event_dict["date"] = re.search(r"^[^->]*", line).group(0).strip()
-        event_dict["path"] = info[0].strip()
-        event_dict["sig"] = re.search(r"^[^\(]*", info[1]).group(0).strip()
-        event_dict["md5sum"] = md5sum
+        matcher = clam_parser.fullmatch(line)
+        assert matcher is not None
+
+        event_dict["hostname"] = matcher.group(1)
+        event_dict["date"] = matcher.group(2)
+        event_dict["path"] = matcher.group(3)
+        event_dict["sig"] = matcher.group(4)
+        event_dict["md5"] = matcher.group(5)
 
         # Processing VirusTotal info
-        vt_crit, report = get_vt_report(md5sum)
+        vt_crit, report = get_vt_report(event_dict["md5"])
         event_dict["vt_crit"] = vt_crit
-        if report:
+        if vt_crit >= 0:
             event_dict["vt_sig"] = report.popular_threat_classification[
                 "suggested_threat_label"
             ]
             event_dict["ssdeep"] = report.ssdeep
         else:
-            event_dict["vt_sig"] = None
-            event_dict["ssdeep"] = None
+            event_dict["vt_sig"] = ""
+            event_dict["ssdeep"] = ""
 
         return event_dict
 
     else:
-        return None
+        return {}
 
 
 @shared_task(name="poll-antivirus-alerts")
-def poll_antivirus_alerts(frequency=30):
+def poll_antivirus_alerts(frequency: int = 30) -> None:
     logger.info(f"Running {__name__}: poll_dbs")
 
     gl = Graylog("antivirus")

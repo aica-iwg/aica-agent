@@ -1,6 +1,6 @@
 import os
 
-from neomodel import (
+from neomodel import (  # type: ignore
     config,
     StructuredNode,
     StringProperty,
