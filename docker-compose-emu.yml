@@ -66,8 +66,7 @@ services:
     command: sh /usr/local/bin/docker_entrypoint.sh
     cap_add:
       - NET_ADMIN
-    networks:
-      - target
+    network_mode: 'service:target'
 
   elasticsearch:
     build: elasticsearch

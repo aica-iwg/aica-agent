@@ -149,4 +149,5 @@ def record_nginx_accesslog(log_entry: Dict[str, str]) -> bool:
     """
     logger.info(f"Running {__name__}: record_nginx_accesslog")
     nodes, relations = nginx_accesslog_to_knowledge(log_entry)
+
     return knowledge_to_neo(nodes=nodes, relations=relations)

@@ -760,6 +760,7 @@ def nginx_accesslog_to_knowledge(
     request_time = datetime.datetime.strptime(
         log_dict["dateandtime"], "%d/%b/%Y:%H:%M:%S %z"
     )
+
     if not request_time:
         logging.error(f"Couldn't parse timestamp {log_dict['dateandtime']}")
         return [], []
@@ -1067,7 +1068,6 @@ def suricata_alert_to_knowledge(
             "rev": alert["alert"]["rev"],
             "signature": alert["alert"]["signature"],
             "severity": alert["alert"]["severity"],
-            "timestamp": alert["timestamp"],
         },
     )
     knowledge_nodes.append(alert_sig_knowledge)
