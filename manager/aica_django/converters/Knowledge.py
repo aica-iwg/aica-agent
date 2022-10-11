@@ -20,20 +20,23 @@ from celery.utils.log import get_task_logger
 logger = get_task_logger(__name__)
 
 
-def dissect_time(timestamp: int) -> dict:
-    dt_utc = datetime.datetime.fromtimestamp(timestamp)
+def dissect_time(timestamp: int, prefix: str = "") -> dict:
+    dt_utc = datetime.datetime.utcfromtimestamp(timestamp)
     dt_americas = dt_utc.astimezone(pytz.timezone("America/Chicago"))
     dt_europeafrica = dt_utc.astimezone(pytz.timezone("Europe/Berlin"))
     dt_asiaoceana = dt_utc.astimezone(pytz.timezone("Asia/Shanghai"))
     time_details = {
+        "second_of_minute": dt_utc.second,
         "minute_of_hour": dt_utc.minute,
         "hour_of_day": dt_utc.hour,
         "day_of_week": dt_utc.weekday(),
+        "day_of_month": dt_utc.day,
         "week_of_month": dt_utc.isocalendar()[1]
         - dt_utc.replace(day=1).isocalendar()[1]
         + 1,
         "week_of_year": dt_utc.isocalendar()[1],
         "month_of_year": dt_utc.month,
+        "year": dt_utc.year,
         # These are only meant to be rough proxies
         "workhours_americas": (dt_americas.weekday() < 5)
         and (6 < dt_americas.hour < 21),
@@ -42,6 +45,8 @@ def dissect_time(timestamp: int) -> dict:
         "workhours_asoce": (dt_asiaoceana.weekday() < 5)
         and (5 < dt_asiaoceana.hour < 21),
     }
+    if prefix != "":
+        time_details = {f"{prefix}_{key}": value for key, value in time_details.items()}
 
     return time_details
 
@@ -64,7 +69,7 @@ class KnowledgeNode:
         if values and type(values) != dict:
             raise ValueError(f"Values must be a dictionary, not {type(values)}")
 
-        self.values = values if values else Dict[str, Any]()
+        self.values = values if values else dict()
         if label == "MACAddress":
             name = normalize_mac_addr(name)
             self.values["value"] = name
@@ -212,8 +217,8 @@ class NetworkTraffic(KnowledgeNode):
         self.label = "NetworkTraffic"
         self.in_packets = in_packets
         self.in_octets = in_octets
-        self.start = (datetime.datetime.fromtimestamp(start_ts),)
-        self.end = datetime.datetime.fromtimestamp(end_ts) if end_ts else None
+        self.start = (datetime.datetime.utcfromtimestamp(start_ts),)
+        self.end = datetime.datetime.utcfromtimestamp(end_ts) if end_ts else None
         self.flags = flags
         self.tos = tos
         self.values = values if values else {}
@@ -266,15 +271,21 @@ class KnowledgeRelation:
 
         if type(label) != str or label == "":
             raise ValueError(f"Label must be a string, not {type(label)}")
-        if type(source_node) != KnowledgeNode:
+        if not (
+            isinstance(source_node, KnowledgeNode)
+            or issubclass(KnowledgeNode, source_node)
+        ):
             raise ValueError(
                 f"Source node must be a KnowledgeNode, not {type(source_node)}"
             )
-        if type(target_node) != KnowledgeNode:
+        if not (
+            isinstance(target_node, KnowledgeNode)
+            or issubclass(KnowledgeNode, target_node)
+        ):
             raise ValueError(
                 f"Target node must be a KnowledgeNode, not {type(target_node)}"
             )
-        if values and type(values) != Dict[str, Any]:
+        if values and type(values) != dict:
             raise ValueError(f"Values must be a dictionary, not {type(values)}")
 
         self.label = label
@@ -290,13 +301,14 @@ def normalize_mac_addr(mac_addr: str) -> str:
 
 
 def netflow_to_knowledge(flow: Dict[str, str]) -> Tuple[list, list]:
-    nodes = []
-    relations = []
+    knowledge_nodes = []
+    knowledge_relations = []
 
     # Create source host and port nodes (and link to protocol node)
     ipv4_src_addr = str(ipaddress.ip_address(flow["IPV4_SRC_ADDR"]))
-    source_addr = IPv4Address(ipv4_src_addr).to_knowledge_node()
-    nodes.append(source_addr)
+    source_addr = IPv4Address(ipv4_src_addr)
+    source_addr_knowledge = source_addr.to_knowledge_node()
+    knowledge_nodes.append(source_addr_knowledge)
 
     source_port = NetworkEndpoint(
         ipv4_src_addr, int(flow["SRC_PORT"]), flow["PROTO"], endpoint="src"
@@ -305,39 +317,41 @@ def netflow_to_knowledge(flow: Dict[str, str]) -> Tuple[list, list]:
     source_port_knowledge = source_port.to_knowledge_node()
     source_port_ref_knowledge = source_port_ref.to_knowledge_node()
 
-    nodes.append(source_port_knowledge)
-    nodes.append(source_port_ref_knowledge)
+    knowledge_nodes.append(source_port_knowledge)
+    knowledge_nodes.append(source_port_ref_knowledge)
 
-    relations.append(
+    knowledge_relations.append(
         KnowledgeRelation(
             label="is-type",
             source_node=source_port_knowledge,
             target_node=source_port_ref_knowledge,
         )
     )
-    relations.append(
+    knowledge_relations.append(
         KnowledgeRelation(
             label="has-port",
-            source_node=source_addr,
-            target_node=source_port,
+            source_node=source_addr_knowledge,
+            target_node=source_port_knowledge,
         )
     )
 
-    source_host = Host(ipv4_src_addr).to_knowledge_node()
-    nodes.append(source_host)
-    relations.append(
+    source_host = Host(ipv4_src_addr)
+    source_host_knowledge = source_host.to_knowledge_node()
+    knowledge_nodes.append(source_host_knowledge)
+    knowledge_relations.append(
         KnowledgeRelation(
             label="has-address",
-            source_node=source_host,
-            target_node=source_addr,
+            source_node=source_host_knowledge,
+            target_node=source_addr_knowledge,
         )
     )
 
     # Create destination host and port nodes (and link to protocol node)
     ipv4_dst_addr_obj = ipaddress.ip_address(flow["IPV4_DST_ADDR"])
     ipv4_dst_addr = str(ipv4_dst_addr_obj)
-    dest_addr = IPv4Address(ipv4_dst_addr).to_knowledge_node()
-    nodes.append(dest_addr)
+    dest_addr = IPv4Address(ipv4_dst_addr)
+    dest_addr_knowledge = dest_addr.to_knowledge_node()
+    knowledge_nodes.append(dest_addr_knowledge)
 
     dest_port = NetworkEndpoint(
         ipv4_dst_addr, int(flow["DST_PORT"]), flow["PROTO"], endpoint="dst"
@@ -345,34 +359,33 @@ def netflow_to_knowledge(flow: Dict[str, str]) -> Tuple[list, list]:
     dest_port_ref = dest_port.to_network_port_ref()
     dest_port_knowledge = dest_port.to_knowledge_node()
     dest_port_ref_knowledge = dest_port_ref.to_knowledge_node()
-    nodes.append(dest_port_knowledge)
-    nodes.append(dest_port_ref_knowledge)
+    knowledge_nodes.append(dest_port_knowledge)
+    knowledge_nodes.append(dest_port_ref_knowledge)
 
-    relations.append(
+    knowledge_relations.append(
         KnowledgeRelation(
             label="is-type",
             source_node=dest_port_knowledge,
             target_node=dest_port_ref_knowledge,
         )
     )
-    relations.append(
+    knowledge_relations.append(
         KnowledgeRelation(
             label="has-port",
-            source_node=dest_addr,
-            target_node=dest_port,
+            source_node=dest_addr_knowledge,
+            target_node=dest_port_knowledge,
         )
     )
 
     if not (ipv4_dst_addr_obj.is_multicast or ipv4_dst_addr_obj.is_reserved):
-        dest_host = Host(
-            ipv4_dst_addr, values={"last_seen": flow["LAST_SWITCHED"]}
-        ).to_knowledge_node()
-        nodes.append(dest_host)
-        relations.append(
+        dest_host = Host(ipv4_dst_addr, values={"last_seen": flow["LAST_SWITCHED"]})
+        dest_host_knowledge = dest_host.to_knowledge_node()
+        knowledge_nodes.append(dest_host_knowledge)
+        knowledge_relations.append(
             KnowledgeRelation(
                 label="has-address",
-                source_node=dest_host,
-                target_node=dest_addr,
+                source_node=dest_host_knowledge,
+                target_node=dest_addr_knowledge,
             )
         )
 
@@ -388,23 +401,23 @@ def netflow_to_knowledge(flow: Dict[str, str]) -> Tuple[list, list]:
             "source": "netflow",
         },
     ).to_knowledge_node()
-    nodes.append(flow_knowledge)
-    relations.append(
+    knowledge_nodes.append(flow_knowledge)
+    knowledge_relations.append(
         KnowledgeRelation(
             label="communicates-to",
-            source_node=source_port,
+            source_node=source_port_knowledge,
             target_node=flow_knowledge,
         )
     )
-    relations.append(
+    knowledge_relations.append(
         KnowledgeRelation(
             label="communicates-to",
-            source_node=flow,
-            target_node=dest_port,
+            source_node=flow_knowledge,
+            target_node=dest_port_knowledge,
         )
     )
 
-    return nodes, relations
+    return knowledge_nodes, knowledge_relations
 
 
 def nginx_accesslog_to_knowledge(log_dict: Dict[str, Any]) -> Tuple[list, list]:
@@ -419,78 +432,79 @@ def nginx_accesslog_to_knowledge(log_dict: Dict[str, Any]) -> Tuple[list, list]:
     if not request_time:
         raise ValueError(f"Couldn't parse timestamp {log_dict['dateandtime']}")
     else:
-        dissected_request_time = dissect_time(int(request_time.timestamp()))
+        dissected_request_time = dissect_time(
+            int(request_time.timestamp()), prefix="last_seen"
+        )
 
     my_hostname = socket.gethostname()
-    my_ipv4 = IPv4Address(socket.gethostbyname(my_hostname)).to_knowledge_node()
-    nodes.append(my_ipv4)
+    my_ipv4 = IPv4Address(socket.gethostbyname(my_hostname))
+    my_ipv4_knowledge = my_ipv4.to_knowledge_node()
+    nodes.append(my_ipv4_knowledge)
 
     # Add requesting host
+    value_dict = dissected_request_time
+    value_dict["last_seen"] = request_time
     requesting_host = Host(
         log_dict["src_ip"],
-        values={
-            "last_seen": request_time,
-            "dissected_last_seen": dissected_request_time,
-        },
-    ).to_knowledge_node()
-    nodes.append(requesting_host)
+        values=value_dict,
+    )
+    requesting_host_knowledge = requesting_host.to_knowledge_node()
+    nodes.append(requesting_host_knowledge)
 
     # Add target NIC to target host
-    nic = KnowledgeNode(
+    nic_knowledge = KnowledgeNode(
         label="NetworkInterface",
         name=str(uuid.uuid4()),
-        values={
-            "last_seen": request_time,
-            "dissected_last_seen": dissected_request_time,
-        },
+        values=value_dict,
     )
-    nodes.append(nic)
+    nodes.append(nic_knowledge)
     relations.append(
         KnowledgeRelation(
             label="component-of",
-            source_node=nic,
-            target_node=requesting_host,
+            source_node=nic_knowledge,
+            target_node=requesting_host_knowledge,
         )
     )
 
-    ipv4_addr = IPv4Address(log_dict["src_ip"]).to_knowledge_node()
-    nodes.append(ipv4_addr)
+    ipv4_addr = IPv4Address(log_dict["src_ip"])
+    ipv4_addr_knowledge = ipv4_addr.to_knowledge_node()
+    nodes.append(ipv4_addr_knowledge)
     relations.append(
         KnowledgeRelation(
             label="has-address",
-            source_node=nic,
-            target_node=ipv4_addr,
+            source_node=nic_knowledge,
+            target_node=ipv4_addr_knowledge,
         )
     )
 
-    http_request = KnowledgeNode(
+    value_dict = dissected_request_time
+    value_dict["request_time"] = request_time
+    value_dict["method"] = log_dict["method"]
+    value_dict["url"] = log_dict["url"]
+    value_dict["response_status"] = log_dict["statuscode"]
+    value_dict["bytes"] = log_dict["bytes_sent"]
+    value_dict["referer"] = log_dict["referer"]
+    value_dict["user_agent"] = log_dict["useragent"]
+
+    http_request_knowledge = KnowledgeNode(
         label="HttpRequest",
         name=str(uuid.uuid4()),
-        values={
-            "request_time": request_time,
-            "dissected_request_time": dissected_request_time,
-            "method": log_dict["method"],
-            "url": log_dict["url"],
-            "response_status": log_dict["statuscode"],
-            "bytes": log_dict["bytes_sent"],
-            "referer": log_dict["referer"],
-            "user_agent": log_dict["useragent"],
-        },
+        values=value_dict,
     )
-    nodes.append(http_request)
+    nodes.append(http_request_knowledge)
 
     relations.append(
         KnowledgeRelation(
             label="communicates-to",
-            source_node=ipv4_addr,
-            target_node=http_request,
+            source_node=ipv4_addr_knowledge,
+            target_node=http_request_knowledge,
         )
     )
     relations.append(
         KnowledgeRelation(
             label="communicates-to",
-            source_node=http_request,
-            target_node=my_ipv4,
+            source_node=http_request_knowledge,
+            target_node=my_ipv4_knowledge,
         )
     )
 
@@ -498,8 +512,8 @@ def nginx_accesslog_to_knowledge(log_dict: Dict[str, Any]) -> Tuple[list, list]:
 
 
 def nmap_scan_to_knowledge(scan_results: Dict[str, Any]) -> Tuple[list, list]:
-    nodes = []
-    relations = []
+    knowledge_nodes = []
+    knowledge_relations = []
 
     scan_time = dateparser.parse(scan_results["runtime"]["time"])
 
@@ -509,7 +523,7 @@ def nmap_scan_to_knowledge(scan_results: Dict[str, Any]) -> Tuple[list, list]:
 
     my_hostname = socket.gethostname()
     my_ipv4 = IPv4Address(socket.gethostbyname(my_hostname)).to_knowledge_node()
-    nodes.append(my_ipv4)
+    knowledge_nodes.append(my_ipv4)
 
     for host, data in scan_results.items():
         if scan_results[host]["state"]["state"] != "up":
@@ -523,68 +537,70 @@ def nmap_scan_to_knowledge(scan_results: Dict[str, Any]) -> Tuple[list, list]:
                 "state_reason": scan_results[host]["state"]["reason"],
                 "state_reason_ttl": scan_results[host]["state"]["reason_ttl"],
             },
-        ).to_knowledge_node()
-        nodes.append(target_host)
+        )
+        target_host_knowledge = target_host.to_knowledge_node()
+        knowledge_nodes.append(target_host_knowledge)
 
         # Add target NIC to target host
-        nic = KnowledgeNode(
+        nic_knowledge = KnowledgeNode(
             label="NetworkInterface",
             name=str(uuid.uuid4()),
             values={"last_seen": scan_time},
         )
-        nodes.append(nic)
-        relations.append(
+        knowledge_nodes.append(nic_knowledge)
+        knowledge_relations.append(
             KnowledgeRelation(
                 label="component-of",
-                source_node=nic,
-                target_node=target_host,
+                source_node=nic_knowledge,
+                target_node=target_host_knowledge,
             )
         )
 
         # Add target IPv4 to NIC
-        ipv4_addr = IPv4Address(host).to_knowledge_node()
-        nodes.append(ipv4_addr)
-        relations.append(
+        ipv4_addr = IPv4Address(host)
+        ipv4_addr_knowledge = ipv4_addr.to_knowledge_node()
+        knowledge_nodes.append(ipv4_addr_knowledge)
+        knowledge_relations.append(
             KnowledgeRelation(
                 label="has-address",
-                source_node=nic,
-                target_node=ipv4_addr,
+                source_node=nic_knowledge,
+                target_node=ipv4_addr_knowledge,
             )
         )
 
         if scan_results[host]["macaddress"]:
             # Add MAC to NIC
-            mac_addr = KnowledgeNode(
+            mac_addr_knowledge = KnowledgeNode(
                 label="MACAddress",
                 name=scan_results[host]["macaddress"]["addr"],
                 values={
                     "mac_address": scan_results[host]["macaddress"]["addr"],
                 },
             )
-            nodes.append(mac_addr)
-            relations.append(
+            knowledge_nodes.append(mac_addr_knowledge)
+            knowledge_relations.append(
                 KnowledgeRelation(
                     label="has-address",
-                    source_node=nic,
-                    target_node=mac_addr,
+                    source_node=nic_knowledge,
+                    target_node=mac_addr_knowledge,
                 )
             )
 
             if "vendor" in scan_results[host]["macaddress"]:
                 # Add firmware to NIC
-                nic_manufacturer = KnowledgeNode(
+                nic_manufacturer_knowledge = KnowledgeNode(
                     label="Vendor",
                     name=f"{scan_results[host]['macaddress']['vendor']}",
                     values={
                         "vendor": scan_results[host]["macaddress"]["vendor"],
                     },
                 )
-                nodes.append(nic_manufacturer)
-                relations.append(
+                knowledge_nodes.append(nic_manufacturer_knowledge)
+                knowledge_relations.append(
                     KnowledgeRelation(
                         label="manufactures",
-                        source_node=nic_manufacturer,
-                        target_node=nic,
+                        source_node=nic_manufacturer_knowledge,
+                        target_node=nic_knowledge,
                     )
                 )
 
@@ -597,27 +613,28 @@ def nmap_scan_to_knowledge(scan_results: Dict[str, Any]) -> Tuple[list, list]:
                     "dns_record": hostname["name"],
                 },
             )
-            nodes.append(domain_name)
+            knowledge_nodes.append(domain_name)
 
-            domain_source_node = None
-            domain_target_node = None
-            if hostname["type"] in ["A", "AAAA", "user"]:
-                domain_source_node = domain_name
-                domain_target_node = ipv4_addr
-            elif hostname["type"] == "PTR":
-                domain_source_node = ipv4_addr
-                domain_target_node = domain_name
-            relations.append(
-                KnowledgeRelation(
-                    label="resolves-to",
-                    source_node=domain_source_node,
-                    target_node=domain_target_node,
-                )
-            )
+            # TODO
+            # domain_source_node = None
+            # domain_target_node = None
+            # if hostname["type"] in ["A", "AAAA", "user"]:
+            #     domain_source_node = domain_name
+            #     domain_target_node = ipv4_addr
+            # elif hostname["type"] == "PTR":
+            #     domain_source_node = ipv4_addr
+            #     domain_target_node = domain_name
+            # knowledge_relations.append(
+            #     KnowledgeRelation(
+            #         label="resolves-to",
+            #         source_node=domain_source_node,
+            #         target_node=domain_target_node,
+            #     )
+            # )
 
         if len(scan_results[host]["osmatch"]) > 1:
             os_match = scan_results[host]["osmatch"][0]
-            operating_system = KnowledgeNode(
+            operating_system_knowledge = KnowledgeNode(
                 label="Software",
                 name=os_match["cpe"] if os_match["cpe"] else os_match["name"],
                 values={
@@ -625,29 +642,29 @@ def nmap_scan_to_knowledge(scan_results: Dict[str, Any]) -> Tuple[list, list]:
                     "version": os_match["osclass"]["osgen"],
                 },
             )
-            nodes.append(operating_system)
-            relations.append(
+            knowledge_nodes.append(operating_system_knowledge)
+            knowledge_relations.append(
                 KnowledgeRelation(
                     label="runs-on",
-                    source_node=operating_system,
-                    target_node=target_host,
+                    source_node=operating_system_knowledge,
+                    target_node=target_host_knowledge,
                 )
             )
 
             if os_match["osclass"]["vendor"]:
-                os_vendor = KnowledgeNode(
+                os_vendor_knowledge = KnowledgeNode(
                     label="Vendor",
                     name=os_match["osclass"]["vendor"],
                     values={
                         "vendor": os_match["osclass"]["vendor"],
                     },
                 )
-                nodes.append(os_vendor)
-                relations.append(
+                knowledge_nodes.append(os_vendor_knowledge)
+                knowledge_relations.append(
                     KnowledgeRelation(
                         label="manufactures",
-                        source_node=os_vendor,
-                        target_node=operating_system,
+                        source_node=os_vendor_knowledge,
+                        target_node=operating_system_knowledge,
                     )
                 )
 
@@ -663,46 +680,47 @@ def nmap_scan_to_knowledge(scan_results: Dict[str, Any]) -> Tuple[list, list]:
                 open_port_ref = open_port.to_network_port_ref()
                 open_port_knowledge = open_port.to_knowledge_node()
                 open_port_ref_knowledge = open_port_ref.to_knowledge_node()
-                nodes.append(open_port_knowledge)
-                nodes.append(open_port_ref_knowledge)
-                relations.append(
+                knowledge_nodes.append(open_port_knowledge)
+                knowledge_nodes.append(open_port_ref_knowledge)
+                knowledge_relations.append(
                     KnowledgeRelation(
                         label="is-type",
                         source_node=open_port_knowledge,
                         target_node=open_port_ref_knowledge,
                     )
                 )
-                relations.append(
+                knowledge_relations.append(
                     KnowledgeRelation(
                         label="has-port",
-                        source_node=ipv4_addr,
-                        target_node=open_port,
+                        source_node=ipv4_addr_knowledge,
+                        target_node=open_port_knowledge,
                         values={"last_seen": scan_time, "status": "open"},
                     )
                 )
 
-    return nodes, relations
+    return knowledge_nodes, knowledge_relations
 
 
 def suricata_alert_to_knowledge(alert: Dict[str, Any]) -> Tuple[list, list]:
-    nodes = []
-    relations = []
+    knowledge_nodes = []
+    knowledge_relations = []
 
-    time_tripped = dateparser.parse(alert["timestamp"])
-    dissected_time = dissect_time(int(alert["timestamp"]))
+    alert_dt = dateparser.parse(alert["timestamp"])
+    assert alert_dt is not None
+    alert_timestamp = int(alert_dt.timestamp())
+    dissected_time = dissect_time(alert_timestamp, prefix="time_tripped")
+    value_dict = dissected_time
+    value_dict["time_tripped"] = alert_timestamp
+    value_dict["flow_id"] = alert["flow_id"]
 
-    alert_obj = KnowledgeNode(
+    alert_knowledge = KnowledgeNode(
         label="Alert",
         name=str(uuid.uuid4()),
-        values={
-            "time_tripped": time_tripped,
-            "dissected_time_tripped": dissected_time,
-            "flow_id": alert["flow_id"],
-        },
+        values=value_dict,
     )
-    nodes.append(alert_obj)
+    knowledge_nodes.append(alert_knowledge)
 
-    alert_signature = KnowledgeNode(
+    alert_sig_knowledge = KnowledgeNode(
         label="AttackSignature",
         name=f"Suricata {alert['alert']['gid']}: {alert['alert']['signature_id']}",
         values={
@@ -713,66 +731,66 @@ def suricata_alert_to_knowledge(alert: Dict[str, Any]) -> Tuple[list, list]:
             "severity": alert["alert"]["severity"],
         },
     )
-    nodes.append(alert_signature)
+    knowledge_nodes.append(alert_sig_knowledge)
 
-    relations.append(
+    knowledge_relations.append(
         KnowledgeRelation(
             label="is-type",
-            source_node=alert_obj,
-            target_node=alert_signature,
+            source_node=alert_knowledge,
+            target_node=alert_sig_knowledge,
         )
     )
 
-    alert_category = KnowledgeNode(
+    alert_cat_knowledge = KnowledgeNode(
         label="AttackSignatureCategory",
         name=alert["alert"]["category"],
         values={
             "category": alert["alert"]["category"],
         },
     )
-    nodes.append(alert_category)
-    relations.append(
+    knowledge_nodes.append(alert_cat_knowledge)
+    knowledge_relations.append(
         KnowledgeRelation(
             label="member-of",
-            source_node=alert_signature,
-            target_node=alert_category,
+            source_node=alert_sig_knowledge,
+            target_node=alert_cat_knowledge,
         )
     )
 
+    value_dict = dissected_time
+    value_dict["time_tripped"] = alert_timestamp
     source_host = Host(
         alert["src_ip"],
-        values={
-            "last_seen": time_tripped,
-            "dissected_last_seen": dissected_time,
-        },
-    ).to_knowledge_node()
-    nodes.append(source_host)
-    source_ip = IPv4Address(alert["src_ip"]).to_knowledge_node()
-    nodes.append(source_ip)
-    relations.append(
+        values=value_dict,
+    )
+    source_host_knowledge = source_host.to_knowledge_node()
+    knowledge_nodes.append(source_host_knowledge)
+    source_ip = IPv4Address(alert["src_ip"])
+    source_ip_knowledge = source_ip.to_knowledge_node()
+    knowledge_nodes.append(source_ip_knowledge)
+    knowledge_relations.append(
         KnowledgeRelation(
             label="has-address",
-            source_node=source_host,
-            target_node=source_ip,
+            source_node=source_host_knowledge,
+            target_node=source_ip_knowledge,
         )
     )
 
     dest_host = Host(
         alert["dest_ip"],
-        values={
-            "last_seen": time_tripped,
-            "dissected_last_seen": dissected_time,
-        },
-    ).to_knowledge_node()
-    nodes.append(dest_host)
-    dest_ip = IPv4Address(alert["dest_ip"]).to_knowledge_node()
-    nodes.append(dest_ip)
+        values=value_dict,
+    )
+    dest_host_knowledge = dest_host.to_knowledge_node()
+    knowledge_nodes.append(dest_host_knowledge)
+    dest_ip = IPv4Address(alert["dest_ip"])
+    dest_ip_knowledge = dest_ip.to_knowledge_node()
+    knowledge_nodes.append(dest_ip_knowledge)
 
-    relations.append(
+    knowledge_relations.append(
         KnowledgeRelation(
             label="has-address",
-            source_node=dest_host,
-            target_node=dest_ip,
+            source_node=dest_host_knowledge,
+            target_node=dest_ip_knowledge,
         )
     )
 
@@ -782,9 +800,9 @@ def suricata_alert_to_knowledge(alert: Dict[str, Any]) -> Tuple[list, list]:
     source_port_ref = source_port.to_network_port_ref()
     source_port_knowledge = source_port.to_knowledge_node()
     source_port_ref_knowledge = source_port_ref.to_knowledge_node()
-    nodes.append(source_port_knowledge)
-    nodes.append(source_port_ref_knowledge)
-    relations.append(
+    knowledge_nodes.append(source_port_knowledge)
+    knowledge_nodes.append(source_port_ref_knowledge)
+    knowledge_relations.append(
         KnowledgeRelation(
             label="is-type",
             source_node=source_port_knowledge,
@@ -793,14 +811,14 @@ def suricata_alert_to_knowledge(alert: Dict[str, Any]) -> Tuple[list, list]:
     )
 
     dest_port = NetworkEndpoint(
-        alert["dst_ip"], alert["dest_port"], alert["proto"], endpoint="dest"
+        alert["dest_ip"], alert["dest_port"], alert["proto"], endpoint="dest"
     )
     dest_port_ref = dest_port.to_network_port_ref()
     dest_port_knowledge = dest_port.to_knowledge_node()
     dest_port_ref_knowledge = dest_port_ref.to_knowledge_node()
-    nodes.append(dest_port_knowledge)
-    nodes.append(dest_port_ref_knowledge)
-    relations.append(
+    knowledge_nodes.append(dest_port_knowledge)
+    knowledge_nodes.append(dest_port_ref_knowledge)
+    knowledge_relations.append(
         KnowledgeRelation(
             label="is-type",
             source_node=dest_port_knowledge,
@@ -808,56 +826,59 @@ def suricata_alert_to_knowledge(alert: Dict[str, Any]) -> Tuple[list, list]:
         )
     )
 
-    dissected_start = dissect_time(alert["flow"]["start"])
+    flow_start_dt = dateparser.parse(alert["flow"]["start"])
+    assert flow_start_dt is not None
+    flow_start_timestamp = int(flow_start_dt.timestamp())
+    dissected_start = dissect_time(flow_start_timestamp, prefix="start")
+    value_dict = dissected_start
+    value_dict["source"] = "suricata"
 
     network_flow = NetworkTraffic(
         int(alert["flow"]["pkts_toserver"]),
         int(alert["flow"]["bytes_toserver"]),
-        int(alert["flow"]["start"]),
-        values={
-            "source": "suricata",
-            "dissected_start": dissected_start,
-        },
-    ).to_knowledge_node()
-    nodes.append(network_flow)
+        flow_start_timestamp,
+        values=value_dict,
+    )
+    network_flow_knowledge = network_flow.to_knowledge_node()
+    knowledge_nodes.append(network_flow_knowledge)
 
-    relations.append(
+    knowledge_relations.append(
         KnowledgeRelation(
             label="component-of",
-            source_node=source_port,
-            target_node=source_ip,
+            source_node=source_port_knowledge,
+            target_node=source_ip_knowledge,
         )
     )
-    relations.append(
+    knowledge_relations.append(
         KnowledgeRelation(
             label="component-of",
-            source_node=dest_port,
-            target_node=dest_ip,
+            source_node=dest_port_knowledge,
+            target_node=dest_ip_knowledge,
         )
     )
-    relations.append(
+    knowledge_relations.append(
         KnowledgeRelation(
             label="communicates-to",
-            source_node=source_port,
-            target_node=network_flow,
+            source_node=source_port_knowledge,
+            target_node=network_flow_knowledge,
         )
     )
-    relations.append(
+    knowledge_relations.append(
         KnowledgeRelation(
             label="communicates-to",
-            source_node=network_flow,
-            target_node=dest_port,
+            source_node=network_flow_knowledge,
+            target_node=dest_port_knowledge,
         )
     )
-    relations.append(
+    knowledge_relations.append(
         KnowledgeRelation(
             label="triggered-by",
-            source_node=alert_obj,
-            target_node=network_flow,
+            source_node=alert_knowledge,
+            target_node=network_flow_knowledge,
         )
     )
 
-    return nodes, relations
+    return knowledge_nodes, knowledge_relations
 
 
 def antivirus_alert_to_knowledge(alert: Dict[str, Any]) -> Tuple[list, list]:
@@ -869,16 +890,16 @@ def antivirus_alert_to_knowledge(alert: Dict[str, Any]) -> Tuple[list, list]:
     # as specified in the Antivirus.py file. Otherwise, we'd have a bunch of errors
     # showing up anytime an API key was invalid or the VT servers are unavailable
     if alert["vt_crit"] == "Not Available":
-        alert_obj = KnowledgeNode(
+        alert_knowledge = KnowledgeNode(
             label="Alert",
             name=str(uuid.uuid4()),
             values={
                 "date": alert["date"],
             },
         )
-        nodes.append(alert_obj)
+        nodes.append(alert_knowledge)
 
-        alert_signature = KnowledgeNode(
+        alert_signature_knowledge = KnowledgeNode(
             label="AttackSignature",
             name=f"{alert['path']}: {alert['sig']}",
             values={
@@ -886,10 +907,10 @@ def antivirus_alert_to_knowledge(alert: Dict[str, Any]) -> Tuple[list, list]:
                 "md5sum": alert["md5sum"],
             },
         )
-        nodes.append(alert_signature)
+        nodes.append(alert_signature_knowledge)
 
     else:
-        alert_obj = KnowledgeNode(
+        alert_knowledge = KnowledgeNode(
             label="Alert",
             name=str(uuid.uuid4()),
             values={
@@ -897,9 +918,9 @@ def antivirus_alert_to_knowledge(alert: Dict[str, Any]) -> Tuple[list, list]:
                 "vt_malicious_confidence": alert["vt_crit"],
             },
         )
-        nodes.append(alert_obj)
+        nodes.append(alert_knowledge)
 
-        alert_signature = KnowledgeNode(
+        alert_signature_knowledge = KnowledgeNode(
             label="AttackSignature",
             name=f"{alert['path']}: {alert['sig']}",
             values={
@@ -908,38 +929,39 @@ def antivirus_alert_to_knowledge(alert: Dict[str, Any]) -> Tuple[list, list]:
                 "ssdeep": alert["ssdeep"],
             },
         )
-        nodes.append(alert_signature)
+        nodes.append(alert_signature_knowledge)
 
     relations.append(
         KnowledgeRelation(
             label="is-type",
-            source_node=alert_obj,
-            target_node=alert_signature,
+            source_node=alert_knowledge,
+            target_node=alert_signature_knowledge,
         )
     )
 
-    path = KnowledgeNode(
+    path_knowledge = KnowledgeNode(
         label="FilePath",
         name=alert["path"],
     )
-    nodes.append(path)
+    nodes.append(path_knowledge)
 
-    hostname = Host(alert["hostname"]).to_knowledge_node()
-    nodes.append(hostname)
+    hostname = Host(alert["hostname"])
+    hostname_knowledge = hostname.to_knowledge_node()
+    nodes.append(hostname_knowledge)
 
     relations.append(
         KnowledgeRelation(
             label="triggered-by",
-            source_node=alert_obj,
-            target_node=path,
+            source_node=alert_knowledge,
+            target_node=path_knowledge,
         )
     )
 
     relations.append(
         KnowledgeRelation(
             label="stored-on",
-            source_node=path,
-            target_node=hostname,
+            source_node=path_knowledge,
+            target_node=hostname_knowledge,
         )
     )
 

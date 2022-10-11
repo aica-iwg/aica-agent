@@ -1,4 +1,6 @@
+import logging
 import os
+import py2neo.errors  # type: ignore
 
 from py2neo import Graph, Node, NodeMatcher, Relationship  # type: ignore
 from urllib.parse import quote_plus
@@ -79,7 +81,11 @@ class AicaNeo4j:
         n = Node(node_label, id=node_name, **node_properties)
         n.__primarylabel__ = node_label
         n.__primarykey__ = "id"
-        self.graph.merge(n)
+        try:
+            self.graph.merge(n)
+        except py2neo.errors.ClientError as e:
+            logging.error(str(e))
+            return False
 
         return True
 
@@ -101,7 +107,12 @@ class AicaNeo4j:
 
         if node_a and node_b:
             r = Relationship(node_a, relation_label, node_b, **relation_properties)
-            self.graph.merge(r, label=relation_label)
+            try:
+                self.graph.merge(r, label=relation_label)
+            except py2neo.errors.ClientError as e:
+                logging.error(str(e))
+                return False
+
             return True
         else:
             raise ValueError(

@@ -56,7 +56,7 @@ def get_vt_report(md5: str) -> Tuple[float, VTTuple]:
 
 # ClamAV logs are not in json, so we need to format them into something like that
 def parse_line(line: str) -> dict:
-    event_dict = Dict[str, Any]()
+    event_dict: Dict[str, Any] = dict()
 
     if "FOUND" in line:
         event_dict["event_type"] = "alert"
@@ -67,10 +67,10 @@ def parse_line(line: str) -> dict:
         event_dict["date"] = matcher.group(2)
         event_dict["path"] = matcher.group(3)
         event_dict["sig"] = matcher.group(4)
-        event_dict["md5"] = matcher.group(5)
+        event_dict["md5sum"] = matcher.group(5)
 
         # Processing VirusTotal info
-        vt_crit, report = get_vt_report(event_dict["md5"])
+        vt_crit, report = get_vt_report(event_dict["md5sum"])
         event_dict["vt_crit"] = vt_crit
         if vt_crit >= 0:
             event_dict["vt_sig"] = report.popular_threat_classification[

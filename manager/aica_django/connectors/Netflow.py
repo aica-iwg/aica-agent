@@ -19,4 +19,4 @@ def network_flow_capture() -> None:
         p = netflow.parse_packet(payload)
         flow_data = [flow.data for flow in p.flows]
         for flow in flow_data:
-            record_netflow.apply_async(args=tuple(flow))
+            record_netflow.apply_async(args=(flow,))
