@@ -15,7 +15,7 @@ logger = get_task_logger(__name__)
 
 
 @shared_task(name="poll-suricata-alerts")
-def poll_suricata_alerts(frequency=30):
+def poll_suricata_alerts(frequency: int = 30) -> None:
     logger.info(f"Running {__name__}: poll_dbs")
 
     gl = Graylog("suricata")

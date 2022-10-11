@@ -8,7 +8,9 @@ logger = get_task_logger(__name__)
 
 
 @shared_task(name="redirect_to_honeypot_iptables")
-def redirect_to_honeypot_iptables(attacker, target, timeout=300):
+def redirect_to_honeypot_iptables(
+    attacker: str, target: str, timeout: int = 300
+) -> None:
     mode = os.getenv("MODE")
     logger.info(f"Running {__name__}: redirect_to_honeypot_iptables")
 
@@ -24,12 +26,10 @@ def redirect_to_honeypot_iptables(attacker, target, timeout=300):
         # The following line has nosec as we've validated the input parameters above
         stdin, stdout, stderr = client.exec_command(command)  # nosec
 
-        output = stdout.readlines()
-        output = "".join(output)
+        output = "".join(stdout.readlines())
         logger.info(output)
 
-        output = stderr.readlines()
-        output = "".join(output)
+        output = "".join(stderr.readlines())
         logger.error(output)
 
         client.close()

@@ -33,7 +33,7 @@ from aica_django.converters.Knowledge import (
 logger = get_task_logger(__name__)
 
 
-def query_action(alert_dict):
+def query_action(alert_dict: dict) -> list:
     print(f"Running {__name__}: query_action")
     mongo_client = AicaMongo()
     mongo_db = mongo_client.get_db_handle()
@@ -57,35 +57,35 @@ def query_action(alert_dict):
 
 
 @shared_task(name="ma-knowledge_base-record_netflow")
-def record_netflow(flow_dict):
+def record_netflow(flow_dict: dict) -> bool:
     logger.info(f"Running {__name__}: record_netflow")
     nodes, relations = netflow_to_knowledge(flow_dict)
-    knowledge_to_neo(nodes=nodes, relations=relations)
+    return knowledge_to_neo(nodes=nodes, relations=relations)
 
 
 @shared_task(name="ma-knowledge_base-record_nmap_scan")
-def record_nmap_scan(scan_dict):
+def record_nmap_scan(scan_dict: dict) -> bool:
     logger.info(f"Running {__name__}: record_nmap_scan")
     nodes, relations = nmap_scan_to_knowledge(scan_dict)
-    knowledge_to_neo(nodes=nodes, relations=relations)
+    return knowledge_to_neo(nodes=nodes, relations=relations)
 
 
 @shared_task(name="ma-knowledge_base-record_suricata_alert")
-def record_suricata_alert(alert_dict):
+def record_suricata_alert(alert_dict: dict) -> bool:
     logger.info(f"Running {__name__}: record_alert")
     nodes, relations = suricata_alert_to_knowledge(alert_dict)
-    knowledge_to_neo(nodes=nodes, relations=relations)
+    return knowledge_to_neo(nodes=nodes, relations=relations)
 
 
 @shared_task(name="ma-knowledge_base-record_antivirus_alert")
-def record_antivirus_alert(alert_dict):
+def record_antivirus_alert(alert_dict: dict) -> bool:
     logger.info(f"Running{__name__}: record_alert")
     nodes, relations = antivirus_alert_to_knowledge(alert_dict)
-    knowledge_to_neo(nodes=nodes, relations=relations)
+    return knowledge_to_neo(nodes=nodes, relations=relations)
 
 
 @shared_task(name="ma-knowledge_base-record_nginx_accesslog")
-def record_nginx_accesslog(log_dict):
+def record_nginx_accesslog(log_dict: dict) -> bool:
     logger.info(f"Running {__name__}: record_nginx_accesslog")
     nodes, relations = nginx_accesslog_to_knowledge(log_dict)
-    knowledge_to_neo(nodes=nodes, relations=relations)
+    return knowledge_to_neo(nodes=nodes, relations=relations)

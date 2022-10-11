@@ -1,4 +1,5 @@
 import os
+
 from pymongo.mongo_client import MongoClient
 from urllib.parse import quote_plus
 
@@ -22,7 +23,7 @@ class AicaMongo:
     def get_client_handle(self):
         return self.client
 
-    def get_db_handle(self, db=None):
+    def get_db_handle(self, db: str = None):
         db = db if db else str(os.getenv("MONGO_INITDB_DATABASE"))
 
         return self.client[db]

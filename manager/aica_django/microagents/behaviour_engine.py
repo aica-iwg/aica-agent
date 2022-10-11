@@ -10,12 +10,12 @@
 
 from celery.app import shared_task
 from celery.utils.log import get_task_logger
-from netifaces import interfaces, ifaddresses, AF_INET
+from netifaces import interfaces, ifaddresses, AF_INET  # type: ignore
 
 logger = get_task_logger(__name__)
 
 
-def get_manager_ips():
+def get_manager_ips() -> list:
     ip_list = []
     for interface in interfaces():
         if AF_INET not in ifaddresses(interface):
@@ -26,7 +26,7 @@ def get_manager_ips():
 
 
 @shared_task(name="ma-behavior_engine-query_rules")
-def query_rules(alert_dict, candidate_action):
+def query_rules(alert_dict: dict, candidate_action: dict) -> str:
     print(f"Running {__name__}: query_rules")
 
     # TODO: This is stubbed out for initial demonstration purposes,

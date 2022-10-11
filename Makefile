@@ -20,6 +20,7 @@ black: $(shell find manager -type f -name *.py)
 lint: deps
 		@${CONDA} black --check --diff -q manager/
 		@${CONDA} flake8 manager/
+		@MYPYPATH=manager ${CONDA} mypy --install-types --non-interactive manager/
 		@find . -name "*.yml" | grep -v venv | xargs ${CONDA} yamllint
 		@find . -name "*.sh" | xargs ${CONDA} bashlint
 

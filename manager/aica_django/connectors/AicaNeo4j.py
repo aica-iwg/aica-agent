@@ -1,6 +1,8 @@
+import logging
 import os
+import py2neo.errors  # type: ignore
 
-from py2neo import Graph, Node, NodeMatcher, Relationship
+from py2neo import Graph, Node, NodeMatcher, Relationship  # type: ignore
 from urllib.parse import quote_plus
 
 # Try to keep these as minimal and orthogonal as possible
@@ -20,7 +22,8 @@ defined_node_labels = [
     "IPv6Address",
     "MACAddress",
     "NetworkInterface",
-    "NetworkPort",
+    "NetworkEndpoint",  # Observed source/destination port/ip pair
+    "NetworkPort",  # Static reference to port info
     "NetworkProtocol",
     "NetworkTraffic",
     "Organization",  # e.g., corporation, agency
@@ -60,33 +63,41 @@ class AicaNeo4j:
 
         self.graph = Graph(uri, auth=(user, password))
 
-    def create_constraints(self):
+    def create_constraints(self) -> bool:
         tx = self.graph.begin()
         for label in defined_node_labels:
             unique_id = f"""CREATE CONSTRAINT unique_id_{label} IF NOT EXISTS
                             FOR (n:{label})
                             REQUIRE n.id IS UNIQUE"""
             tx.run(unique_id)
-        tx.commit()
+        self.graph.commit(tx)
 
-    def add_node(self, node_name, node_label, node_properties):
+        return True
+
+    def add_node(self, node_name: str, node_label: str, node_properties: dict) -> bool:
         if not node_properties:
             node_properties = dict()
 
         n = Node(node_label, id=node_name, **node_properties)
         n.__primarylabel__ = node_label
         n.__primarykey__ = "id"
-        self.graph.merge(n)
+        try:
+            self.graph.merge(n)
+        except py2neo.errors.ClientError as e:
+            logging.error(str(e))
+            return False
+
+        return True
 
     def add_relation(
         self,
-        node_a_name,
-        node_a_label,
-        node_b_name,
-        node_b_label,
-        relation_label,
-        relation_properties,
-    ):
+        node_a_name: str,
+        node_a_label: str,
+        node_b_name: str,
+        node_b_label: str,
+        relation_label: str,
+        relation_properties: dict,
+    ) -> bool:
         if not relation_properties:
             relation_properties = dict()
 
@@ -96,7 +107,13 @@ class AicaNeo4j:
 
         if node_a and node_b:
             r = Relationship(node_a, relation_label, node_b, **relation_properties)
-            self.graph.merge(r, label=relation_label)
+            try:
+                self.graph.merge(r, label=relation_label)
+            except py2neo.errors.ClientError as e:
+                logging.error(str(e))
+                return False
+
+            return True
         else:
             raise ValueError(
                 f"Couldn't find {node_a_name} ({node_a}) "
