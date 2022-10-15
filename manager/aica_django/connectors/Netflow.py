@@ -17,6 +17,9 @@ def network_flow_capture() -> None:
     while True:
         payload = sock.recv(4096)
         p = netflow.parse_packet(payload)
-        flow_data = [flow.data for flow in p.flows]
-        for flow in flow_data:
-            record_netflow.apply_async(args=(flow,))
+        offset = p.header.timestamp - p.header.uptime
+        for flow in p.flows:
+            data = flow.data
+            data["FIRST_SWITCHED"] = data["FIRST_SWITCHED"] + offset
+            data["LAST_SWITCHED"] = data["LAST_SWITCHED"] + offset
+            record_netflow.apply_async(args=(data,))

@@ -19,7 +19,22 @@ def overview(request: HttpRequest) -> HttpResponse:
 
     host_list = Host.nodes.all()
     data["hosts"] = json2table.convert(
-        {"Hosts": host_list},
+        {
+            "Hosts": [
+                {
+                    "IPv4 Address": ", ".join(
+                        [y.address for y in x.ipv4_address.all()]
+                    ),
+                    "Alert Count": len(x.alerts()),
+                    "Last Seen": x.last_seen,
+                    "Suspicious Source Ratio": round(x.suspicious_source_ratio(), 3),
+                    "Suspicious Destination Ratio": round(
+                        x.suspicious_destination_ratio(), 3
+                    ),
+                }
+                for x in host_list
+            ],
+        },
         table_attributes={
             "id": "host_table",
             "class": "table table-dark table-striped table-hover table-responsive",
@@ -29,7 +44,22 @@ def overview(request: HttpRequest) -> HttpResponse:
     # Recent Alerts
     alert_list = Alert.nodes.all()
     data["alerts"] = json2table.convert(
-        {"Alerts": alert_list},
+        {
+            "Alerts": [
+                {
+                    "Severity": x.attack_signature.single().severity,
+                    "Attack Signature": x.attack_signature.single().signature,
+                    "Attack Signature Category": x.attack_signature.single()
+                    .signature_category.single()
+                    .category,
+                    "Host": str(
+                        x.triggered_by.single().communicates_from.single().ip_address
+                    ),
+                    "Times Tripped": x.time_tripped,
+                }
+                for x in alert_list
+            ],
+        },
         table_attributes={
             "id": "alert_table",
             "class": "table table-dark table-striped table-hover table-responsive",
