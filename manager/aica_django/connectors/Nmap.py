@@ -1,4 +1,6 @@
-import fcntl
+import datetime
+
+import fasteners  # type: ignore
 import logging
 import netifaces  # type: ignore
 import nmap3  # type: ignore
@@ -10,6 +12,8 @@ from netaddr import IPAddress  # type: ignore
 
 from celery import shared_task
 from celery.utils.log import get_task_logger
+
+from aica_django.connectors.AicaMongo import AicaMongo
 
 logger = get_task_logger(__name__)
 
@@ -28,7 +32,9 @@ def periodic_network_scan(nmap_target: str = None, nmap_args: str = None) -> Non
 
 @shared_task(name="network-scan")
 def network_scan(
-    nmap_target: str = None, nmap_args: str = "-O -Pn --osscan-limit --host-timeout=30"
+    nmap_target: str = None,
+    nmap_args: str = "-O -Pn --osscan-limit --host-timeout=30",
+    min_scan_interval=300,
 ) -> dict:
     targets = []
     if not nmap_target:
@@ -48,23 +54,26 @@ def network_scan(
         targets.append(nmap_target)
 
     scan_results = dict()
+    aica_mongo = AicaMongo()
     for target in targets:
         hasher = sha256()
         hasher.update(target.encode("utf-8"))
         host_hash = hasher.hexdigest()
-        with open(f"/var/lock/aica-nmap-scan-{host_hash}", "w") as lockfile:
-            try:
-                fcntl.flock(lockfile, fcntl.LOCK_EX | fcntl.LOCK_NB)
-            except OSError:
-                logging.warning(
-                    "Couldn't obtain lock to run nmap scan of target, "
-                    "existing scan in-progress?"
-                )
-                return {}
-
-        nmap = nmap3.Nmap()
-        logging.debug(f"Scanning {target} with {nmap_args}")
-        scan_result = nmap.scan_top_ports(target, args=nmap_args)
-        scan_results.update(scan_result)
+        last_scantime = aica_mongo.get_last_scan(host_hash)
+        if last_scantime < min_scan_interval:
+            scan_lock = fasteners.InterProcessLock(
+                f"/var/lock/aica-nmap-scan-{host_hash}"
+            )
+            with scan_lock:
+                nmap = nmap3.Nmap()
+                logging.debug(f"Scanning {target} with {nmap_args}")
+                current_time = datetime.datetime.now().timestamp()
+                scan_result = nmap.scan_top_ports(target, args=nmap_args)
+                aica_mongo.record_scan(host_hash, current_time)
+                scan_results.update(scan_result)
+        else:
+            logging.warning(
+                f"Host {target} has been scanned recently, not scanning again"
+            )
 
     return scan_results
