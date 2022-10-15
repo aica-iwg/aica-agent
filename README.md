@@ -63,7 +63,6 @@ The AICA agent is built as a Django project, and so the normal Django convention
 * `.gitignore` tells git which files to never check into the repository.
 * `.yamllint` configures the YAML lint that runs at build/test time
 * `docker-compose.yml`  is the YAML file instructing docker-compose how to create the necessary containers and networks for the agent. The additional `docker-compose-emu.yml` and `docker-compose-virt.yml` have addition definitions intended for those modes only and are additionally invoked in the `Makefile` based on the MODE environmental variable.
-* `setup.cfg` contains settings to control programs such as flake8. 
 
 ## Maintainers
 
