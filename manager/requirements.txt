@@ -7,6 +7,7 @@ django-bootstrap-v5==1.0.11
 django-extensions==3.2.1
 django-neomodel==0.0.7
 django-sb-admin==5.5.1.1
+fasteners==0.18
 flower==1.2.0
 gunicorn==20.1.0
 json2table==1.1.5

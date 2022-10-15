@@ -72,7 +72,8 @@ outputs:
             # session id
             #session-resumption: no
             # custom controls which TLS fields that are included in eve-log
-            #custom: [subject, issuer, session_resumed, serial, fingerprint, sni, version, not_before, not_after, certificate, chain, ja3, ja3s]
+            #custom: [subject, issuer, session_resumed, serial, fingerprint,
+            # sni, version, not_before, not_after, certificate, chain, ja3, ja3s]
         - files:
             force-magic: no   # force logging magic on all logged files
             # force logging of checksums, available hash functions are md5,
@@ -223,8 +224,10 @@ outputs:
       #dir: /nsm_data/
 
       #ts-format: usec # sec or usec second format (default) is filename.sec usec is filename.sec.usec
-      use-stream-depth: no #If set to "yes" packets seen after reaching stream inspection depth are ignored. "no" logs all packets
-      honor-pass-rules: no # If set to "yes", flows in which a pass rule matched will stop being logged.
+      #If set to "yes" packets seen after reaching stream inspection depth are ignored. "no" logs all packets
+      use-stream-depth: no
+      # If set to "yes", flows in which a pass rule matched will stop being logged.
+      honor-pass-rules: no
 
   # a full alert log containing much information for signature writers
   # or for investigating suspected false positives.
