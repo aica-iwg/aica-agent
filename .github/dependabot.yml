@@ -1,14 +1,54 @@
 version: 2
 updates:
-  - package-ecosystem: docker
-    directory: "/"
-    schedule:
-      interval: "weekly"
   - package-ecosystem: github-actions
     directory: "/"
     schedule:
       interval: "weekly"
+  - package-ecosystem: docker
+    directory: "manager"
+    schedule:
+      interval: "weekly"
+  - package-ecosystem: docker
+    directory: "manager_graphdb"
+    schedule:
+      interval: "weekly"
+  - package-ecosystem: docker
+    directory: "manager_mongodb"
+    schedule:
+      interval: "weekly"
+  - package-ecosystem: docker
+    directory: "elasticsearch"
+    schedule:
+      interval: "weekly"
+  - package-ecosystem: docker
+    directory: "attacker"
+    schedule:
+      interval: "weekly"
+  - package-ecosystem: docker
+    directory: "target"
+    schedule:
+      interval: "weekly"
+  - package-ecosystem: docker
+    directory: "node_red_target"
+    schedule:
+      interval: "weekly"
+  - package-ecosystem: docker
+    directory: "ids"
+    schedule:
+      interval: "weekly"
+  - package-ecosystem: docker
+    directory: "siem"
+    schedule:
+      interval: "weekly"
+  - package-ecosystem: docker
+    directory: "honeypot"
+    schedule:
+      interval: "weekly"
   - package-ecosystem: pip
-    directory: "/"
+    directory: "manager"
+    schedule:
+      interval: "weekly"
+  - package-ecosystem: pip
+    directory: "honeypot"
     schedule:
       interval: "weekly"
