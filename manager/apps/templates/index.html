@@ -1,11 +1,12 @@
-{% extends 'base.html' %}
+{% extends "base.html" %}
 
 {% block content %}
 {{hosts}}
+
 {{alerts}}
-{% endblock %}
 
 <script>
 $('#host_table').DataTable();
 $('#alert_table').DataTable();
 </script>
+{% endblock %}

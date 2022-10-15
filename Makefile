@@ -44,7 +44,13 @@ stop: check-env
 
 rebuild: stop build start
 
+mrebuild:
+		@docker compose -f docker-compose.yml -f docker-compose-${MODE}.yml up -d --no-deps --build manager
+
 restart: stop start
+
+manager-shell: check-env
+		@docker compose -f docker-compose.yml -f docker-compose-${MODE}.yml exec -u root manager /bin/bash
 
 attacker-shell: check-env
 		@docker compose -f docker-compose.yml -f docker-compose-${MODE}.yml exec -u root attacker /bin/bash
@@ -52,11 +58,11 @@ attacker-shell: check-env
 target-shell: check-env
 		@docker compose -f docker-compose.yml -f docker-compose-${MODE}.yml exec -u root target /bin/bash
 
-manager-shell: check-env
-		@docker compose -f docker-compose.yml -f docker-compose-${MODE}.yml exec -u root manager /bin/bash
-
 logs: check-env
 		@docker compose -f docker-compose.yml -f docker-compose-${MODE}.yml logs -f
+
+mlogs: check-env
+		@docker compose -f docker-compose.yml -f docker-compose-${MODE}.yml logs -f | grep "^manager\b"
 
 clean: check-env
 		@docker compose -f docker-compose.yml -f docker-compose-${MODE}.yml down -v --rmi all --remove-orphans
