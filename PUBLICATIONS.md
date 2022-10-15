@@ -1,6 +1,7 @@
 ## AICA-Related Publications ##
 
-* Blakely, B. (2021, October 18). Cyber Senses: Modeling Network Situational Awareness after Biology. Resilience Week 2021, Washington, DC, USA. https://resilience.inl.gov/rw2021/
+* Blakely, B. (2021, October 18). Cyber Senses: Modeling Network Situational Awareness after Biology. Resilience Week 2021, Washington, DC, USA. https://ieeexplore.ieee.org/abstract/document/9611793/
+* Blakely, B. (2022, September 27). An Experimental Platform for Autonomous Intelligent Cyber-Defense Agents: Towards a collaborative community approach (WIPP). Resilience Week 2022, National Harbor, MD, USA.
 * Blakely, B., Horsthemke, W., Poczatec, A., Nowak, L., & Evans, N. (2019). Moving Target, Deception, and Other Adaptive Defenses. In C. Rieger, I. Ray, Q. Zhu, & M. A. Haney (Eds.), Industrial Control Systems Security and Resiliency: Practice and Theory (pp. 95–118). Springer International Publishing. https://doi.org/10.1007/978-3-030-18214-4_6
 * Evans, N., & Horsthemke, W. (2019). Active Defense Techniques. In A. Kott & I. Linkov (Eds.), Cyber Resilience of Systems and Networks (pp. 221–246). Springer International Publishing. https://doi.org/10.1007/978-3-319-77492-3_10
 * Kott, A., & Theron, P. (2020). Doers, Not Watchers: Intelligent Autonomous Agents Are a Path to Cyber Resilience. IEEE Security & Privacy, 18(3), 62–66. https://doi.org/10.1109/MSEC.2020.2983714
