@@ -1,16 +1,14 @@
 import datetime
 import json
 import logging
-import os
 import re
 import requests
 import time
-import vt  # type: ignore
 
 from celery import current_app
 from celery.app import shared_task
 from celery.utils.log import get_task_logger
-from typing import Tuple, NamedTuple, Dict, Any
+from typing import Dict, Any
 
 from aica_django.connectors.Graylog import Graylog
 
@@ -18,40 +16,8 @@ logger = get_task_logger(__name__)
 
 
 clam_parser = re.compile(
-    r"^(\S+)\s+clamav\:([^-]+) -> ([^:]+): ([^(]+)\(([a-f0-9]+):\d+\) FOUND"
+    r"^(\S+)\s+clamav\:([^-]+) -> ([^:]+): ([^-]+)-([^-]+)-([^(]+)\(([a-f0-9]+):(\d+)\) FOUND"
 )
-
-
-class VTTuple(NamedTuple):
-    popular_threat_classification: dict
-    ssdeep: str
-
-
-def malicious_confidence(vt_results: dict) -> float:
-    """Determine malicious confidence from a VT API Report"""
-    # Credit: HuskyHacks and mttaggart
-    # (https://github.com/mttaggart/blue-jupyter/blob/main/utils/malware.py)
-    try:
-        dispositions = [r["result"] for r in vt_results.values()]
-        malicious = list(filter(lambda d: d is not None, dispositions))
-        return round(len(malicious) / len(dispositions) * 100, 2)
-    except KeyError:
-        return 0
-
-
-def get_vt_report(md5: str) -> Tuple[float, VTTuple]:
-    vt_api_key = os.getenv("VT_API_KEY")
-    if not vt_api_key:
-        logging.error(
-            "Missing VT_API_KEY environment variable, not able to lookup VirusTotal information"
-        )
-        return -1, VTTuple(popular_threat_classification={}, ssdeep="")
-    else:
-        client = vt.Client(vt_api_key)
-        file = client.get_object(f"/files/{md5}")
-        conf = malicious_confidence(file.last_analysis_results)
-
-        return conf, file
 
 
 # ClamAV logs are not in json, so we need to format them into something like that
@@ -66,20 +32,11 @@ def parse_line(line: str) -> dict:
         event_dict["hostname"] = matcher.group(1)
         event_dict["date"] = matcher.group(2)
         event_dict["path"] = matcher.group(3)
-        event_dict["sig"] = matcher.group(4)
-        event_dict["md5sum"] = matcher.group(5)
-
-        # Processing VirusTotal info
-        vt_crit, report = get_vt_report(event_dict["md5sum"])
-        event_dict["vt_crit"] = vt_crit
-        if vt_crit >= 0:
-            event_dict["vt_sig"] = report.popular_threat_classification[
-                "suggested_threat_label"
-            ]
-            event_dict["ssdeep"] = report.ssdeep
-        else:
-            event_dict["vt_sig"] = ""
-            event_dict["ssdeep"] = ""
+        event_dict["platform"] = matcher.group(4)
+        event_dict["category"] = matcher.group(5)
+        event_dict["name"] = matcher.group(6)
+        event_dict["signature"] = matcher.group(7)
+        event_dict["revision"] = matcher.group(8)
 
         return event_dict
 

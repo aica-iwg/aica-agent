@@ -918,47 +918,36 @@ def antivirus_alert_to_knowledge(alert: Dict[str, Any]) -> Tuple[list, list]:
     # data isn't properly stored in the alert object and we get the "Not Available"
     # as specified in the Antivirus.py file. Otherwise, we'd have a bunch of errors
     # showing up anytime an API key was invalid or the VT servers are unavailable
-    if alert["vt_crit"] == "Not Available":
-        alert_knowledge = KnowledgeNode(
-            label="Alert",
-            name=str(uuid.uuid4()),
-            values={
-                "date": alert["date"],
-            },
-        )
-        nodes.append(alert_knowledge)
+    alert_knowledge = KnowledgeNode(
+        label="Alert",
+        name=str(uuid.uuid4()),
+        values={
+            "date": alert["date"],
+        },
+    )
+    nodes.append(alert_knowledge)
 
-        alert_signature_knowledge = KnowledgeNode(
-            label="AttackSignature",
-            name=f"{alert['path']}: {alert['sig']}",
-            values={
-                "AVSignature": alert["sig"],
-                "md5sum": alert["md5sum"],
-            },
+    alert_signature_knowledge = KnowledgeNode(
+        label="AttackSignature",
+        name=f"{alert['signature']}:{alert['revision']}",
+        values={
+            "platform": alert["platform"],
+            "name": alert["name"],
+        },
+    )
+    nodes.append(alert_signature_knowledge)
+    alert_signature_category_knowledge = KnowledgeNode(
+        label="AttackSignatureCategory",
+        name=f"{alert['category']}",
+    )
+    nodes.append(alert_signature_category_knowledge)
+    relations.append(
+        KnowledgeRelation(
+            "IS_TYPE",
+            source_node=alert_signature_knowledge,
+            target_node=alert_signature_category_knowledge,
         )
-        nodes.append(alert_signature_knowledge)
-
-    else:
-        alert_knowledge = KnowledgeNode(
-            label="Alert",
-            name=str(uuid.uuid4()),
-            values={
-                "date": alert["date"],
-                "vt_malicious_confidence": alert["vt_crit"],
-            },
-        )
-        nodes.append(alert_knowledge)
-
-        alert_signature_knowledge = KnowledgeNode(
-            label="AttackSignature",
-            name=f"{alert['path']}: {alert['sig']}",
-            values={
-                "VTSuggestedLabel": alert["vt_sig"],
-                "md5": alert["md5sum"],
-                "ssdeep": alert["ssdeep"],
-            },
-        )
-        nodes.append(alert_signature_knowledge)
+    )
 
     relations.append(
         KnowledgeRelation(
