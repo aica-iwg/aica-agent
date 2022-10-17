@@ -1,4 +1,4 @@
-import backoff
+import backoff  # type: ignore
 import os
 import logging
 import requests
