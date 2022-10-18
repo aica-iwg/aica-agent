@@ -35,7 +35,7 @@ test: check-env lint security
 				manage.py test --noinput --failfast -v 3
 		# Starting with a low threshold as we increase our test coverage
 		@docker compose -f docker-compose.yml -f docker-compose-${MODE}.yml \
-			run -e SKIP_TASKS=true --rm -v TESTDIR:/tmp/testdir \
+			run --rm -v TESTDIR:/tmp/testdir \
 			manager /opt/venv/bin/coverage report --data-file=/tmp/testdir/.coverage --fail-under=30
 
 start: build
