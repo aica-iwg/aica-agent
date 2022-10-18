@@ -39,6 +39,6 @@ class AicaMongo:
     def get_last_scan(self, host_hash: str) -> float:
         result = self.scan_collection.find_one({"host_hash": host_hash})
         if result:
-            return result["result"]
+            return result["last_scantime"]
         else:
             return 0

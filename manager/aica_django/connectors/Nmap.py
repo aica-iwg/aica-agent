@@ -60,7 +60,7 @@ def network_scan(
         hasher.update(target.encode("utf-8"))
         host_hash = hasher.hexdigest()
         last_scantime = aica_mongo.get_last_scan(host_hash)
-        if last_scantime < min_scan_interval:
+        if last_scantime < datetime.datetime.now().timestamp() - min_scan_interval:
             scan_lock = fasteners.InterProcessLock(
                 f"/var/lock/aica-nmap-scan-{host_hash}"
             )
