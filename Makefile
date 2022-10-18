@@ -25,13 +25,18 @@ security:
 		@${CONDA} safety check -r manager/requirements.txt
 		@${CONDA} safety check -r honeypot/requirements.txt
 
-build: check-env lint security
+build: check-env
 		@docker compose -f docker-compose.yml -f docker-compose-${MODE}.yml build
 
-test: check-env deps
-		@docker compose -f docker-compose.yml -f docker-compose-${MODE}.yml run \
-			-e SKIP_TASKS=true --rm manager /opt/venv/bin/python3 manage.py \
-			test --noinput --failfast -v 3
+test: check-env lint security
+		@docker compose -f docker-compose.yml -f docker-compose-${MODE}.yml \
+			run -e SKIP_TASKS=true --rm -v TESTDIR:/tmp/testdir \
+			manager /opt/venv/bin/coverage run --data-file=/tmp/testdir/.coverage --omit="*test*" \
+				manage.py test --noinput --failfast -v 3
+		# Starting with a low threshold as we increase our test coverage
+		@docker compose -f docker-compose.yml -f docker-compose-${MODE}.yml \
+			run -e SKIP_TASKS=true --rm -v TESTDIR:/tmp/testdir \
+			manager /opt/venv/bin/coverage report --data-file=/tmp/testdir/.coverage --fail-under=30
 
 start: build
 		@docker compose -f docker-compose.yml -f docker-compose-${MODE}.yml up -d
