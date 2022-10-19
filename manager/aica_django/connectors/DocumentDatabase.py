@@ -8,8 +8,8 @@ Classes:
 import os
 from typing import Any
 
-from pymongo.database import Database
-from pymongo.mongo_client import MongoClient
+from pymongo.database import Database  # type:ignore
+from pymongo.mongo_client import MongoClient  # type: ignore
 from urllib.parse import quote_plus
 
 
@@ -58,12 +58,12 @@ class AicaMongo:
             f"mongodb://{user}:{password}@{host}:{port}/"
             f"{db}?retryWrites=true&w=majority"
         )
-        self.client: MongoClient = MongoClient(conn)  # type: ignore
+        self.client: MongoClient = MongoClient(conn)
         self.scan_collection = self.client[str(os.getenv("MONGO_INITDB_DATABASE"))][
             "scans"
         ]
 
-    def get_client_handle(self) -> MongoClient:  # type: ignore
+    def get_client_handle(self) -> MongoClient:
         """
         Return a handle to the MongoClient object
 
@@ -73,7 +73,7 @@ class AicaMongo:
 
         return self.client
 
-    def get_db_handle(self, db: str = "") -> Database:  # type: ignore
+    def get_db_handle(self, db: str = "") -> Database:
         """
         Return handle to a specific DB in the MongoDB instance.
 

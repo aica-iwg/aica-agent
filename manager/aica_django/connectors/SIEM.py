@@ -8,7 +8,7 @@ Functions:
     make_request: A rate limited static function to make requests to Graylog's API, with retry logic.
 """
 
-import backoff
+import backoff  # type: ignore
 import os
 import logging
 import requests
@@ -21,7 +21,7 @@ headers = {"Accept": "application/json", "X-Requested-By": __name__}
 
 @backoff.on_exception(
     backoff.expo, (requests.exceptions.Timeout, requests.exceptions.ConnectionError)
-)
+)  # type: ignore
 def make_graylog_request(
     url: str,
     method: str,
