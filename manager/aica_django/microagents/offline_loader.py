@@ -20,7 +20,7 @@ Functions:
 
 import logging
 import os
-import pandas as pd
+import pandas as pd  # type: ignore
 import requests
 import time
 import yaml
