@@ -1,3 +1,29 @@
+"""
+This module defines objects representing nodes and relations in the Knowledge graph, and functions for
+handling them (e.g., parsing/converting).
+
+Classes:
+    KnowledgeNode: Base/generic class for representing a knowledge object
+    KnowledgeRelation: Base/generic class for representing a knowledge relationship
+    Host: A physical/virtual system, potentially with multiple addresses
+    IPv4Address: The IPv4 address corresponding to a host, potentially with listening ports (NetworkEndpoints)
+    IPv6Address: The IPv6 address corresponding to a host, potentially with listening ports (NetworkEndpoints)
+    NetworkEndpoint: A listening or transmitting NetworkPort tied to a specific address
+    NetworkPort: A global representation a network port and associated attributes
+    NetworkTraffic: A record of a transmission over the network
+
+Functions:
+    antivirus_alert_to_knowledge: Converts an alert from the antivirus system to KnowledgeNodes/Relations
+    netflow_to_knowledge: Converts a network flow record to KnowledgeNodes/Relations
+    nginx_accesslog_to_knowledge: Converts an HTTP access log entry to KnowledgeNodes/Relations
+    nmap_scan_to_knowledge: Converts a network scan result to KnowledgeNodes/Relations
+    suricata_alert_to_knowledge: Converts an alert from the IDS to KnowledgeNodes/Relations
+    knowledge_to_neo: Stores lists of KnowledgeNodes and KnowledgeRelations in the knowledge graph database
+    normalize_mac_addr: Converts MAC address to standard lowercase hex value without separators
+    dissect_time: Converts a timestamp value into a dictionary of time attributes potential relevant for classification
+
+"""
+
 import dateparser
 import datetime
 import ipaddress
@@ -8,9 +34,9 @@ import re
 import socket
 import uuid
 
-from typing import Tuple, Dict, Any, Optional, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
-from aica_django.connectors.AicaNeo4j import (
+from aica_django.connectors.GraphDatabase import (
     AicaNeo4j,
     defined_node_labels,
     defined_relation_labels,
@@ -20,7 +46,19 @@ from celery.utils.log import get_task_logger
 logger = get_task_logger(__name__)
 
 
-def dissect_time(timestamp: float, prefix: str = "") -> dict:
+def dissect_time(timestamp: float, prefix: str = "") -> Dict[str, Any]:
+    """
+    Converts a timestamp into a dictionary of timestamp attributes potentially relevant
+    for classification.
+
+    @param timestamp: The timestamp to "dissect"
+    @type timestamp: float
+    @param prefix: A prefix to use for dictionary keys, if desired
+    @type prefix: str
+    @return: Dictionary of attributes related to this timestamp
+    @rtype: dict
+    """
+
     dt_utc = datetime.datetime.utcfromtimestamp(timestamp)
     dt_americas = dt_utc.astimezone(pytz.timezone("America/Chicago"))
     dt_europeafrica = dt_utc.astimezone(pytz.timezone("Europe/Berlin"))
@@ -52,24 +90,32 @@ def dissect_time(timestamp: float, prefix: str = "") -> dict:
 
 
 class KnowledgeNode:
-    label: str = ""
-    name: str = ""
-    values: Dict[str, Any] = dict()
+    """
+    Represents an arbitrary knowledge object, intended mainly for sub-classing
+    """
 
-    def __init__(self, label: str, name: str, values: Dict[str, Any] = None):
+    def __init__(
+        self, label: str, name: str, values: Union[None, Dict[str, Any]] = None
+    ):
+        """
+        Initialize a new KnowledgeNode object.
+
+        @param label: The type of node, of the types specified in aica_django.connectors.GraphDatabase
+        @type label: str
+        @param name: A human-readable name for this node
+        @type name: str
+        @param values: Any metadata values that should be stored with this node
+        @type values: dict
+        @raise ValueError: If an unsupported node label or invalid name is provided.
+        """
+
         if label not in defined_node_labels:
             raise ValueError(f"Unsupported node label {label} for {name}")
 
-        if type(label) != str or label == "":
-            raise ValueError(f"Label must be a non-empty string, not {type(label)}")
-        if type(name) not in (str, int) or name == "":
-            raise ValueError(
-                f"Name must be a non-empty string or int, not {type(name)}"
-            )
-        if values and type(values) != dict:
-            raise ValueError(f"Values must be a dictionary, not {type(values)}")
+        if name == "":
+            raise ValueError(f"Name must be non-empty")
 
-        self.values = values if values else dict()
+        self.values = values if values else {}
         if label == "MACAddress":
             name = normalize_mac_addr(name)
             self.values["value"] = name
@@ -79,19 +125,61 @@ class KnowledgeNode:
 
 
 class NetworkPort(KnowledgeNode):
+    """
+    Represents a global reference for an IP port that may contain additional metadata useful
+    for classification.
+    """
+
     def __init__(
-        self, port: int, protocol: Union[int, str], values: Dict[str, Any] = None
+        self,
+        port: int,
+        protocol: Union[int, str],
+        values: Union[None, Dict[str, Any]] = None,
     ):
+        """
+        Initialize this NetworkPort object
+
+        @param port: The port number (0-65535)
+        @type port: int
+        @param protocol: The protocol name or numerical representation (e.g., TCP or 6)
+        @type protocol: Union[int, str]
+        @param values: Any metadata values that should be stored with this node
+        @type values: dict
+        @raise: ValueError: if the specific port or protocol numbers are out of bounds
+        """
+
         self.label = "NetworkPort"
-        self.port = port
-        self.protocol = (
-            protocol if type(protocol) == int else socket.getprotobyname(str(protocol))
-        )
+
+        if 0 <= port < 65535:
+            self.port = port
+        else:
+            raise ValueError("Invalid port number")
+
+        if type(protocol) == int:
+            if 0 <= protocol < 256:
+                self.protocol = protocol
+            else:
+                raise ValueError("Invalid protocol number")
+        else:
+            assert type(protocol) == str
+            try:
+                proto_num = socket.getprotobyname(protocol)
+                self.protocol = proto_num
+            except OSError:
+                raise ValueError("Invalid protocol name")
+
         self.name = f"{self.port}/{self.protocol}"
         self.values = values if values else {}
         super().__init__(self.label, self.name, values=self.values)
 
     def to_knowledge_node(self) -> KnowledgeNode:
+        """
+        Convert this NetworkPort object to a KnowledgeNode representation.
+
+        @return: KnowledgeNode version of this object.
+        @rtype: KnowledgeNode
+        """
+
         values = self.values
         values["port"] = self.port
         values["protocol"] = self.protocol
@@ -104,29 +192,82 @@ class NetworkPort(KnowledgeNode):
 
 
 class NetworkEndpoint(KnowledgeNode):
+    """
+    Represents a specific reference to a communicating IP port on a host (source or destination).
+    """
+
     def __init__(
         self,
         ip_address: str,
         port: int,
         protocol: Union[str, int],
-        endpoint: str = None,
-        values: Dict[str, Any] = None,
+        endpoint: str = "",
+        values: Union[None, Dict[str, Any]] = None,
     ):
+        """
+        Initialize this NetworkEndpoint object.
+
+        @param ip_address: The string representation of the IP address associated with this port
+        @type ip_address: str
+        @param port: The port number (0-65535)
+        @type port: int
+        @param protocol: The protocol name or numerical representation (e.g., TCP or 6)
+        @type protocol: Union[int, str]
+        @param endpoint: Whether this endpoint is the source ("src") or destination ("dst") of the flow
+        @type endpoint: str
+        @param values: Any metadata values that should be stored with this node
+        @type values: dict
+        @raise: ValueError: if the specific port or protocol numbers are out of bounds
+        """
         self.label = "NetworkEndpoint"
-        self.ip_address = ip_address
-        self.port = port
-        self.protocol: int = (
-            protocol if type(protocol) == int else socket.getprotobyname(str(protocol))
-        )
+
+        try:
+            self.ip_addr = ipaddress.ip_address(ip_address)
+            self.ip_address = ip_address
+        except ValueError:
+            raise ValueError("Provided IP address was not a valid IPv4 or IPv6 address")
+
+        if 0 <= port < 65535:
+            self.port = port
+        else:
+            raise ValueError("Invalid port number")
+
+        if type(protocol) == int:
+            if 0 <= protocol < 256:
+                self.protocol = protocol
+            else:
+                raise ValueError("Invalid protocol number")
+        else:
+            assert type(protocol) == str
+            try:
+                proto_num = socket.getprotobyname(protocol)
+                self.protocol = proto_num
+            except OSError:
+                raise ValueError("Invalid protocol name")
+
         self.endpoint = endpoint if endpoint in ["src", "dst"] else None
+
         self.name = f"{self.ip_address}:{self.port}/{self.protocol}"
         self.values = values if values else {}
         super().__init__(self.label, self.name, values=self.values)
 
     def to_network_port_ref(self) -> NetworkPort:
+        """
+        Convert to genericized NetworkPort reference (remove specific Host/IP info)
+        @return: Generic NetworkPort object
+        @rtype: NetworkPort
+        """
+
         return NetworkPort(self.port, self.protocol, values=self.values)
 
     def to_knowledge_node(self) -> KnowledgeNode:
+        """
+        Convert this NetworkEndpoint object to a KnowledgeNode representation.
+
+        @return: KnowledgeNode version of this object.
+        @rtype: KnowledgeNode
+        """
+
         values = self.values
         values["port"] = self.port
         values["protocol"] = self.protocol
@@ -141,18 +282,40 @@ class NetworkEndpoint(KnowledgeNode):
 
 
 class IPv4Address(KnowledgeNode):
-    def __init__(self, ip_addr: str, values: Dict[str, Any] = None):
+    """
+    Represents an IPv4 address
+    """
+
+    def __init__(self, ip_addr: str, values: Union[None, Dict[str, Any]] = None):
+        """
+        Initialize this IPv4Address object
+
+        @param ip_addr: A string representation (dotted quad) of this IP
+        @type ip_addr: str
+        @param values: Any metadata values that should be stored with this relationship
+        @type values: dict
+        """
+
+        self.label = "IPv4Address"
+
         try:
             socket.inet_pton(socket.AF_INET, ip_addr)
         except socket.error:
             logging.error(f"Invalid IPv4 Address: {ip_addr}")
-        self.label = "IPv4Address"
         self.ip_addr = ipaddress.ip_address(ip_addr)
         self.name = ip_addr
+
         self.values = values if values else {}
         super().__init__(self.label, self.name, values=self.values)
 
     def to_knowledge_node(self) -> KnowledgeNode:
+        """
+        Convert this IPv4Address object to a KnowledgeNode representation.
+
+        @return: KnowledgeNode version of this object.
+        @rtype: KnowledgeNode
+        """
+
         values = self.values
         values["address"] = str(self.ip_addr)
         values["is_private"] = self.ip_addr.is_private
@@ -174,18 +337,40 @@ class IPv4Address(KnowledgeNode):
 
 
 class IPv6Address(KnowledgeNode):
-    def __init__(self, ip_addr: str, values: Dict[str, Any] = None):
+    """
+    Represents an IPv6 address
+    """
+
+    def __init__(self, ip_addr: str, values: Union[None, Dict[str, Any]] = None):
+        """
+        Initialize this IPv6Address object
+
+        @param ip_addr: A string representation (colon-separated) of this IP
+        @type ip_addr: str
+        @param values: Any metadata values that should be stored with this relationship
+        @type values: dict
+        """
+
+        self.label = "IPv6Address"
+
         try:
             socket.inet_pton(socket.AF_INET6, ip_addr)
         except socket.error:
             logging.error(f"Invalid IPv6 Address: {ip_addr}")
-        self.label = "IPv6Address"
         self.ip_addr = ipaddress.ip_address(ip_addr)
         self.name = ip_addr
+
         self.values = values if values else {}
         super().__init__(self.label, self.name, values=self.values)
 
     def to_knowledge_node(self) -> KnowledgeNode:
+        """
+        Convert this IPv6Address object to a KnowledgeNode representation.
+
+        @return: KnowledgeNode version of this object.
+        @rtype: KnowledgeNode
+        """
+
         values = self.values
         values["address"] = str(self.ip_addr)
         values["is_private"] = self.ip_addr.is_private
@@ -210,6 +395,10 @@ class IPv6Address(KnowledgeNode):
 
 
 class NetworkTraffic(KnowledgeNode):
+    """
+    Represents a specific network communication observed on the network
+    """
+
     def __init__(
         self,
         in_packets: int,
@@ -218,20 +407,65 @@ class NetworkTraffic(KnowledgeNode):
         end_ts: float = 0,
         flags: int = 0,
         tos: int = 0,
-        values: Dict[str, Any] = None,
+        values: Union[None, Dict[str, Any]] = None,
     ):
+        """
+        Initialize this NetworkTraffic object.
+
+        @param in_packets: Number of ingress packets, per Netflow
+        @type in_packets: int
+        @param in_octets: Number of ingress bytes, per Netflow
+        @type in_octets: int
+        @param start_ts: Start timestamp for flow
+        @type start_ts: float
+        @param end_ts: End timestamp for flow, defaults to "0"
+        @type end_ts: float
+        @param flags: Integer representation of flags field, per Netflow
+        @type flags: int
+        @param tos: Integer representation of TOS field, per Netflow
+        @type tos: int
+        @param values: Any metadata values that should be stored with this relationship
+        @type values: dict
+        @raises: ValueError: if the provided flags or tos values are invalid
+        """
+
         self.label = "NetworkTraffic"
         self.in_packets = in_packets
         self.in_octets = in_octets
         self.start = start_ts
         self.end = end_ts if end_ts else None
-        self.flags = flags
-        self.tos = tos
+
+        if 0 <= flags < 513:
+            self.tcp_flags_fin = bool(flags & 0x1)
+            self.tcp_flags_syn = bool(flags & 0x2)
+            self.tcp_flags_rst = bool(flags & 0x4)
+            self.tcp_flags_psh = bool(flags & 0x8)
+            self.tcp_flags_ack = bool(flags & 0x16)
+            self.tcp_flags_urg = bool(flags & 0x32)
+            self.tcp_flags_ece = bool(flags & 0x64)
+            self.tcp_flags_cwr = bool(flags & 0x128)
+            self.tcp_flags_ns = bool(flags & 0x256)
+        else:
+            raise ValueError(f"Invalid flags value specified: {flags}")
+
+        if 0 <= tos < 256:
+            # Hex to discourage use as continuous value
+            self.tos = hex(tos)
+        else:
+            raise ValueError(f"Invalid TOS/DSCP value specified: {tos}")
+
         self.values = values if values else {}
         self.name = str(uuid.uuid4())
         super().__init__(self.label, self.name, values=self.values)
 
     def to_knowledge_node(self) -> KnowledgeNode:
+        """
+        Convert this NetworkTraffic object to a KnowledgeNode representation.
+
+        @return: KnowledgeNode version of this object.
+        @rtype: KnowledgeNode
+        """
+
         return KnowledgeNode(
             label="NetworkTraffic",
             name=self.name,
@@ -240,14 +474,41 @@ class NetworkTraffic(KnowledgeNode):
                 "in_octets": self.in_octets,
                 "start": self.start,
                 "end": self.end,
-                "flags": self.flags,
+                "tcp_flags_fin": self.tcp_flags_fin,
+                "tcp_flags_syn": self.tcp_flags_syn,
+                "tcp_flags_rst": self.tcp_flags_rst,
+                "tcp_flags_psh": self.tcp_flags_psh,
+                "tcp_flags_ack": self.tcp_flags_ack,
+                "tcp_flags_urg": self.tcp_flags_urg,
+                "tcp_flags_ece": self.tcp_flags_ece,
+                "tcp_flags_cwr": self.tcp_flags_cwr,
+                "tcp_flags_ns": self.tcp_flags_ns,
                 "tos": self.tos,
             },
         )
 
 
 class Host(KnowledgeNode):
-    def __init__(self, identifier: str, last_seen: float, values=None):
+    """
+    Represents a specific (physical/virtual) system, potentially with multiple IP addresses.
+    """
+
+    def __init__(
+        self,
+        identifier: str,
+        last_seen: float,
+        values: Union[None, Dict[str, Any]] = None,
+    ):
+        """
+        Initialize this Host object.
+
+        @param identifier: A unique identifier for this host.
+        @type identifier: str
+        @param last_seen: A timestamp value for the last time this host was observed.
+        @type last_seen: float
+        @param values: Any metadata values that should be stored with this relationship
+        @type values: dict
+        """
         self.label = "Host"
         self.name = identifier
         self.values = values if values else {}
@@ -255,6 +516,13 @@ class Host(KnowledgeNode):
         super().__init__(self.label, self.name, values=self.values)
 
     def to_knowledge_node(self) -> KnowledgeNode:
+        """
+        Convert this Host object to a KnowledgeNode representation.
+
+        @return: KnowledgeNode version of this object.
+        @rtype: KnowledgeNode
+        """
+
         return KnowledgeNode(
             label=self.label,
             name=self.name,
@@ -263,51 +531,81 @@ class Host(KnowledgeNode):
 
 
 class KnowledgeRelation:
-    label = None
-    source_node = None
-    source_label = None
-    target_node = None
-    target_label = None
-    values: Dict[str, Any] = dict()
+    """
+    Represents an arbitrary knowledge relationship object, intended mainly for sub-classing
+    """
 
-    def __init__(self, label, source_node, target_node, values=None):
+    def __init__(
+        self,
+        label: str,
+        source_node: KnowledgeNode,
+        target_node: KnowledgeNode,
+        values: Union[None, Dict[str, Any]] = None,
+    ):
+        """
+        Initialize this knowledge relation
+
+        @param label: The type of relation, of the types specified in aica_django.connectors.GraphDatabase
+        @type label: str
+        @param source_node: The originating point for this relationship
+        @type source_node: KnowledgeNode
+        @param target_node: The terminating point for this relationship
+        @type target_node: KnowledgeNode
+        @param values: Any metadata values that should be stored with this relationship
+        @type values: dict
+        """
+
         if label not in defined_relation_labels:
             raise ValueError(
                 f"Unsupported relation label {label} from {source_node}->{target_node}"
             )
 
-        if type(label) != str or label == "":
-            raise ValueError(f"Label must be a string, not {type(label)}")
-        if not (
-            isinstance(source_node, KnowledgeNode)
-            or issubclass(KnowledgeNode, source_node)
-        ):
+        if not (isinstance(source_node, KnowledgeNode)):
             raise ValueError(
                 f"Source node must be a KnowledgeNode, not {type(source_node)}"
             )
-        if not (
-            isinstance(target_node, KnowledgeNode)
-            or issubclass(KnowledgeNode, target_node)
-        ):
+        if not (isinstance(target_node, KnowledgeNode)):
             raise ValueError(
                 f"Target node must be a KnowledgeNode, not {type(target_node)}"
             )
-        if values and type(values) != dict:
-            raise ValueError(f"Values must be a dictionary, not {type(values)}")
 
         self.label = label
         self.source_node = source_node.name
         self.source_label = source_node.label
         self.target_node = target_node.name
         self.target_label = target_node.label
-        self.values = values
+        self.values = values if values else {}
 
 
 def normalize_mac_addr(mac_addr: str) -> str:
-    return re.sub(r"[^A-Fa-f\d]", "", mac_addr).lower()
+    """
+
+    @param mac_addr: A MAC address string to be normalized
+    @type mac_addr: str
+    @return: A normalized (lowercase, hex, no separators) representation of the provided MAC address
+    @rtype: str
+    @raise: ValueError: MAC address does not parse to normalized form
+    """
+
+    normed_mac = re.sub(r"[^A-Fa-f\d]", "", mac_addr).lower()
+    if len(normed_mac) != 12:
+        raise ValueError("Invalid MAC Address Provided")
+
+    return normed_mac
 
 
-def netflow_to_knowledge(flow: Dict[str, str]) -> Tuple[list, list]:
+def netflow_to_knowledge(
+    flow: Dict[str, str]
+) -> Tuple[List[KnowledgeNode], List[KnowledgeRelation]]:
+    """
+    Converts a netflow dictionary (from the Python netflow library) to knowledge objects.
+
+    @param flow: A netflow dictionary to be converted to knowledge objects
+    @type flow: Dict[str, str]
+    @return: Knowledge nodes and relations resulting form this conversion
+    @rtype: Tuple[list, list]
+    """
+
     knowledge_nodes = []
     knowledge_relations = []
 
@@ -430,9 +728,21 @@ def netflow_to_knowledge(flow: Dict[str, str]) -> Tuple[list, list]:
     return knowledge_nodes, knowledge_relations
 
 
-def nginx_accesslog_to_knowledge(log_dict: Dict[str, Any]) -> Tuple[list, list]:
-    nodes = []
-    relations = []
+def nginx_accesslog_to_knowledge(
+    log_dict: Dict[str, Any]
+) -> Tuple[List[KnowledgeNode], List[KnowledgeRelation]]:
+    """
+    Converts an HTTP access log dictionary (as returned by aica_django.connectors.Nginx.poll_nginx_accesslogs)
+    to knowledge objects.
+
+    @param log_dict: An HTTP access log dictionary to be converted to knowledge objects
+    @type log_dict: Dict[str, Any]
+    @return: Knowledge nodes and relations resulting form this conversion
+    @rtype: Tuple[list, list]
+    """
+
+    knowledge_nodes = []
+    knowledge_relations = []
 
     # dateparser can't seem to handle this format
     request_time = datetime.datetime.strptime(
@@ -449,7 +759,7 @@ def nginx_accesslog_to_knowledge(log_dict: Dict[str, Any]) -> Tuple[list, list]:
     my_hostname = socket.gethostname()
     my_ipv4 = IPv4Address(socket.gethostbyname(my_hostname))
     my_ipv4_knowledge = my_ipv4.to_knowledge_node()
-    nodes.append(my_ipv4_knowledge)
+    knowledge_nodes.append(my_ipv4_knowledge)
 
     # Add requesting host
     value_dict = dissected_request_time
@@ -459,7 +769,7 @@ def nginx_accesslog_to_knowledge(log_dict: Dict[str, Any]) -> Tuple[list, list]:
         values=value_dict,
     )
     requesting_host_knowledge = requesting_host.to_knowledge_node()
-    nodes.append(requesting_host_knowledge)
+    knowledge_nodes.append(requesting_host_knowledge)
 
     # Add target NIC to target host
     nic_knowledge = KnowledgeNode(
@@ -467,8 +777,8 @@ def nginx_accesslog_to_knowledge(log_dict: Dict[str, Any]) -> Tuple[list, list]:
         name=str(uuid.uuid4()),
         values=value_dict,
     )
-    nodes.append(nic_knowledge)
-    relations.append(
+    knowledge_nodes.append(nic_knowledge)
+    knowledge_relations.append(
         KnowledgeRelation(
             label="COMPONENT_OF",
             source_node=nic_knowledge,
@@ -478,8 +788,8 @@ def nginx_accesslog_to_knowledge(log_dict: Dict[str, Any]) -> Tuple[list, list]:
 
     ipv4_addr = IPv4Address(log_dict["src_ip"])
     ipv4_addr_knowledge = ipv4_addr.to_knowledge_node()
-    nodes.append(ipv4_addr_knowledge)
-    relations.append(
+    knowledge_nodes.append(ipv4_addr_knowledge)
+    knowledge_relations.append(
         KnowledgeRelation(
             label="HAS_ADDRESS",
             source_node=nic_knowledge,
@@ -501,16 +811,16 @@ def nginx_accesslog_to_knowledge(log_dict: Dict[str, Any]) -> Tuple[list, list]:
         name=str(uuid.uuid4()),
         values=value_dict,
     )
-    nodes.append(http_request_knowledge)
+    knowledge_nodes.append(http_request_knowledge)
 
-    relations.append(
+    knowledge_relations.append(
         KnowledgeRelation(
             label="COMMUNICATES_TO",
             source_node=ipv4_addr_knowledge,
             target_node=http_request_knowledge,
         )
     )
-    relations.append(
+    knowledge_relations.append(
         KnowledgeRelation(
             label="COMMUNICATES_TO",
             source_node=http_request_knowledge,
@@ -518,10 +828,21 @@ def nginx_accesslog_to_knowledge(log_dict: Dict[str, Any]) -> Tuple[list, list]:
         )
     )
 
-    return nodes, relations
+    return knowledge_nodes, knowledge_relations
 
 
-def nmap_scan_to_knowledge(scan_results: Dict[str, Any]) -> Tuple[list, list]:
+def nmap_scan_to_knowledge(
+    scan_results: Dict[str, Any]
+) -> Tuple[List[KnowledgeNode], List[KnowledgeRelation]]:
+    """
+    Converts an nmap scan result (from the Python nmap3 library) to knowledge objects.
+
+    @param scan_results: A dictionary as returned by nmap3 to be converted to knowledge objects
+    @type scan_results: Dict[str, str]
+    @return: Knowledge nodes and relations resulting form this conversion
+    @rtype: Tuple[list, list]
+    """
+
     knowledge_nodes = []
     knowledge_relations = []
 
@@ -628,23 +949,6 @@ def nmap_scan_to_knowledge(scan_results: Dict[str, Any]) -> Tuple[list, list]:
             )
             knowledge_nodes.append(domain_name)
 
-            # TODO
-            # domain_source_node = None
-            # domain_target_node = None
-            # if hostname["type"] in ["A", "AAAA", "user"]:
-            #     domain_source_node = domain_name
-            #     domain_target_node = ipv4_addr
-            # elif hostname["type"] == "PTR":
-            #     domain_source_node = ipv4_addr
-            #     domain_target_node = domain_name
-            # knowledge_relations.append(
-            #     KnowledgeRelation(
-            #         label="resolves-to",
-            #         source_node=domain_source_node,
-            #         target_node=domain_target_node,
-            #     )
-            # )
-
         if len(scan_results[host]["osmatch"]) > 1:
             os_match = scan_results[host]["osmatch"][0]
             operating_system_knowledge = KnowledgeNode(
@@ -685,7 +989,7 @@ def nmap_scan_to_knowledge(scan_results: Dict[str, Any]) -> Tuple[list, list]:
             if port["state"] == "open":
                 open_port = NetworkEndpoint(
                     host,
-                    port["portid"],
+                    int(port["portid"]),
                     port["protocol"],
                     endpoint="dst",
                     values={"service_name": port["service"]["name"]},
@@ -714,14 +1018,27 @@ def nmap_scan_to_knowledge(scan_results: Dict[str, Any]) -> Tuple[list, list]:
     return knowledge_nodes, knowledge_relations
 
 
-def suricata_alert_to_knowledge(alert: Dict[str, Any]) -> Tuple[list, list]:
+def suricata_alert_to_knowledge(
+    alert: Dict[str, Any]
+) -> Tuple[List[KnowledgeNode], List[KnowledgeRelation]]:
+    """
+    Converts a Suricata alert (as returned from aica_django.connectors.Suricata.poll_suricata_alerts)
+    to knowledge objects.
+
+    @param alert: A dictionary as returned by poll_suricata_alerts to be converted to knowledge objects
+    @type alert: Dict[str, Any]
+    @return: Knowledge nodes and relations resulting form this conversion
+    @rtype: Tuple[list, list]
+    """
+
     knowledge_nodes = []
     knowledge_relations = []
 
     alert_dt: Optional[datetime.datetime] = dateparser.parse(alert["timestamp"])
     assert alert_dt is not None
-    dissected_time = dissect_time(alert_dt.timestamp(), prefix="time_tripped")
-    value_dict: dict = dissected_time
+
+    dissected_time_tripped = dissect_time(alert_dt.timestamp(), prefix="time_tripped")
+    value_dict: Dict[str, Any] = dissected_time_tripped
     value_dict["time_tripped"] = alert_dt.timestamp()
     value_dict["flow_id"] = alert["flow_id"]
 
@@ -769,6 +1086,7 @@ def suricata_alert_to_knowledge(alert: Dict[str, Any]) -> Tuple[list, list]:
         )
     )
 
+    dissected_time = dissect_time(alert_dt.timestamp())
     source_host = Host(
         alert["src_ip"],
         last_seen=alert_dt.timestamp(),
@@ -858,7 +1176,9 @@ def suricata_alert_to_knowledge(alert: Dict[str, Any]) -> Tuple[list, list]:
     )
     assert flow_start_dt is not None
 
-    dissected_start: dict = dissect_time(flow_start_dt.timestamp(), prefix="start")
+    dissected_start: Dict[str, Any] = dissect_time(
+        flow_start_dt.timestamp(), prefix="start"
+    )
     value_dict = dissected_start
     value_dict["source"] = "suricata"
 
@@ -910,7 +1230,19 @@ def suricata_alert_to_knowledge(alert: Dict[str, Any]) -> Tuple[list, list]:
     return knowledge_nodes, knowledge_relations
 
 
-def antivirus_alert_to_knowledge(alert: Dict[str, Any]) -> Tuple[list, list]:
+def antivirus_alert_to_knowledge(
+    alert: Dict[str, Any]
+) -> Tuple[List[KnowledgeNode], List[KnowledgeRelation]]:
+    """
+    Converts an antivirus alert (as returned from aica_django.connectors.Antivirus.poll_antivirus_alerts)
+    to knowledge objects.
+
+    @param alert: A dictionary as returned by poll_antivirus_alerts to be converted to knowledge objects
+    @type alert: Dict[str, Any]
+    @return: Knowledge nodes and relations resulting form this conversion
+    @rtype: Tuple[list, list]
+    """
+
     nodes = []
     relations = []
 
@@ -986,16 +1318,23 @@ def antivirus_alert_to_knowledge(alert: Dict[str, Any]) -> Tuple[list, list]:
     return nodes, relations
 
 
-def knowledge_to_neo(nodes: list = None, relations: list = None) -> bool:
-    if nodes is None:
-        nodes = list()
+def knowledge_to_neo(
+    nodes: List[KnowledgeNode], relations: List[KnowledgeRelation]
+) -> bool:
+    """
+    Stores KnowledgeNode and KnowledgeRelation objects in the knowledge graph database.
 
-    if relations is None:
-        relations = list()
+    @param nodes: KnowledgeNodes to store
+    @type nodes: list
+    @param relations: KnowledgeRelations to store (must consist entirely of existing or to-be-added nodes)
+    @type relations: list
+    @return: Whether the insert was successful
+    @rtype: bool
+    """
 
-    neo_host = os.getenv("NEO4J_HOST")
-    neo_user = os.getenv("NEO4J_USER")
-    neo_password = os.getenv("NEO4J_PASSWORD")
+    neo_host = str(os.getenv("NEO4J_HOST"))
+    neo_user = str(os.getenv("NEO4J_USER"))
+    neo_password = str(os.getenv("NEO4J_PASSWORD"))
 
     graph = AicaNeo4j(host=neo_host, user=neo_user, password=neo_password)
 

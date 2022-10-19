@@ -1,3 +1,13 @@
+"""
+This module defines the views for the Django web frontend
+
+Classes:
+    None
+Functions:
+    modules(request): Listing of Django-enabled modules
+    overview(request): "Heads-up-display" for operators
+"""
+
 import json2table  # type: ignore
 
 from django.http import HttpRequest, HttpResponse
@@ -8,6 +18,15 @@ from apps.aica_manager.models import Host, Alert
 
 
 def modules(request: HttpRequest) -> HttpResponse:
+    """
+    Presents a listing of Django-activated modules, mainly for debugging
+
+    @param request: Django request object
+    @type request: HttpRequest
+    @return: Django rendered HTTP response
+    @rtype: HttpResponse
+    """
+
     html = "<h1>AICA Manager</h1>"
     tasks = list(sorted(name for name in app.tasks if not name.startswith("celery.")))
     html += f"{tasks}"
@@ -15,6 +34,15 @@ def modules(request: HttpRequest) -> HttpResponse:
 
 
 def overview(request: HttpRequest) -> HttpResponse:
+    """
+    Presents a general dashboard "Heads up display" for human operators.
+
+    @param request: Django request object
+    @type request: HttpRequest
+    @return: Django rendered HTTP response
+    @rtype: HttpResponse
+    """
+
     data = dict()
 
     host_list = Host.nodes.all()

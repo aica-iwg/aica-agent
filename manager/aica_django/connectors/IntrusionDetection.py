@@ -1,3 +1,10 @@
+"""
+This module contains all code relevant to interacting with Suricata IDS deployments.
+
+Functions:
+    poll_suricata_alerts: Periodically queries Graylog for IDS-related alerts of interest.
+"""
+
 import datetime
 import json
 import logging
@@ -8,14 +15,22 @@ import time
 from celery import current_app
 from celery.app import shared_task
 from celery.utils.log import get_task_logger
+from typing import Dict, List, Union
 
-from aica_django.connectors.Graylog import Graylog
+from aica_django.connectors.SIEM import Graylog
 
 logger = get_task_logger(__name__)
 
 
 @shared_task(name="poll-suricata-alerts")
 def poll_suricata_alerts(frequency: int = 30) -> None:
+    """
+    Periodically query Graylog for Suricata alerts and add to Knowledge Graph.
+
+    @param frequency: How often to query for alerts
+    @type frequency: int
+    """
+
     logger.info(f"Running {__name__}: poll_dbs")
 
     gl = Graylog("suricata")
@@ -24,7 +39,7 @@ def poll_suricata_alerts(frequency: int = 30) -> None:
         to_time = datetime.datetime.now()
         from_time = to_time - datetime.timedelta(seconds=frequency)
 
-        query_params = {
+        query_params: Dict[str, Union[str, int, List[str]]] = {
             "query": r"suricata\: AND event_type",  # Required
             "from": from_time.strftime("%Y-%m-%d %H:%M:%S"),  # Required
             "to": to_time.strftime("%Y-%m-%d %H:%M:%S"),  # Required
@@ -32,7 +47,7 @@ def poll_suricata_alerts(frequency: int = 30) -> None:
             "limit": 150,  # Optional: Default limit is 150 in Graylog
         }
 
-        response = gl.query(query_params)
+        response = gl.query_graylog(query_params)
 
         try:
             response.raise_for_status()

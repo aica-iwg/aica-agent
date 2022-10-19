@@ -1,3 +1,10 @@
+"""
+This module contains all code relevant to capturing and parsing Netflow logs
+
+Functions:
+    network_flow_capture: Start a Netflow listener and handoff inbound flows as they arrive.
+"""
+
 import netflow  # type: ignore
 import socket
 
@@ -10,6 +17,10 @@ logger = get_task_logger(__name__)
 
 @shared_task(name="network-flow-capture")
 def network_flow_capture() -> None:
+    """
+    Start a listener for receiving and handling Netflow logs from remote senders.
+    """
+
     logger.info(f"Running {__name__}: network_flow_capture")
     # Create listener for Netflow exports on port 2055
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)

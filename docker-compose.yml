@@ -7,7 +7,6 @@ services:
     container_name: 'manager'
     env_file:
       - 'manager/.env'
-      - 'manager/.env.local'
     tty: true
     ports:
       - "8000:8000" # Django frontend
