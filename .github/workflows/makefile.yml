@@ -6,6 +6,7 @@ on:
 
 env:
   MODE: emu
+  ENV_FILE: ${{ secrets.ENV_FILE }}
 
 jobs:
   build:
@@ -21,4 +22,4 @@ jobs:
         python-version: ${{ matrix.python-version }}
       
     - name: Run tests
-      run:  make deps && make build && make test
+      run:  echo $ENV_FILE | base64 --decode > manager/.env && make deps && make build && make test
