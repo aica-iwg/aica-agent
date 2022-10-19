@@ -1,3 +1,10 @@
+"""
+This module contains all code relevant to interacting with Nginx daemons.
+
+Functions:
+    poll_nginx_accesslogs: Periodically queries Graylog for Nginx-related access log entries.
+"""
+
 import datetime
 import logging
 import re
@@ -7,8 +14,9 @@ import time
 from celery import current_app
 from celery.app import shared_task
 from celery.utils.log import get_task_logger
+from typing import Dict, List, Union
 
-from aica_django.connectors.Graylog import Graylog
+from aica_django.connectors.SIEM import Graylog
 
 logger = get_task_logger(__name__)
 
@@ -23,6 +31,13 @@ nginx_regex = (
 
 @shared_task(name="poll-nginx-accesslogs")
 def poll_nginx_accesslogs(frequency: int = 30) -> None:
+    """
+    Periodically query Graylog for Nginx accesslogs, and insert into the knowledge graph.
+
+    @param frequency: How often to query graylog (default 30 seconds)
+    @type frequency:  int
+    """
+
     logger.info(f"Running {__name__}: poll_nginx_accesslogs")
     matcher = re.compile(nginx_regex)
 
@@ -32,7 +47,7 @@ def poll_nginx_accesslogs(frequency: int = 30) -> None:
         to_time = datetime.datetime.now()
         from_time = to_time - datetime.timedelta(seconds=frequency)
 
-        query_params = {
+        query_params: Dict[str, Union[str, int, List[str]]] = {
             "query": r"nginx\: AND HTTP",  # Required
             "from": from_time.strftime("%Y-%m-%d %H:%M:%S"),  # Required
             "to": to_time.strftime("%Y-%m-%d %H:%M:%S"),  # Required
@@ -40,7 +55,7 @@ def poll_nginx_accesslogs(frequency: int = 30) -> None:
             "limit": 150,  # Optional: Default limit is 150 in Graylog
         }
 
-        response = gl.query(query_params)
+        response = gl.query_graylog(query_params)
 
         try:
             response.raise_for_status()

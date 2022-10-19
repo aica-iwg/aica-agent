@@ -1,3 +1,7 @@
+"""
+Main entrypoint for starting Celery task queue for Django
+"""
+
 import os
 
 from celery import Celery
@@ -15,5 +19,5 @@ app = Celery("aica_django")
 app.config_from_object("django.conf:settings", namespace="CELERY")
 
 # Discover apps
-app.autodiscover_tasks(lambda: settings.INSTALLED_APPS)
+app.autodiscover_tasks(lambda: settings.INSTALLED_APPS)  # type: ignore
 app.conf.timezone = "UTC"

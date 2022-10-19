@@ -1,3 +1,11 @@
+"""
+This module contains all code relevant to interacting with antivirus agents.
+
+Functions:
+    poll_antivirus_alerts: Periodically queries Graylog for A/V-related alerts of interest.
+    parse_clamav_alert: Extracts fields from a ClamAV "FOUND" alert.
+"""
+
 import datetime
 import json
 import logging
@@ -8,9 +16,9 @@ import time
 from celery import current_app
 from celery.app import shared_task
 from celery.utils.log import get_task_logger
-from typing import Dict, Any
+from typing import Any, Dict, List, Union
 
-from aica_django.connectors.Graylog import Graylog
+from aica_django.connectors.SIEM import Graylog
 
 logger = get_task_logger(__name__)
 
@@ -21,7 +29,15 @@ clam_parser = re.compile(
 
 
 # ClamAV logs are not in json, so we need to format them into something like that
-def parse_line(line: str) -> dict:
+def parse_clamav_alert(line: str) -> Dict[str, Any]:
+    """
+    Extract fields from ClamAV "FOUND" alert into a dictionary.
+
+    @param line: The log event to parse
+    @type line: str
+    @return: The extracted fields
+    @rtype: dict
+    """
     event_dict: Dict[str, Any] = dict()
 
     if "FOUND" in line:
@@ -45,7 +61,14 @@ def parse_line(line: str) -> dict:
 
 
 @shared_task(name="poll-antivirus-alerts")
-def poll_antivirus_alerts(frequency: int = 30) -> None:
+def poll_clamav_alerts(frequency: int = 30) -> None:
+    """
+    Periodically query Graylog for ClamAV "FOUND" alerts, and add to the knowledge graph.
+
+    @param frequency: How often to query Graylog (default, 30 seconds)
+    @type frequency: int
+    """
+
     logger.info(f"Running {__name__}: poll_dbs")
 
     gl = Graylog("antivirus")
@@ -54,7 +77,7 @@ def poll_antivirus_alerts(frequency: int = 30) -> None:
         to_time = datetime.datetime.now()
         from_time = to_time - datetime.timedelta(seconds=frequency)
 
-        query_params = {
+        query_params: Dict[str, Union[str, int, List[str]]] = {
             "query": r"clamav\: AND FOUND",  # Required
             "from": from_time.strftime("%Y-%m-%d %H:%M:%S"),  # Required
             "to": to_time.strftime("%Y-%m-%d %H:%M:%S"),  # Required
@@ -62,14 +85,14 @@ def poll_antivirus_alerts(frequency: int = 30) -> None:
             "limit": 150,  # Optional: Default limit is 150 in Graylog
         }
 
-        response = gl.query(query_params)
+        response = gl.query_graylog(query_params)
 
         try:
             response.raise_for_status()
             if response.json()["total_results"] > 0:
                 for message in response.json()["messages"]:
                     event = message["message"]["message"]
-                    alert_dict = parse_line(event)
+                    alert_dict = parse_clamav_alert(event)
                     if alert_dict:
                         alert_dict = json.loads(json.dumps(alert_dict))
                         current_app.send_task(

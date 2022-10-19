@@ -15,10 +15,11 @@ black:
 		@${CONDA} black -q manager/
 
 lint:
-		@${CONDA} black --check --diff -q manager/
-		@MYPYPATH=manager ${CONDA} mypy --install-types --non-interactive manager/
 		@${CONDA} yamllint .
 		@${CONDA} bashlint .
+		@${CONDA} pylint -E --disable=all --enable=missing-docstring --ignore-patterns=__init__.py,test manager
+		@${CONDA} black --check --diff -q manager/
+		@MYPYPATH=manager ${CONDA} mypy --install-types --warn-unreachable --strict --non-interactive --exclude test manager/
 
 security:
 		@${CONDA} bandit -q -ll -ii -r manager/
@@ -30,13 +31,10 @@ build: check-env
 
 test: check-env lint security
 		@docker compose -f docker-compose.yml -f docker-compose-${MODE}.yml \
-			run -e SKIP_TASKS=true --rm -v TESTDIR:/tmp/testdir \
-			manager /opt/venv/bin/coverage run --data-file=/tmp/testdir/.coverage --omit="*test*" \
-				manage.py test --noinput --failfast -v 3
-		# Starting with a low threshold as we increase our test coverage
-		@docker compose -f docker-compose.yml -f docker-compose-${MODE}.yml \
-			run --rm -v TESTDIR:/tmp/testdir \
-			manager /opt/venv/bin/coverage report --data-file=/tmp/testdir/.coverage --fail-under=30
+			run -e SKIP_TASKS=true --rm \
+			manager /bin/bash -c " \
+				/opt/venv/bin/coverage run --omit='*test*' manage.py test --noinput --failfast -v 3 && \
+				/opt/venv/bin/coverage report --fail-under=30"
 
 start: build
 		@docker compose -f docker-compose.yml -f docker-compose-${MODE}.yml up -d
