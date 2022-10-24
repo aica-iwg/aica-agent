@@ -18,7 +18,7 @@ neomodel==4.0.8
 netaddr==0.8.0
 netflow==0.11.2
 netifaces==0.11.0
-pandas==1.5.0
+pandas==1.5.1
 paramiko==2.11.0
 psycopg2-binary==2.9.4
 pymongo==4.3.2
