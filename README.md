@@ -12,8 +12,9 @@ This project will build on the ideas of the AICA framework as outlined in [Thero
 4. Install miniconda from [https://docs.conda.io/en/latest/miniconda.html#linux-installers](), you will need to add your chosen installation location to your shell's PATH variable.
 5. Ensure `make` is installed, for example in Ubuntu this is part of the `build-essentials` package you can install with apt.
 6. Clone this repo, and open in IDE of your choice (ensure .gitignore is updated as necessary)
-7. Set the MODE variable like `export MODE=emu` (for Bash, other shells may vary).
-8. You can now run `make deps` to build your development environment, then `make build` to build the Docker containers, and `make start` to launch AICA. See more below.
+7. Copy `manager/.env.sample` to `manager/.env` and make any necessary changes
+8. Set the MODE variable like `export MODE=emu` (for Bash, other shells may vary).
+9. You can now run `make deps` to build your development environment, then `make build` to build the Docker containers, and `make start` to launch AICA. See more below.
 
 ## Setting up Host Environment (Windows)
 
@@ -24,8 +25,9 @@ This project will build on the ideas of the AICA framework as outlined in [Thero
 5. Install Make from [https://gnuwin32.sourceforge.net/packages/make.htm](); yes this is from 2006
 6. Add Make to System Path: `C:\Program Files (x86)\GnuWin32\bin`
 7. Clone this repo, and open in IDE of your choice (ensure .gitignore is updated as necessary)
-8. In Powershell, set the MODE variable like: `$env:MODE = 'emu'`
-9. You can now run `make deps` to build your development environment, then `make build` to build the Docker containers, and `make start` to launch AICA. See more below.
+8. Copy `manager/.env.sample` to `manager/.env` and make any necessary changes
+9. In Powershell, set the MODE variable like: `$env:MODE = 'emu'`
+10. You can now run `make deps` to build your development environment, then `make build` to build the Docker containers, and `make start` to launch AICA. See more below.
 
 ## Building, Testing, and Sharing Changes
 
