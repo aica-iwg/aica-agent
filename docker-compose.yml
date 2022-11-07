@@ -12,11 +12,13 @@ services:
       - "8000:8000" # Django frontend
       - "5555:5555" # Celery Flower
     depends_on:
-      manager_db:
-        condition: service_healthy
       manager_mq:
         condition: service_healthy
+      manager_db:
+        condition: service_healthy
       manager_mongodb:
+        condition: service_healthy
+      manager_graphdb:
         condition: service_healthy
     networks:
       - bridge
@@ -72,6 +74,11 @@ services:
       - "7687:7687"  # Neo4j API port (needed for web GUI)
     networks:
       - control
+    healthcheck:
+      test: [ "CMD-SHELL", "wget http://localhost:7474/" ]
+      interval: 10s
+      timeout: 10s
+      retries: 5
 
 networks:
   bridge:

@@ -10,7 +10,7 @@ RUN chown -R root:root /root && \
   chmod 750 /root/.ssh && \
   chmod 600 /root/.ssh/authorized_keys
 
-RUN wget https://secure.eicar.org/eicar.com.txt -O /tmp/eica.com.txt
+RUN wget https://secure.eicar.org/eicar.com.txt -O /tmp/eicar.com.txt
 
 COPY clamonacc.sh /usr/local/bin
 COPY etc/clamav /etc/clamav/
