@@ -11,6 +11,7 @@ services:
     ports:
       - "8000:8000" # Django frontend
       - "5555:5555" # Celery Flower
+    restart: always
     depends_on:
       manager_mq:
         condition: service_healthy
@@ -35,6 +36,7 @@ services:
       interval: 10s
       timeout: 10s
       retries: 5
+    restart: always
     networks:
       - control
 
@@ -48,6 +50,7 @@ services:
       interval: 10s
       timeout: 10s
       retries: 5
+    restart: always
     networks:
       - control
 
@@ -63,6 +66,7 @@ services:
       interval: 10s
       timeout: 10s
       retries: 5
+    restart: always
 
   manager_graphdb:
     image: neo4j:4.4-community
@@ -79,6 +83,7 @@ services:
       interval: 10s
       timeout: 10s
       retries: 5
+    restart: always
 
 networks:
   bridge:
