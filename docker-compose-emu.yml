@@ -94,7 +94,7 @@ services:
               | grep '\"status\" : \"green\"'"]
       interval: 10s
       timeout: 10s
-      retries: 5
+      retries: 10
     networks:
       - control
 
