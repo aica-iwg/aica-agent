@@ -30,10 +30,10 @@ build: check-env
 		@docker compose -f docker-compose.yml -f docker-compose-${MODE}.yml build
 
 test: check-env lint security
-		@docker compose -f docker-compose.yml -f docker-compose-${MODE}.yml \
+		@MODE=emu docker compose -f docker-compose.yml -f docker-compose-${MODE}.yml \
 			run -e SKIP_TASKS=true --rm \
 			manager /bin/bash -c " \
-				/opt/venv/bin/coverage run --omit='*test*' manage.py test --noinput --failfast -v 3 && \
+				/opt/venv/bin/coverage run --omit='*test*' manage.py test --noinput && \
 				/opt/venv/bin/coverage report --fail-under=30"
 
 start: build

@@ -24,7 +24,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/3.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = "django-insecure-=r(*4=w52ti1qbeo=a5=^z60=l!*s=sh!v)zw)crn&y*0-n7n0"
+SECRET_KEY = os.getenv("DJANGO_SECRET")
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
@@ -91,18 +91,18 @@ DATABASES = {
     "postgres": {
         "ENGINE": "django.db.backends.postgresql_psycopg2",
         "NAME": "postgres",
-        "USER": "postgres",
-        "PASSWORD": "postgres",
-        "HOST": "manager_db",
-        "PORT": 5432,
+        "USER": os.getenv("POSTGRES_USER"),
+        "PASSWORD": os.getenv("POSTGRES_PASSWORD"),
+        "HOST": os.getenv("POSTGRES_HOST"),
+        "PORT": os.getenv("POSTGRES_PORT"),
     },
     "default": {
         "ENGINE": "django.db.backends.postgresql_psycopg2",
-        "NAME": "aica_django",
-        "USER": "postgres",
-        "PASSWORD": "postgres",
-        "HOST": "manager_db",
-        "PORT": 5432,
+        "NAME": os.getenv("POSTGRES_DB"),
+        "USER": os.getenv("POSTGRES_USER"),
+        "PASSWORD": os.getenv("POSTGRES_PASSWORD"),
+        "HOST": os.getenv("POSTGRES_HOST"),
+        "PORT": os.getenv("POSTGRES_PORT"),
     },
 }
 
@@ -156,11 +156,17 @@ STATICFILES_FINDERS = [
 # https://docs.djangoproject.com/en/3.2/ref/settings/#default-auto-field
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-BROKER_URL = "amqp://guest:guest@manager_mq:5672//"
+CELERY_BROKER_URL = (
+    f"amqp://{os.getenv('CELERY_USER')}:{os.getenv('CELERY_PASSWORD')}@"
+    f"{os.getenv('CELERY_HOST')}:{os.getenv('CELERY_PORT')}//"
+)
 
 CELERY_SERIALIZER = "json"
 
-CELERY_RESULT_BACKEND = "db+postgresql://postgres:postgres@manager_db/postgres"
+CELERY_RESULT_BACKEND = (
+    f"db+postgresql://{os.getenv('POSTGRES_USER')}:{os.getenv('POSTGRES_PASSWORD')}@"
+    f"{os.getenv('POSTGRES_HOST')}:{os.getenv('POSTGRES_PORT')}/postgres"
+)
 
 CELERY_RESULT_SERIALIZER = "json"
 CELERY_ACCEPT_CONTENT = ["json"]

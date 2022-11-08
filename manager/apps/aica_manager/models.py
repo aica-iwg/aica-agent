@@ -29,7 +29,7 @@ from neomodel.core import NodeBase  # type: ignore
 from neomodel.contrib import SemiStructuredNode  # type: ignore
 from typing import Any, List
 
-config.DATABASE_URL = os.environ["NEO4J_BOLT_URL"]
+config.DATABASE_URL = os.environ["NEO4J_BOLT_URI"]
 config.FORCE_TIMEZONE = True
 
 
