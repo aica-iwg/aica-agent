@@ -1,4 +1,4 @@
-FROM alpine:3.16
+FROM alpine:3.17
 
 RUN apk update && apk upgrade && \
     apk add openssh iptables ipset nginx bind-tools bash syslog-ng clamav supervisor
