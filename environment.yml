@@ -4,11 +4,11 @@ channels:
   - conda-forge
 dependencies:
   - python=3.9
-  - black=22.6.0
-  - mypy=0.982
-  - pylint=2.15.3
-  - safety=2.1.1
-  - yamllint=1.27.1
+  - black=22.10.0
+  - mypy=0.991
+  - pylint=2.15.8
+  - safety=2.3.5
+  - yamllint=1.28.0
   - pip
   - pip:
       - bandit==1.7.4
