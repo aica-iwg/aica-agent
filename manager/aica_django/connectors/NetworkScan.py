@@ -30,7 +30,7 @@ logger = get_task_logger(__name__)
 @shared_task(name="network-scan")
 def network_scan(
     nmap_target: str = "",
-    nmap_args: str = "-O -Pn --osscan-limit --host-timeout=30",
+    nmap_args: str = "-O -Pn --osscan-limit --host-timeout=10",
     min_scan_interval: int = 300,
 ) -> Dict[str, Any]:
     """
