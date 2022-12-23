@@ -610,14 +610,33 @@ def netflow_to_knowledge(
     knowledge_relations = []
 
     # Create source host and port nodes (and link to protocol node)
-    ipv4_src_addr = str(ipaddress.ip_address(flow["IPV4_SRC_ADDR"]))
-    source_addr = IPv4Address(ipv4_src_addr)
+    if flow["IPV4_SRC_ADDR"] is not None:
+        ip_src_addr = str(ipaddress.ip_address(flow["IPV4_SRC_ADDR"]))
+        source_addr = IPv4Address(ip_src_addr)
+
+        ip_dst_addr_obj = ipaddress.ip_address(flow["IPV4_DST_ADDR"])
+        ip_dst_addr = str(ip_dst_addr_obj)
+        dest_addr = IPv4Address(ip_dst_addr)
+
+    elif flow["IPV6_SRC_ADDR"] is not None:
+        ip_src_addr = str(ipaddress.ip_address(flow["IPV6_SRC_ADDR"]))
+        source_addr = IPv6Address(ip_src_addr)
+
+        ip_dst_addr_obj = ipaddress.ip_address(flow["IPV6_DST_ADDR"])
+        ip_dst_addr = str(ip_dst_addr_obj)
+        dest_addr = IPv6Address(ip_dst_addr)
+
+    source_host = Host(ip_src_addr, last_seen=float(flow["LAST_SWITCHED"]))
+    source_port = NetworkEndpoint(
+        ip_src_addr, int(flow["SRC_PORT"]), flow["PROTO"], endpoint="src"
+    )
+    dest_port = NetworkEndpoint(
+        ip_dst_addr, int(flow["DST_PORT"]), flow["PROTO"], endpoint="dst"
+    )
+
     source_addr_knowledge = source_addr.to_knowledge_node()
     knowledge_nodes.append(source_addr_knowledge)
 
-    source_port = NetworkEndpoint(
-        ipv4_src_addr, int(flow["SRC_PORT"]), flow["PROTO"], endpoint="src"
-    )
     source_port_ref = source_port.to_network_port_ref()
     source_port_knowledge = source_port.to_knowledge_node()
     source_port_ref_knowledge = source_port_ref.to_knowledge_node()
@@ -640,7 +659,8 @@ def netflow_to_knowledge(
         )
     )
 
-    source_host = Host(ipv4_src_addr, last_seen=float(flow["LAST_SWITCHED"]))
+
+
     source_host_knowledge = source_host.to_knowledge_node()
     knowledge_nodes.append(source_host_knowledge)
     knowledge_relations.append(
@@ -652,15 +672,12 @@ def netflow_to_knowledge(
     )
 
     # Create destination host and port nodes (and link to protocol node)
-    ipv4_dst_addr_obj = ipaddress.ip_address(flow["IPV4_DST_ADDR"])
-    ipv4_dst_addr = str(ipv4_dst_addr_obj)
-    dest_addr = IPv4Address(ipv4_dst_addr)
+
     dest_addr_knowledge = dest_addr.to_knowledge_node()
     knowledge_nodes.append(dest_addr_knowledge)
 
-    dest_port = NetworkEndpoint(
-        ipv4_dst_addr, int(flow["DST_PORT"]), flow["PROTO"], endpoint="dst"
-    )
+
+
     dest_port_ref = dest_port.to_network_port_ref()
     dest_port_knowledge = dest_port.to_knowledge_node()
     dest_port_ref_knowledge = dest_port_ref.to_knowledge_node()
@@ -682,9 +699,9 @@ def netflow_to_knowledge(
         )
     )
 
-    if not (ipv4_dst_addr_obj.is_multicast or ipv4_dst_addr_obj.is_reserved):
+    if not (ip_dst_addr_obj.is_multicast or ip_dst_addr_obj.is_reserved):
         dest_host = Host(
-            ipv4_dst_addr,
+            ip_dst_addr,
             last_seen=float(flow["LAST_SWITCHED"]),
         )
         dest_host_knowledge = dest_host.to_knowledge_node()
@@ -757,9 +774,19 @@ def nginx_accesslog_to_knowledge(
         )
 
     my_hostname = socket.gethostname()
-    my_ipv4 = IPv4Address(socket.gethostbyname(my_hostname))
-    my_ipv4_knowledge = my_ipv4.to_knowledge_node()
-    knowledge_nodes.append(my_ipv4_knowledge)
+    try:
+        my_ipv4 = IPv4Address(socket.gethostbyname(my_hostname))
+        my_ipv4_knowledge = my_ipv4.to_knowledge_node()
+        knowledge_nodes.append(my_ipv4_knowledge)
+    except:
+        pass
+
+    try:
+        my_ipv6 = IPv6Address(socket.getaddrinfo(my_hostname, None, socket.AF_INET6))
+        my_ipv6_knowledge = my_ipv6.to_knowledge_node()
+        knowledge_nodes.append(my_ipv6_knowledge)
+    except:
+        pass
 
     # Add requesting host
     value_dict = dissected_request_time
@@ -786,14 +813,17 @@ def nginx_accesslog_to_knowledge(
         )
     )
 
-    ipv4_addr = IPv4Address(log_dict["src_ip"])
-    ipv4_addr_knowledge = ipv4_addr.to_knowledge_node()
-    knowledge_nodes.append(ipv4_addr_knowledge)
+    if type(ipaddress.ip_address(log_dict["src_ip"])) is ipaddress.IPv4Address:
+        ip_addr_knowledge = IPv4Address(log_dict["src_ip"]).to_knowledge_node()
+    else:
+        ip_addr_knowledge = IPv6Address(log_dict["src_ip"]).to_knowledge_node()
+
+    knowledge_nodes.append(ip_addr_knowledge)
     knowledge_relations.append(
         KnowledgeRelation(
             label="HAS_ADDRESS",
             source_node=nic_knowledge,
-            target_node=ipv4_addr_knowledge,
+            target_node=ip_addr_knowledge,
         )
     )
 
@@ -816,7 +846,7 @@ def nginx_accesslog_to_knowledge(
     knowledge_relations.append(
         KnowledgeRelation(
             label="COMMUNICATES_TO",
-            source_node=ipv4_addr_knowledge,
+            source_node=ip_addr_knowledge,
             target_node=http_request_knowledge,
         )
     )
@@ -824,7 +854,7 @@ def nginx_accesslog_to_knowledge(
         KnowledgeRelation(
             label="COMMUNICATES_TO",
             source_node=http_request_knowledge,
-            target_node=my_ipv4_knowledge,
+            target_node=ip_addr_knowledge,
         )
     )
 
@@ -845,6 +875,10 @@ def nmap_scan_to_knowledge(
 
     knowledge_nodes = []
     knowledge_relations = []
+    if "runtime" not in scan_results:
+        print("gotcha!", scan_results)
+
+    assert "runtime" in scan_results
 
     scan_time: Optional[datetime.datetime] = dateparser.parse(
         scan_results["runtime"]["time"]
@@ -852,15 +886,32 @@ def nmap_scan_to_knowledge(
     assert scan_time is not None
 
     # Not needed and make iteration below messy
-    del scan_results["stats"]
-    del scan_results["runtime"]
+    if "stats" in scan_results:
+        del scan_results["stats"]
+
+    if "runtime" in scan_results:
+        del scan_results["runtime"]
 
     my_hostname = socket.gethostname()
-    my_ipv4 = IPv4Address(socket.gethostbyname(my_hostname)).to_knowledge_node()
-    knowledge_nodes.append(my_ipv4)
+    try:
+        my_ipv4 = IPv4Address(socket.gethostbyname(my_hostname)).to_knowledge_node()
+        knowledge_nodes.append(my_ipv4)
+    except:
+        pass
+    try:
+        my_ipv6 = IPv6Address(socket.getaddrinfo(my_hostname, None, socket.AF_INET6)).to_knowledge_node()
+        knowledge_nodes.append(my_ipv6)
+    except:
+        pass
 
     for host, data in scan_results.items():
-        if scan_results[host]["state"]["state"] != "up":
+        if "task_results" in host:
+            continue
+        if "state" not in data:
+            print("Knowledge.py state not found!",host,data)
+        elif "state" not in scan_results[host]["state"]:
+            print("Knowledge.py double state not found!", host, data)
+        if "state" in data and "state" in data["state"] and data["state"]["state"] != "up":
             continue
 
         # Add scan target
@@ -868,8 +919,8 @@ def nmap_scan_to_knowledge(
             host,
             last_seen=scan_time.timestamp(),
             values={
-                "state_reason": scan_results[host]["state"]["reason"],
-                "state_reason_ttl": scan_results[host]["state"]["reason_ttl"],
+                "state_reason": data["state"]["reason"],
+                "state_reason_ttl": data["state"]["reason_ttl"],
             },
         )
         target_host_knowledge = target_host.to_knowledge_node()
@@ -891,14 +942,18 @@ def nmap_scan_to_knowledge(
         )
 
         # Add target IPv4 to NIC
-        ipv4_addr = IPv4Address(host)
-        ipv4_addr_knowledge = ipv4_addr.to_knowledge_node()
-        knowledge_nodes.append(ipv4_addr_knowledge)
+        if type(ipaddress.ip_address(host)) is ipaddress.IPv4Address:
+            ip_addr = IPv4Address(host)
+            ip_addr_knowledge = ip_addr.to_knowledge_node()
+        else:
+            ip_addr = IPv6Address(host)
+            ip_addr_knowledge = ip_addr.to_knowledge_node()
+        knowledge_nodes.append(ip_addr_knowledge)
         knowledge_relations.append(
             KnowledgeRelation(
                 label="HAS_ADDRESS",
                 source_node=nic_knowledge,
-                target_node=ipv4_addr_knowledge,
+                target_node=ip_addr_knowledge,
             )
         )
 
@@ -1009,7 +1064,7 @@ def nmap_scan_to_knowledge(
                 knowledge_relations.append(
                     KnowledgeRelation(
                         label="HAS_PORT",
-                        source_node=ipv4_addr_knowledge,
+                        source_node=ip_addr_knowledge,
                         target_node=open_port_knowledge,
                         values={"last_seen": scan_time.timestamp(), "status": "open"},
                     )
@@ -1048,7 +1103,6 @@ def suricata_alert_to_knowledge(
         values=value_dict,
     )
     knowledge_nodes.append(alert_knowledge)
-
     alert_sig_knowledge = KnowledgeNode(
         label="AttackSignature",
         name=f"Suricata {alert['alert']['gid']}: {alert['alert']['signature_id']}",
@@ -1070,6 +1124,8 @@ def suricata_alert_to_knowledge(
         )
     )
 
+    if alert["alert"]["category"] == "":
+        raise ValueError(f"Name must be non-empty|alert:" + str(alert))
     alert_cat_knowledge = KnowledgeNode(
         label="AttackSignatureCategory",
         name=alert["alert"]["category"],
@@ -1094,7 +1150,13 @@ def suricata_alert_to_knowledge(
     )
     source_host_knowledge = source_host.to_knowledge_node()
     knowledge_nodes.append(source_host_knowledge)
-    source_ip = IPv4Address(alert["src_ip"])
+
+    if type(ipaddress.ip_address(alert["src_ip"])) is ipaddress.IPv4Address:
+        source_ip = IPv4Address(alert["src_ip"])
+    else:
+        logger.info(f"ipaddress: {alert['src_ip']} type:{type(ipaddress.ip_address(alert['src_ip']))}")
+        source_ip = IPv6Address(alert["src_ip"])
+
     source_ip_knowledge = source_ip.to_knowledge_node()
     knowledge_nodes.append(source_ip_knowledge)
     knowledge_relations.append(
@@ -1105,13 +1167,22 @@ def suricata_alert_to_knowledge(
         )
     )
 
+    try:
+        logger.info(f"GameMeta: {alert['GameMeta']['Dest']['Host'] }.{alert['GameMeta']['Dest']['Domain']}")
+    except:
+        pass
     dest_host = Host(
         alert["dest_ip"],
         last_seen=alert_dt.timestamp(),
     )
     dest_host_knowledge = dest_host.to_knowledge_node()
     knowledge_nodes.append(dest_host_knowledge)
-    dest_ip = IPv4Address(alert["dest_ip"])
+
+    if type(ipaddress.ip_address(alert["dest_ip"])) is ipaddress.IPv4Address:
+        dest_ip = IPv4Address(alert["dest_ip"])
+    else:
+        dest_ip = IPv6Address(alert["dest_ip"])
+
     dest_ip_knowledge = dest_ip.to_knowledge_node()
     knowledge_nodes.append(dest_ip_knowledge)
 

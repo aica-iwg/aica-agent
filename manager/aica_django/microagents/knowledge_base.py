@@ -102,6 +102,7 @@ def record_nmap_scan(scan_result: Dict[str, Any]) -> bool:
 
     logger.info(f"Running {__name__}: record_nmap_scan")
     nodes, relations = nmap_scan_to_knowledge(scan_result)
+    logger.info(f"record_nmap_scan knowledge_to_neo: nr nodes: {str(len(nodes))} nr relations: {str(len(relations))}")
     return knowledge_to_neo(nodes=nodes, relations=relations)
 
 

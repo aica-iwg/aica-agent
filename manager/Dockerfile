@@ -63,11 +63,11 @@ RUN curl -fL -o /tmp/nmap.tar.bz2 \
  && tar -xjf /tmp/nmap.tar.bz2 -C /tmp \
  && cd /tmp/nmap* 
 
+
 #old nmap-7.8 crashes AICA workers resulting in: nmap: Target.cc:503: void Target::stopTimeOutClock(const timeval*): Assertion `htn.toclock_running == true' failed
 #patch nmap-7.93 to make it building on Debian Bullseye (https://github.com/nmap/nmap/commit/d6bea8dcdee36a3902cece14097993350306f1b6)
 RUN cd /tmp/nmap* \
     && sed -i '/#if OPENSSL_API_LEVEL < 10100/c\#if OPENSSL_VERSION_NUMBER < 0x10100000L' /tmp/nmap-${nmap_ver}/ncat/http_digest.c 
-
 
 
 RUN cd /tmp/nmap* \
