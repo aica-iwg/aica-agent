@@ -259,8 +259,7 @@ class Host(SemiStructuredNode):  # type: ignore
         @rtype: list
         """
         all_results = []
-        ip_strings = [str(x.address) for x in self.ipv4_address.all()]
-        for ip in ip_strings:
+        for ip in [str(x.address) for x in self.ipv4_address.all()]:
             results, columns = self.cypher(
                 "MATCH (h:Host)-[:`HAS_ADDRESS`]->"
                 "(:IPv4Address)-[:`HAS_PORT`]->"
@@ -272,8 +271,7 @@ class Host(SemiStructuredNode):  # type: ignore
                 "RETURN n"
             )
             all_results.extend(results)
-        ip_strings = [str(x.address) for x in self.ipv6_address.all()]
-        for ip in ip_strings:
+        for ip in [str(x.address) for x in self.ipv6_address.all()]:
             results, columns = self.cypher(
                 "MATCH (h:Host)-[:`HAS_ADDRESS`]->"
                 "(:IPv6Address)-[:`HAS_PORT`]->"

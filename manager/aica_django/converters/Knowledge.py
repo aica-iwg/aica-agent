@@ -801,7 +801,7 @@ def nginx_accesslog_to_knowledge(
     # Add target NIC to target host
     nic_knowledge = KnowledgeNode(
         label="NetworkInterface",
-        name=str(uuid.uuid4()),
+        name=str(uuid.uuid4()), # This results in hundreds of NIC's per host, does not make sense.
         values=value_dict,
     )
     knowledge_nodes.append(nic_knowledge)
@@ -815,8 +815,10 @@ def nginx_accesslog_to_knowledge(
 
     if type(ipaddress.ip_address(log_dict["src_ip"])) is ipaddress.IPv4Address:
         ip_addr_knowledge = IPv4Address(log_dict["src_ip"]).to_knowledge_node()
-    else:
+    elif type(ipaddress.ip_address(log_dict["src_ip"])) is ipaddress.IPv6Address:
         ip_addr_knowledge = IPv6Address(log_dict["src_ip"]).to_knowledge_node()
+    else:
+        raise Exception(f"Unhandled address type: {type(ipaddress.ip_address(log_dict['src_ip'])) }")
 
     knowledge_nodes.append(ip_addr_knowledge)
     knowledge_relations.append(
@@ -875,8 +877,6 @@ def nmap_scan_to_knowledge(
 
     knowledge_nodes = []
     knowledge_relations = []
-    if "runtime" not in scan_results:
-        print("gotcha!", scan_results)
 
     assert "runtime" in scan_results
 
@@ -945,9 +945,11 @@ def nmap_scan_to_knowledge(
         if type(ipaddress.ip_address(host)) is ipaddress.IPv4Address:
             ip_addr = IPv4Address(host)
             ip_addr_knowledge = ip_addr.to_knowledge_node()
-        else:
+        elif type(ipaddress.ip_address(host)) is ipaddress.IPv6Address:
             ip_addr = IPv6Address(host)
             ip_addr_knowledge = ip_addr.to_knowledge_node()
+        else:
+            raise ValueError(f"Unsupported ip type {type(ipaddress.ip_address(host)) } for {host}")
         knowledge_nodes.append(ip_addr_knowledge)
         knowledge_relations.append(
             KnowledgeRelation(
@@ -1153,9 +1155,11 @@ def suricata_alert_to_knowledge(
 
     if type(ipaddress.ip_address(alert["src_ip"])) is ipaddress.IPv4Address:
         source_ip = IPv4Address(alert["src_ip"])
-    else:
-        logger.info(f"ipaddress: {alert['src_ip']} type:{type(ipaddress.ip_address(alert['src_ip']))}")
+    elif type(ipaddress.ip_address(alert["src_ip"])) is ipaddress.IPv6Address:
         source_ip = IPv6Address(alert["src_ip"])
+    else:
+        raise ValueError(f"Unsupported src_ip type {type(ipaddress.ip_address(alert['src_ip'])) } for {alert['src_ip']}")
+
 
     source_ip_knowledge = source_ip.to_knowledge_node()
     knowledge_nodes.append(source_ip_knowledge)
@@ -1167,10 +1171,6 @@ def suricata_alert_to_knowledge(
         )
     )
 
-    try:
-        logger.info(f"GameMeta: {alert['GameMeta']['Dest']['Host'] }.{alert['GameMeta']['Dest']['Domain']}")
-    except:
-        pass
     dest_host = Host(
         alert["dest_ip"],
         last_seen=alert_dt.timestamp(),
@@ -1180,8 +1180,10 @@ def suricata_alert_to_knowledge(
 
     if type(ipaddress.ip_address(alert["dest_ip"])) is ipaddress.IPv4Address:
         dest_ip = IPv4Address(alert["dest_ip"])
-    else:
+    elif type(ipaddress.ip_address(alert["dest_ip"])) is ipaddress.IPv6Address:
         dest_ip = IPv6Address(alert["dest_ip"])
+    else:
+        raise ValueError(f"Unsupported dest_ip type {type(ipaddress.ip_address(alert['dest_ip'])) } for {alert['dest_ip']}")
 
     dest_ip_knowledge = dest_ip.to_knowledge_node()
     knowledge_nodes.append(dest_ip_knowledge)
