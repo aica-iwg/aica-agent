@@ -2,7 +2,7 @@ Django==4.1.4
 amqp==5.1.1
 backoff==2.2.1
 celery==5.2.7
-coverage==6.5.0
+coverage==7.1.0
 dateparser==1.1.4
 django-bootstrap-v5==1.0.11
 django-extensions==3.2.1
