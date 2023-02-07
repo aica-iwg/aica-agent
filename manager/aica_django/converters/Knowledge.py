@@ -36,7 +36,7 @@ import uuid
 
 from typing import Any, Dict, List, Optional, Tuple, Union
 
-from aica_django.connectors.GraphDatabase import (
+from aica_django.connectors.graph_database import (
     AicaNeo4j,
     defined_node_labels,
     defined_relation_labels,
@@ -1258,7 +1258,7 @@ def antivirus_alert_to_knowledge(
 
     # The if statement is here for error handling the case where the VirusTotal
     # data isn't properly stored in the alert object and we get the "Not Available"
-    # as specified in the Antivirus.py file. Otherwise, we'd have a bunch of errors
+    # as specified in the antivirus.py file. Otherwise, we'd have a bunch of errors
     # showing up anytime an API key was invalid or the VT servers are unavailable
     alert_knowledge = KnowledgeNode(
         label="Alert",
@@ -1346,7 +1346,7 @@ def knowledge_to_neo(
     neo_user = str(os.getenv("NEO4J_USER"))
     neo_password = str(os.getenv("NEO4J_PASSWORD"))
 
-    graph = AicaNeo4j(host=neo_host, user=neo_user, password=neo_password)
+    graph = AicaNeo4j()
 
     # Intentionally only handling lists to encourage batching
     res1 = False

@@ -24,8 +24,8 @@ from celery.app import shared_task
 from celery.utils.log import get_task_logger
 from typing import Any, Dict, List, Union
 
-from aica_django.connectors.Honeypot import redirect_to_honeypot_iptables  # noqa: F401
-from aica_django.connectors.NetworkScan import network_scan  # noqa: F401
+from aica_django.connectors.ssh import redirect_to_honeypot_iptables  # noqa: F401
+from aica_django.connectors.network_scan import network_scan  # noqa: F401
 from aica_django.microagents.knowledge_base import query_action
 from aica_django.microagents.behaviour_engine import query_rules
 

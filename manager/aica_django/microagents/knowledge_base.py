@@ -26,8 +26,8 @@ from celery.app import shared_task
 from celery.utils.log import get_task_logger
 from typing import Any, Dict, List
 
-from aica_django.connectors.DocumentDatabase import AicaMongo
-from aica_django.converters.Knowledge import (
+from aica_django.connectors.document_database import AicaMongo
+from aica_django.converters.knowledge import (
     netflow_to_knowledge,
     nginx_accesslog_to_knowledge,
     nmap_scan_to_knowledge,
