@@ -21,8 +21,8 @@ from celery import shared_task
 from celery.utils.log import get_task_logger
 from typing import Any, Dict
 
-from aica_django.connectors.document_database import AicaMongo
-from aica_django.converters.knowledge import nmap_scan_to_knowledge
+from aica_django.connectors.DocumentDatabase import AicaMongo
+from aica_django.converters.Knowledge import nmap_scan_to_knowledge
 
 logger = get_task_logger(__name__)
 

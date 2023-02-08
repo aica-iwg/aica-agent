@@ -1,5 +1,5 @@
 .coverage
-.env.local
+.env
 .idea
 .mypy_cache
 .pytest_cache

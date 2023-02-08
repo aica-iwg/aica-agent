@@ -26,8 +26,8 @@ from celery.app import shared_task
 from celery.utils.log import get_task_logger
 from typing import Any, Dict, List
 
-from aica_django.connectors.document_database import AicaMongo
-from aica_django.converters.knowledge import (
+from aica_django.connectors.DocumentDatabase import AicaMongo
+from aica_django.converters.Knowledge import (
     netflow_to_knowledge,
     nginx_accesslog_to_knowledge,
     nmap_scan_to_knowledge,
@@ -86,6 +86,7 @@ def record_netflow(flow: Dict[str, Any]) -> bool:
 
     logger.info(f"Running {__name__}: record_netflow")
     nodes, relations = netflow_to_knowledge(flow)
+
     return knowledge_to_neo(nodes=nodes, relations=relations)
 
 
@@ -102,6 +103,7 @@ def record_nmap_scan(scan_result: Dict[str, Any]) -> bool:
 
     logger.info(f"Running {__name__}: record_nmap_scan")
     nodes, relations = nmap_scan_to_knowledge(scan_result)
+
     return knowledge_to_neo(nodes=nodes, relations=relations)
 
 
@@ -118,6 +120,7 @@ def record_suricata_alert(alert: Dict[str, Any]) -> bool:
 
     logger.info(f"Running {__name__}: record_alert")
     nodes, relations = suricata_alert_to_knowledge(alert)
+
     return knowledge_to_neo(nodes=nodes, relations=relations)
 
 

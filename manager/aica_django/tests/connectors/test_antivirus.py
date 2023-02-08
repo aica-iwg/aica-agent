@@ -5,9 +5,9 @@ from celery.utils.log import get_task_logger
 from django.test import TestCase
 from time import sleep
 
-from aica_django.connectors.antivirus import parse_clamav_alert, poll_clamav_alerts
-from aica_django.connectors.graph_database import AicaNeo4j
-from aica_django.connectors.ssh import send_ssh_command
+from aica_django.connectors.Antivirus import parse_clamav_alert, poll_clamav_alerts
+from aica_django.connectors.GraphDatabase import AicaNeo4j
+from aica_django.connectors.SSH import send_ssh_command
 
 logger = get_task_logger(__name__)
 

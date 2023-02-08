@@ -11,7 +11,6 @@ import socket
 from typing import Tuple, Union
 
 from paramiko import SSHClient, AutoAddPolicy
-from paramiko.channel import ChannelFile, ChannelStderrFile
 from celery.app import shared_task
 from celery.utils.log import get_task_logger
 

@@ -3,7 +3,7 @@ import socket
 
 from django.test import TestCase
 
-from aica_django.connectors.ssh import send_ssh_command, redirect_to_honeypot_iptables
+from aica_django.connectors.SSH import send_ssh_command, redirect_to_honeypot_iptables
 
 
 class TestSsh(TestCase):

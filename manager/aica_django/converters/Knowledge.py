@@ -36,7 +36,7 @@ import uuid
 
 from typing import Any, Dict, List, Optional, Tuple, Union
 
-from aica_django.connectors.graph_database import (
+from aica_django.connectors.GraphDatabase import (
     AicaNeo4j,
     defined_node_labels,
     defined_relation_labels,

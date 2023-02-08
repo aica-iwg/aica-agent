@@ -18,7 +18,7 @@ from celery.app import shared_task
 from celery.utils.log import get_task_logger
 from typing import Any, Dict, List, Union
 
-from aica_django.connectors.siem import Graylog
+from aica_django.connectors.SIEM import Graylog
 
 logger = get_task_logger(__name__)
 
