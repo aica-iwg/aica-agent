@@ -11,7 +11,7 @@ import py2neo.errors  # type: ignore
 
 from py2neo import Graph, Node, NodeMatcher, Relationship
 from urllib.parse import quote_plus
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 # Try to keep these as minimal and orthogonal as possible
 defined_node_labels = [
@@ -66,33 +66,13 @@ class AicaNeo4j:
     The object to instantiate to create a persistent interface to Neo4j
     """
 
-    def __init__(
-        self, host: str = "", user: str = "", password: str = "", port: int = -1
-    ):
+    def __init__(self) -> None:
         """
         Initialize a new AiceNeo4j object.
-
-        @param host: The Neo4j host, read from environment variable NEO4J_SERVER if not provided
-        @type host: str
-        @param user: The Neo4j user, read from environment variable NEO4J_USER if not provided
-        @type user: str
-        @param password: The Neo4j user password, read from environment variable NEO4J_PASS if not provided
-        @type password: str
-        @param port: The Neo4j server port, read from environment variable NEO4J_SERVER_PORT or defaults to 7687
-        @type port: int
         """
 
-        host = host if host != "" else quote_plus(str(os.getenv("NEO4J_SERVER")))
-        port = (
-            port if port >= 0 else int(quote_plus(str(os.getenv("NEO4J_SERVER_PORT"))))
-        )
-        user = user if user != "" else quote_plus(str(os.getenv("NEO4J_USER")))
-        password = (
-            password if password != "" else quote_plus(str(os.getenv("NEO4J_PASS")))
-        )
-        uri = f"bolt://{host}:{port}"
-
-        self.graph = Graph(uri, auth=(user, password))
+        uri = os.getenv("NEO4J_BOLT_URI")
+        self.graph = Graph(uri)
 
     def create_constraints(self) -> bool:
         """
@@ -205,3 +185,31 @@ class AicaNeo4j:
                 f"Couldn't find {node_a_name} ({node_a}) "
                 f"or {node_b_name} ({node_b})"
             )
+
+    def get_nodes_by_label(self, label: str) -> List[Node]:
+        """
+        Get all nodes from graph with a given label.
+
+        @param label: Type (label) of nodes to retrieve.
+        @type label: str
+        @return:
+        @rtype:
+        """
+        query = f"MATCH (n:{label}) return n"
+        results = list(self.graph.run(query))
+
+        return results
+
+    def get_relations_by_label(self, label: str) -> List[Node]:
+        """
+        Get all relations from graph with a given label.
+
+        @param label: Type (label) of nodes to retrieve.
+        @type label: str
+        @return:
+        @rtype:
+        """
+        query = f"MATCH ()-[r:{label}]-() return r"
+        results = list(self.graph.run(query))
+
+        return results

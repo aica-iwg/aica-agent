@@ -756,6 +756,16 @@ def nginx_accesslog_to_knowledge(
             request_time.timestamp(), prefix="last_seen"
         )
 
+    # dateparser can't seem to handle this format
+    request_time = datetime.datetime.strptime(
+        log_dict["dateandtime"], "%d/%b/%Y:%H:%M:%S %z"
+    )
+
+    if not request_time:
+        logging.error(f"Couldn't parse timestamp {log_dict['dateandtime']}")
+        return [], []
+
+    request_timestamp = int(request_time.timestamp())
     my_hostname = socket.gethostname()
     my_ipv4 = IPv4Address(socket.gethostbyname(my_hostname))
     my_ipv4_knowledge = my_ipv4.to_knowledge_node()
@@ -765,7 +775,7 @@ def nginx_accesslog_to_knowledge(
     value_dict = dissected_request_time
     requesting_host = Host(
         log_dict["src_ip"],
-        last_seen=request_time.timestamp(),
+        last_seen=request_timestamp,
         values=value_dict,
     )
     requesting_host_knowledge = requesting_host.to_knowledge_node()
@@ -1248,7 +1258,7 @@ def antivirus_alert_to_knowledge(
 
     # The if statement is here for error handling the case where the VirusTotal
     # data isn't properly stored in the alert object and we get the "Not Available"
-    # as specified in the Antivirus.py file. Otherwise, we'd have a bunch of errors
+    # as specified in the antivirus.py file. Otherwise, we'd have a bunch of errors
     # showing up anytime an API key was invalid or the VT servers are unavailable
     alert_knowledge = KnowledgeNode(
         label="Alert",
@@ -1336,7 +1346,7 @@ def knowledge_to_neo(
     neo_user = str(os.getenv("NEO4J_USER"))
     neo_password = str(os.getenv("NEO4J_PASSWORD"))
 
-    graph = AicaNeo4j(host=neo_host, user=neo_user, password=neo_password)
+    graph = AicaNeo4j()
 
     # Intentionally only handling lists to encourage batching
     res1 = False
