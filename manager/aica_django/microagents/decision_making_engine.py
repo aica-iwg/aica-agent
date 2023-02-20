@@ -74,11 +74,11 @@ def handle_suricata_alert(alert: Dict[str, Union[str, Dict[str, Any]]]) -> bool:
                 return True
             elif action["action"] == "scan_src":
                 logger.info(f"Initiating return scan to {alert['src_ip']}")
-                current_app.send_task("network-scan", nmap_target=alert["src_ip"])
+                current_app.send_task("network-scan", [alert["src_ip"]])
                 return True
             elif action["action"] == "scan_target":
                 logger.info(f"Initiating scan of target at {alert['dest_ip']}")
-                current_app.send_task("network-scan", nmap_target=alert["dest_ip"])
+                current_app.send_task("network-scan", [alert["dest_ip"]])
                 return True
 
     return False

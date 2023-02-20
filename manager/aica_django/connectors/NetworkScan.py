@@ -22,7 +22,7 @@ from celery.utils.log import get_task_logger
 from typing import Any, Dict
 
 from aica_django.connectors.DocumentDatabase import AicaMongo
-from aica_django.converters.Knowledge import nmap_scan_to_knowledge
+from aica_django.microagents.knowledge_base import record_nmap_scan
 
 logger = get_task_logger(__name__)
 
@@ -30,7 +30,7 @@ logger = get_task_logger(__name__)
 @shared_task(name="network-scan")
 def network_scan(
     nmap_target: str = "",
-    nmap_args: str = "-O -Pn --osscan-limit --host-timeout=30",
+    nmap_args: str = "-O -Pn --osscan-limit --host-timeout=7",
     min_scan_interval: int = 300,
 ) -> Dict[str, Any]:
     """
@@ -48,6 +48,7 @@ def network_scan(
     @rtype: dict
     """
     targets = []
+    logger.info(f"Running network_scan on {nmap_target}")
     if nmap_target == "":
         # Scan apparently local subnet(s)
         for interface in netifaces.interfaces():
@@ -87,6 +88,12 @@ def network_scan(
                 f"Host {target} has been scanned recently, not scanning again"
             )
 
+    if len(scan_results) > 0:
+        logger.info(f"record_nmap_scan for: {nmap_target}")
+        record_nmap_scan.apply_async(args=(scan_results,))
+    else:
+        logger.info(f"No nmap results for: {nmap_target}")
+
     return scan_results
 
 
@@ -105,10 +112,12 @@ def periodic_network_scan(nmap_target: str = "", nmap_args: str = "") -> None:
     logger.info(f"Running {__name__}: periodic-network-scan")
     while True:
         if nmap_args != "":
+            logger.info(
+                f"Running {__name__}:{nmap_target} {nmap_args}: periodic-network-scan with args"
+            )
             results = network_scan(nmap_target, nmap_args)
         else:
+            logger.info(f"Running {__name__}:{nmap_target} : periodic-network-scan")
             results = network_scan(nmap_target)
-
-        nmap_scan_to_knowledge(results)
 
         time.sleep(int(os.getenv("NETWORK_SCAN_INTERVAL_MINUTES") or 0) * 60)

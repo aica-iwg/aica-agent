@@ -1,9 +1,12 @@
-FROM python:3.9-bullseye
+FROM ubuntu:22.04
 
 ENV PYTHONDONTWRITEBYTECODE 1
 ENV PYTHONIOENCODING UTF-8
 ENV PYTHONUNBUFFERED 1
 ENV DEBIAN_FRONTEND noninteractive
+
+ARG build_rev=2
+
 
 WORKDIR /usr/src/app
 
@@ -44,6 +47,7 @@ RUN python3 -m venv /opt/venv && \
 RUN python3 -m venv /opt/venv && \
         /opt/venv/bin/pip3 --no-cache install -qUr requirements.txt
 
+# Install dependencies
 RUN apt-get -y remove \
         cmake \
         libtool \
@@ -72,3 +76,4 @@ COPY docker_entrypoint.sh /usr/local/bin/docker_entrypoint.sh
 RUN chmod +x /usr/local/bin/docker_entrypoint.sh
 
 CMD /usr/local/bin/docker_entrypoint.sh
+
