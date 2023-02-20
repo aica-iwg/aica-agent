@@ -50,8 +50,11 @@ def overview(request: HttpRequest) -> HttpResponse:
         {
             "Hosts": [
                 {
-                    "IPv4 Address": ", ".join(
-                        [y.address for y in x.ipv4_address.all()]
+                    "IP Address": ", ".join(
+                        [
+                            y.address
+                            for y in (x.ipv4_address.all() + x.ipv6_address.all())
+                        ]
                     ),
                     "Alert Count": len(x.alerts()),
                     "Last Seen": x.last_seen,

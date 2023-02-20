@@ -49,6 +49,25 @@ class IPv4Address(SemiStructuredNode):  # type: ignore
     reserved = BooleanProperty()
 
 
+class IPv6Address(SemiStructuredNode):  # type: ignore
+    """
+    The IPv4 address corresponding to a host, potentially with listening ports (NetworkEndpoints)
+    """
+
+    id = StringProperty(required=True)
+    address = StringProperty(required=True)
+    class_16 = StringProperty()
+    class_32 = StringProperty()
+    class_48 = StringProperty()
+    class_56 = StringProperty()
+    class_64 = StringProperty()
+    is_private = BooleanProperty()
+    link_local = BooleanProperty()
+    loopback = BooleanProperty()
+    multicast = BooleanProperty()
+    reserved = BooleanProperty()
+
+
 class AttackSignatureCategory(SemiStructuredNode):  # type: ignore
     """
     Broader buckets of attack signatures
@@ -90,6 +109,7 @@ class Host(SemiStructuredNode):  # type: ignore
     id = StringProperty(required=True)
     last_seen = DateTimeProperty(required=True)
     ipv4_address = RelationshipTo("IPv4Address", "HAS_ADDRESS")
+    ipv6_address = RelationshipTo("IPv6Address", "HAS_ADDRESS")
 
     # Associated Alerts
     def alerts(self, since: int = 86400) -> List[NodeBase]:
@@ -101,8 +121,8 @@ class Host(SemiStructuredNode):  # type: ignore
         @return: List of all associated alerts as returned by the graph database
         @rtype: list
         """
-        ip_strings = [str(x.address) for x in self.ipv4_address.all()]
         all_results = []
+        ip_strings = [str(x.address) for x in self.ipv4_address.all()]
         for ip in ip_strings:
             results, columns = self.cypher(
                 "MATCH (h:Host)-[:`HAS_ADDRESS`]->"
@@ -114,7 +134,18 @@ class Host(SemiStructuredNode):  # type: ignore
                 "RETURN a"
             )
             all_results.extend(results)
-
+        ip_strings = [str(x.address) for x in self.ipv6_address.all()]
+        for ip in ip_strings:
+            results, columns = self.cypher(
+                "MATCH (h:Host)-[:`HAS_ADDRESS`]->"
+                "(:IPv6Address)-[:`HAS_PORT`]->"
+                "(:NetworkEndpoint)-[:`COMMUNICATES_TO`]->"
+                "(:NetworkTraffic)<-[:`TRIGGERED_BY`]-"
+                "(a:Alert) "
+                f"WHERE a.time_tripped >= (dateTime().epochMillis / 1000) - {since} AND h.id = '{ip}' "
+                "RETURN a"
+            )
+            all_results.extend(results)
         return [self.inflate(row[0]) for row in all_results]
 
     def non_suspicious_source_flows(self, since: int = 86400) -> List[List[Any]]:
@@ -127,12 +158,25 @@ class Host(SemiStructuredNode):  # type: ignore
         @return: List of all associated flows as returned by the graph database
         @rtype: list
         """
-        ip_strings = [str(x.address) for x in self.ipv4_address.all()]
         all_results = []
+        ip_strings = [str(x.address) for x in self.ipv4_address.all()]
         for ip in ip_strings:
             results, columns = self.cypher(
                 "MATCH (h:Host)-[:`HAS_ADDRESS`]->"
                 "(:IPv4Address)-[:`HAS_PORT`]->"
+                "(:NetworkEndpoint)-[:`COMMUNICATES_TO`]->"
+                "(n:NetworkTraffic)"
+                "WHERE NOT EXISTS {MATCH (:Alert)-[:`TRIGGERED_BY`]->(n:NetworkTraffic)} AND "
+                f"n.start >= (dateTime().epochMillis / 1000) - {since} "
+                f"AND h.id = '{ip}' "
+                "RETURN n"
+            )
+            all_results.extend(results)
+        ip_strings = [str(x.address) for x in self.ipv6_address.all()]
+        for ip in ip_strings:
+            results, columns = self.cypher(
+                "MATCH (h:Host)-[:`HAS_ADDRESS`]->"
+                "(:IPv6Address)-[:`HAS_PORT`]->"
                 "(:NetworkEndpoint)-[:`COMMUNICATES_TO`]->"
                 "(n:NetworkTraffic)"
                 "WHERE NOT EXISTS {MATCH (:Alert)-[:`TRIGGERED_BY`]->(n:NetworkTraffic)} AND "
@@ -154,12 +198,25 @@ class Host(SemiStructuredNode):  # type: ignore
         @return: List of all associated flows as returned by the graph database
         @rtype: list
         """
-        ip_strings = [str(x.address) for x in self.ipv4_address.all()]
         all_results = []
+        ip_strings = [str(x.address) for x in self.ipv4_address.all()]
         for ip in ip_strings:
             results, columns = self.cypher(
                 "MATCH (h:Host)-[:`HAS_ADDRESS`]->"
                 "(:IPv4Address)-[:`HAS_PORT`]->"
+                "(:NetworkEndpoint)-[:`COMMUNICATES_TO`]->"
+                "(n:NetworkTraffic)"
+                "WHERE EXISTS {MATCH (:Alert)-[:`TRIGGERED_BY`]->(n:NetworkTraffic)} AND "
+                f"n.start >= (dateTime().epochMillis / 1000) - {since} "
+                f"AND h.id = '{ip}' "
+                "RETURN n"
+            )
+            all_results.extend(results)
+        ip_strings = [str(x.address) for x in self.ipv6_address.all()]
+        for ip in ip_strings:
+            results, columns = self.cypher(
+                "MATCH (h:Host)-[:`HAS_ADDRESS`]->"
+                "(:IPv6Address)-[:`HAS_PORT`]->"
                 "(:NetworkEndpoint)-[:`COMMUNICATES_TO`]->"
                 "(n:NetworkTraffic)"
                 "WHERE EXISTS {MATCH (:Alert)-[:`TRIGGERED_BY`]->(n:NetworkTraffic)} AND "
@@ -202,12 +259,23 @@ class Host(SemiStructuredNode):  # type: ignore
         @return: List of all associated flows as returned by the graph database
         @rtype: list
         """
-        ip_strings = [str(x.address) for x in self.ipv4_address.all()]
         all_results = []
-        for ip in ip_strings:
+        for ip in [str(x.address) for x in self.ipv4_address.all()]:
             results, columns = self.cypher(
                 "MATCH (h:Host)-[:`HAS_ADDRESS`]->"
                 "(:IPv4Address)-[:`HAS_PORT`]->"
+                "(:NetworkEndpoint)<-[:`COMMUNICATES_TO`]-"
+                "(n:NetworkTraffic)"
+                "WHERE NOT EXISTS {MATCH (:Alert)-[:`TRIGGERED_BY`]->(n:NetworkTraffic)} AND "
+                f"n.start >= (dateTime().epochMillis / 1000) - {since} "
+                f"AND h.id = '{ip}' "
+                "RETURN n"
+            )
+            all_results.extend(results)
+        for ip in [str(x.address) for x in self.ipv6_address.all()]:
+            results, columns = self.cypher(
+                "MATCH (h:Host)-[:`HAS_ADDRESS`]->"
+                "(:IPv6Address)-[:`HAS_PORT`]->"
                 "(:NetworkEndpoint)<-[:`COMMUNICATES_TO`]-"
                 "(n:NetworkTraffic)"
                 "WHERE NOT EXISTS {MATCH (:Alert)-[:`TRIGGERED_BY`]->(n:NetworkTraffic)} AND "
@@ -229,8 +297,8 @@ class Host(SemiStructuredNode):  # type: ignore
         @return: List of all associated flows as returned by the graph database
         @rtype: list
         """
-        ip_strings = [str(x.address) for x in self.ipv4_address.all()]
         all_results = []
+        ip_strings = [str(x.address) for x in self.ipv4_address.all()]
         for ip in ip_strings:
             results, columns = self.cypher(
                 "MATCH (h:Host)-[:`HAS_ADDRESS`]->"
@@ -243,7 +311,19 @@ class Host(SemiStructuredNode):  # type: ignore
                 "RETURN n"
             )
             all_results.extend(results)
-
+        ip_strings = [str(x.address) for x in self.ipv6_address.all()]
+        for ip in ip_strings:
+            results, columns = self.cypher(
+                "MATCH (h:Host)-[:`HAS_ADDRESS`]->"
+                "(:IPv6Address)-[:`HAS_PORT`]->"
+                "(:NetworkEndpoint)<-[:`COMMUNICATES_TO`]-"
+                "(n:NetworkTraffic)"
+                "WHERE EXISTS {MATCH (:Alert)-[:`TRIGGERED_BY`]->(n:NetworkTraffic)} AND "
+                f"n.start >= (dateTime().epochMillis / 1000) - {since} "
+                f"AND h.id = '{ip}' "
+                "RETURN n"
+            )
+            all_results.extend(results)
         return all_results
 
     # Proportion of Suspicious to Non-Suspicious Traffic (Destination)

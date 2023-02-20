@@ -11,6 +11,7 @@ services:
     ports:
       - "8000:8000" # Django frontend
       - "5555:5555" # Celery Flower
+
     restart: always
     depends_on:
       manager_mq:
@@ -41,7 +42,7 @@ services:
       - control
 
   manager_mq:
-    image: rabbitmq:3.11-management-alpine
+    build: manager_mq
     container_name: 'manager_mq'
     volumes:
       - ./manager_mq/enabled_plugins:/etc/rabbitmq/enabled_plugins

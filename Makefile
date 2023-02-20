@@ -37,7 +37,7 @@ test: check-env lint security
 				/opt/venv/bin/coverage report --fail-under=30"
 
 start: build
-		@docker compose -f docker-compose.yml -f docker-compose-${MODE}.yml up -d
+		@docker compose -f docker-compose.yml -f docker-compose-${MODE}.yml up --wait -d
 
 stop: check-env
 		@docker compose -f docker-compose.yml -f docker-compose-${MODE}.yml down -v
