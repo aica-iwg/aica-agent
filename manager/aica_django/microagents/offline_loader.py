@@ -35,7 +35,7 @@ from typing import Any, Dict
 from aica_django.connectors.DocumentDatabase import AicaMongo
 from aica_django.connectors.GraphDatabase import AicaNeo4j
 from aica_django.connectors.Netflow import network_flow_capture
-from aica_django.connectors.HttpServer import poll_nginx_accesslogs
+from aica_django.connectors.HTTPServer import poll_nginx_accesslogs
 from aica_django.connectors.NetworkScan import periodic_network_scan
 from aica_django.connectors.IntrusionDetection import poll_suricata_alerts
 from aica_django.connectors.Antivirus import poll_clamav_alerts
@@ -216,14 +216,9 @@ def initialize(**kwargs: Dict[Any, Any]) -> bool:
         return True
 
     # Wait for graph to come up and then set uniqueness constraints
-    neo_host = str(os.getenv("NEO4J_HOST"))
-    neo_user = str(os.getenv("NEO4J_USER"))
-    neo_password = str(os.getenv("NEO4J_PASSWORD"))
     while True:
         try:
-            graph = AicaNeo4j(
-                host=neo_host, port=7687, user=neo_user, password=neo_password
-            )
+            graph = AicaNeo4j()
             graph.create_constraints()
             break
         except ConnectionUnavailable:

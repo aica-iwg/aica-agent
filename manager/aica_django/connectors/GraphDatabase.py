@@ -11,7 +11,7 @@ import py2neo.errors  # type: ignore
 
 from py2neo import Graph, Node, NodeMatcher, Relationship
 from urllib.parse import quote_plus
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 # Try to keep these as minimal and orthogonal as possible
 defined_node_labels = [
@@ -66,9 +66,7 @@ class AicaNeo4j:
     The object to instantiate to create a persistent interface to Neo4j
     """
 
-    def __init__(
-        self, host: str = "", user: str = "", password: str = "", port: int = -1
-    ):
+    def __init__(self) -> None:
         """
         Initialize a new AiceNeo4j object.
 
@@ -203,3 +201,31 @@ class AicaNeo4j:
                 f"Couldn't find {node_a_name} ({node_a}) "
                 f"or {node_b_name} ({node_b})"
             )
+
+    def get_nodes_by_label(self, label: str) -> List[Node]:
+        """
+        Get all nodes from graph with a given label.
+
+        @param label: Type (label) of nodes to retrieve.
+        @type label: str
+        @return:
+        @rtype:
+        """
+        query = f"MATCH (n:{label}) return n"
+        results = list(self.graph.run(query))
+
+        return results
+
+    def get_relations_by_label(self, label: str) -> List[Node]:
+        """
+        Get all relations from graph with a given label.
+
+        @param label: Type (label) of nodes to retrieve.
+        @type label: str
+        @return:
+        @rtype:
+        """
+        query = f"MATCH ()-[r:{label}]-() return r"
+        results = list(self.graph.run(query))
+
+        return results
