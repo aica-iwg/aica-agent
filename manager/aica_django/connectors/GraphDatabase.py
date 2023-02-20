@@ -66,7 +66,9 @@ class AicaNeo4j:
     The object to instantiate to create a persistent interface to Neo4j
     """
 
-    def __init__(self) -> None:
+    def __init__(
+        self, host: str = "", port: int = 0, user: str = "", password: str = ""
+    ) -> None:
         """
         Initialize a new AiceNeo4j object.
 
@@ -80,10 +82,10 @@ class AicaNeo4j:
         @type port: int
         """
 
-        host: str = host if host != "" else quote_plus(str(os.getenv("NEO4J_HOST")))
-        port: int = port if port >= 0 else int(quote_plus(str(os.getenv("NEO4J_PORT"))))
-        user: str = user if user != "" else quote_plus(str(os.getenv("NEO4J_USER")))
-        password: str = (
+        host = host if host != "" else quote_plus(str(os.getenv("NEO4J_HOST")))
+        port = port if port >= 0 else int(quote_plus(str(os.getenv("NEO4J_PORT"))))
+        user = user if user != "" else quote_plus(str(os.getenv("NEO4J_USER")))
+        password = (
             password if password != "" else quote_plus(str(os.getenv("NEO4J_PASSWORD")))
         )
         uri = f"bolt://{host}:{port}"
