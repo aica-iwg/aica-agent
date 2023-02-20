@@ -80,10 +80,10 @@ class AicaNeo4j:
         @type port: int
         """
 
-        host = host if host != "" else quote_plus(str(os.getenv("NEO4J_HOST")))
-        port = port if port >= 0 else int(quote_plus(str(os.getenv("NEO4J_PORT"))))
-        user = user if user != "" else quote_plus(str(os.getenv("NEO4J_USER")))
-        password = (
+        host: str = host if host != "" else quote_plus(str(os.getenv("NEO4J_HOST")))
+        port: int = port if port >= 0 else int(quote_plus(str(os.getenv("NEO4J_PORT"))))
+        user: str = user if user != "" else quote_plus(str(os.getenv("NEO4J_USER")))
+        password: str = (
             password if password != "" else quote_plus(str(os.getenv("NEO4J_PASSWORD")))
         )
         uri = f"bolt://{host}:{port}"
