@@ -111,7 +111,6 @@ def periodic_network_scan(nmap_target: str = "", nmap_args: str = "") -> None:
 
     logger.info(f"Running {__name__}: periodic-network-scan")
     while True:
-
         if nmap_args != "":
             logger.info(
                 f"Running {__name__}:{nmap_target} {nmap_args}: periodic-network-scan with args"
