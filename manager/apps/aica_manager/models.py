@@ -48,6 +48,7 @@ class IPv4Address(SemiStructuredNode):  # type: ignore
     multicast = BooleanProperty()
     reserved = BooleanProperty()
 
+
 class IPv6Address(SemiStructuredNode):  # type: ignore
     """
     The IPv4 address corresponding to a host, potentially with listening ports (NetworkEndpoints)

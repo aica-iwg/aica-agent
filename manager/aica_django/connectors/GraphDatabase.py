@@ -83,9 +83,7 @@ class AicaNeo4j:
         """
 
         host = host if host != "" else quote_plus(str(os.getenv("NEO4J_HOST")))
-        port = (
-            port if port >= 0 else int(quote_plus(str(os.getenv("NEO4J_PORT"))))
-        )
+        port = port if port >= 0 else int(quote_plus(str(os.getenv("NEO4J_PORT"))))
         user = user if user != "" else quote_plus(str(os.getenv("NEO4J_USER")))
         password = (
             password if password != "" else quote_plus(str(os.getenv("NEO4J_PASSWORD")))
