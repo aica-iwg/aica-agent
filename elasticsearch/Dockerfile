@@ -1,2 +1,2 @@
-# Version 8 not yet supported by Graylog
-FROM elasticsearch:7.17.8
+# Version 8 not supported by Graylog
+FROM elasticsearch:7.17.10
