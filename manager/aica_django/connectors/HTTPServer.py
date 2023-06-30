@@ -51,7 +51,7 @@ def poll_nginx_accesslogs(frequency: int = 30) -> None:
             "query": r"nginx\: AND HTTP",  # Required
             "from": from_time.strftime("%Y-%m-%d %H:%M:%S"),  # Required
             "to": to_time.strftime("%Y-%m-%d %H:%M:%S"),  # Required
-            "fields": ["message"],  # Required
+            "fields": "message, gl2_remote_ip",  # Required
             "limit": 150,  # Optional: Default limit is 150 in Graylog
         }
 
@@ -63,11 +63,13 @@ def poll_nginx_accesslogs(frequency: int = 30) -> None:
                 for message in response.json()["messages"]:
                     event = message["message"]["message"]
                     event = re.sub(r"^\S+ nginx: ", "", event)
-                    log_dict = matcher.match(event)
-                    if log_dict:
+                    match = matcher.match(event)
+                    if match:
+                        log_dict = match.groupdict()
+                        log_dict["server_ip"] = message["message"]["gl2_remote_ip"]
                         current_app.send_task(
                             "ma-knowledge_base-record_nginx_accesslog",
-                            [log_dict.groupdict()],
+                            [log_dict],
                         )
         except requests.exceptions.HTTPError as e:
             logging.error(f"{e}\n{response.text}")
