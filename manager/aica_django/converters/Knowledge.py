@@ -46,7 +46,7 @@ from celery.utils.log import get_task_logger
 logger = get_task_logger(__name__)
 
 
-def dissect_time(timestamp: float, prefix: str = "") -> Dict[str, Any]:
+def dissect_time(timestamp: Union[int, float], prefix: str = "") -> Dict[str, Any]:
     """
     Converts a timestamp into a dictionary of timestamp attributes potentially relevant
     for classification.
@@ -764,21 +764,9 @@ def nginx_accesslog_to_knowledge(
 
     if not request_time:
         raise ValueError(f"Couldn't parse timestamp {log_dict['dateandtime']}")
-    else:
-        dissected_request_time = dissect_time(
-            request_time.timestamp(), prefix="last_seen"
-        )
-
-    # dateparser can't seem to handle this format
-    request_time = datetime.datetime.strptime(
-        log_dict["dateandtime"], "%d/%b/%Y:%H:%M:%S %z"
-    )
-
-    if not request_time:
-        logging.error(f"Couldn't parse timestamp {log_dict['dateandtime']}")
         return [], []
 
-    request_timestamp = int(request_time.timestamp())
+    dissected_request_time = dissect_time(request_time.timestamp(), prefix="last_seen")
     my_hostname = socket.gethostname()
     try:
         my_ipv4 = IPv4Address(socket.gethostbyname(my_hostname))
@@ -800,9 +788,10 @@ def nginx_accesslog_to_knowledge(
     value_dict = dissected_request_time
     requesting_host = Host(
         log_dict["src_ip"],
-        last_seen=request_timestamp,
+        last_seen=request_time.timestamp(),
         values=value_dict,
     )
+
     requesting_host_knowledge = requesting_host.to_knowledge_node()
     knowledge_nodes.append(requesting_host_knowledge)
 
@@ -811,7 +800,7 @@ def nginx_accesslog_to_knowledge(
         label="NetworkInterface",
         name=str(
             uuid.uuid4()
-        ),  # This results in hundreds of NIC's per host, does not make sense.
+        ),  # TODO: This results in hundreds of NIC's per host, does not make sense.
         values=value_dict,
     )
     knowledge_nodes.append(nic_knowledge)
@@ -842,7 +831,7 @@ def nginx_accesslog_to_knowledge(
     )
 
     value_dict = dissected_request_time
-    value_dict["request_time"] = request_time
+    value_dict["request_time"] = request_time.timestamp()
     value_dict["method"] = log_dict["method"]
     value_dict["url"] = log_dict["url"]
     value_dict["response_status"] = log_dict["statuscode"]
