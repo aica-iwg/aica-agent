@@ -32,7 +32,10 @@ class TestAntiVirus(TestCase):
         self.assertEqual(parsed_alert["revision"], "68")
 
     def test020_parse_clamav_non_alert(self):
-        fake_alert = "943acdb73f35 clamav: Wed Oct 26 07:20:28 2022 -> Limits: PCRERecMatchLimit limit set to 2000."
+        fake_alert = {
+            "message": "943acdb73f35 clamav: Wed Oct 26 07:20:28 2022 -> Limits: PCRERecMatchLimit limit set to 2000.",
+            "source_ip": "127.0.0.1",
+        }
         try:
             parse_clamav_alert(fake_alert)
             self.fail()
