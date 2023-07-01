@@ -7,6 +7,7 @@ Functions:
 """
 
 import datetime
+import ipaddress
 import json
 import logging
 import re
@@ -41,9 +42,15 @@ def parse_clamav_alert(alert: Dict[str, Any]) -> Dict[str, Any]:
     """
     alert_dict: Dict[str, Any] = dict()
 
+    try:
+        ipaddress.ip_address(alert["source_ip"])
+    except ValueError:
+        raise ValueError("Invalid IP address given for antivirus alert")
+
     if "FOUND" in alert["message"]:
         alert_dict["event_type"] = "alert"
-        alert_dict["source_host"] = alert["source_ip"]
+
+        alert_dict["source_ip"] = alert["source_ip"]
         matcher = clam_parser.fullmatch(alert["message"])
         if matcher is None:
             raise ValueError("Invalid ClamAV line encountered")

@@ -7,3 +7,4 @@ RUN apk update && apk upgrade && \
 RUN adduser -D ssh_user
 
 COPY docker_entrypoint.sh /usr/local/bin/
+RUN chmod +x /usr/local/bin/docker_entrypoint.sh

@@ -4,7 +4,7 @@ version: "3.8"
 services:
   manager:
     environment:
-      MODE: "emu"
+      - MODE=emu
     # For Testing, ensure these containers start with manager
     depends_on:
       siem:
@@ -20,16 +20,15 @@ services:
 
   attacker:
     build: attacker
-    container_name: 'attacker'
-    command: sh /usr/local/bin/docker_entrypoint.sh
+    container_name: attacker
+    command: /usr/local/bin/docker_entrypoint.sh
     networks:
       - target
-    tty: true
 
   target:
     build: target
-    container_name: 'target'
-    command: sh /usr/local/bin/docker_entrypoint.sh
+    container_name: target
+    command: /usr/local/bin/docker_entrypoint.sh
     sysctls:
       - net.ipv4.conf.all.forwarding=1
     cap_add:
@@ -45,15 +44,15 @@ services:
 
   node_red_target:
     build: node_red_target
-    container_name: 'node_red_target'
+    container_name: node_red_target
     env_file:
-      - 'node_red_target/.env'
+      - node_red_target/.env
     networks:
       - target
 
   honeypot:
     build: honeypot
-    container_name: 'honeypot'
+    container_name: honeypot
     command: /usr/bin/opencanaryd --dev
     volumes:
       - ./honeypot/opencanary.conf:/etc/opencanaryd/opencanary.conf
@@ -62,15 +61,15 @@ services:
 
   ids:
     build: ./ids
-    container_name: 'ids'
+    container_name: ids
     command: sh /usr/local/bin/docker_entrypoint.sh
     cap_add:
       - NET_ADMIN
-    network_mode: 'service:target'
+    network_mode: service:target
 
   elasticsearch:
     build: elasticsearch
-    container_name: "elasticsearch"
+    container_name: elasticsearch
     # Required so that ES generates an acceptable SAN in its HTTPS Cert
     hostname: "elasticsearch"
     environment:
@@ -80,6 +79,8 @@ services:
       - ELASTIC_PASSWORD=aicaelastic
       - xpack.security.enabled=true
       - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    networks:
+      - control
     ulimits:
       memlock:
         soft: -1
@@ -95,12 +96,10 @@ services:
       interval: 10s
       timeout: 30s
       retries: 20
-    networks:
-      - control
 
   siem:
     build: siem
-    container_name: 'siem'
+    container_name: siem
     env_file:
       manager/.env
     depends_on:

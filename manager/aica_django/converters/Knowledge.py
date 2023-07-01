@@ -1349,7 +1349,7 @@ def antivirus_alert_to_knowledge(
     )
     nodes.append(path_knowledge)
 
-    host = Host(alert["source_host"], last_seen=datetime.datetime.now().timestamp())
+    host = Host(alert["source_ip"], last_seen=datetime.datetime.now().timestamp())
     host_knowledge = host.to_knowledge_node()
     nodes.append(host_knowledge)
 
@@ -1386,9 +1386,9 @@ def knowledge_to_neo(
     @rtype: bool
     """
 
-    neo_host = str(os.getenv("NEO4J_HOST"))
-    neo_user = str(os.getenv("NEO4J_USER"))
-    neo_password = str(os.getenv("NEO4J_PASSWORD"))
+    neo_host = str(os.getenv("N4J_HOST"))
+    neo_user = str(os.getenv("N4J_USER"))
+    neo_password = str(os.getenv("N4J_PASSWORD"))
 
     graph = AicaNeo4j()
 
