@@ -7,6 +7,7 @@ Functions:
 """
 
 import datetime
+import ipaddress
 import json
 import logging
 import re
@@ -29,7 +30,7 @@ clam_parser = re.compile(
 
 
 # ClamAV logs are not in json, so we need to format them into something like that
-def parse_clamav_alert(message: Dict[str, Any]) -> Dict[str, Any]:
+def parse_clamav_alert(alert: Dict[str, Any]) -> Dict[str, Any]:
     """
     Extract fields from ClamAV "FOUND" alert into a dictionary.
 
@@ -39,25 +40,31 @@ def parse_clamav_alert(message: Dict[str, Any]) -> Dict[str, Any]:
     @rtype: dict or bool
     @raise: ValueError: if the FOUND message cannot be parsed
     """
-    event_dict: Dict[str, Any] = dict()
+    alert_dict: Dict[str, Any] = dict()
 
-    if "FOUND" in message["message"]:
-        event_dict["event_type"] = "alert"
-        event_dict["source_host"] = message["source_ip"]
-        matcher = clam_parser.fullmatch(message["message"])
+    try:
+        ipaddress.ip_address(alert["source_ip"])
+    except ValueError:
+        raise ValueError("Invalid IP address given for antivirus alert")
+
+    if "FOUND" in alert["message"]:
+        alert_dict["event_type"] = "alert"
+
+        alert_dict["source_ip"] = alert["source_ip"]
+        matcher = clam_parser.fullmatch(alert["message"])
         if matcher is None:
             raise ValueError("Invalid ClamAV line encountered")
 
-        event_dict["hostname"] = matcher.group(1)
-        event_dict["date"] = matcher.group(2)
-        event_dict["path"] = matcher.group(3)
-        event_dict["platform"] = matcher.group(4)
-        event_dict["category"] = matcher.group(5)
-        event_dict["name"] = matcher.group(6)
-        event_dict["signature"] = matcher.group(7)
-        event_dict["revision"] = matcher.group(8)
+        alert_dict["hostname"] = matcher.group(1)
+        alert_dict["date"] = matcher.group(2)
+        alert_dict["path"] = matcher.group(3)
+        alert_dict["platform"] = matcher.group(4)
+        alert_dict["category"] = matcher.group(5)
+        alert_dict["name"] = matcher.group(6)
+        alert_dict["signature"] = matcher.group(7)
+        alert_dict["revision"] = matcher.group(8)
 
-        return event_dict
+        return alert_dict
 
     else:
         raise ValueError("Invalid ClamAV line encountered")

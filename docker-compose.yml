@@ -4,15 +4,13 @@ version: "3.8"
 services:
   manager:
     build: manager
-    container_name: 'manager'
+    container_name: manager
+    restart: unless-stopped
     env_file:
-      - 'manager/.env'
-    tty: true
+      - manager/.env
     ports:
       - "8000:8000" # Django frontend
       - "5555:5555" # Celery Flower
-
-    restart: always
     depends_on:
       manager_mq:
         condition: service_healthy
@@ -29,37 +27,42 @@ services:
 
   manager_db:
     image: postgres:13.8-bullseye
-    container_name: 'manager_db'
+    container_name: manager_db
+    restart: unless-stopped
     env_file:
-      - 'manager/.env'
+      - manager/.env
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    networks:
+      - control
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 10s
       timeout: 10s
       retries: 5
-    restart: always
-    networks:
-      - control
 
   manager_mq:
     build: manager_mq
-    container_name: 'manager_mq'
+    container_name: manager_mq
+    restart: unless-stopped
     volumes:
       - ./manager_mq/enabled_plugins:/etc/rabbitmq/enabled_plugins
+    networks:
+      - control
     healthcheck:
       test: ["CMD-SHELL", "rabbitmq-diagnostics -q ping"]
       interval: 10s
       timeout: 10s
       retries: 5
-    restart: always
-    networks:
-      - control
 
   manager_mongodb:
     build: manager_mongodb
-    container_name: 'manager_mongodb'
+    container_name: manager_mongodb
+    restart: unless-stopped
     env_file:
-      - 'manager/.env'
+      - manager/.env
+    volumes:
+      - mongo_data:/data/db
     networks:
       - control
     healthcheck:
@@ -67,13 +70,19 @@ services:
       interval: 10s
       timeout: 10s
       retries: 5
-    restart: always
 
   manager_graphdb:
-    image: neo4j:4.4-community
-    container_name: 'manager_graphdb'
+    build: manager_graphdb 
+    container_name: manager_graphdb
+    restart: unless-stopped
+    environment:
+      - apoc.export.file.enabled=true
+      - apoc.import.file.enabled=true
+      - apoc.import.file.use_neo4j_config=false
     env_file:
-      - 'manager/.env'
+      - manager/.env
+    volumes:
+      - neo_data:/var/lib/neo4j/data
     ports:
       - "7474:7474"  # Neo4j web GUI
       - "7687:7687"  # Neo4j API port (needed for web GUI)
@@ -84,7 +93,11 @@ services:
       interval: 10s
       timeout: 10s
       retries: 5
-    restart: always
+
+volumes:
+  mongo_data:
+  pg_data:
+  neo_data:
 
 networks:
   bridge:
