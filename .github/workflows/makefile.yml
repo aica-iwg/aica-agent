@@ -27,10 +27,6 @@ jobs:
     - name: Build Containers 
       run:  make build
 
-    - name: Dump docker logs on failure
-      if: failure()
-      uses: jwalton/gh-docker-logs@v2
-    
     - name: Run tests
       run:  make test
 
