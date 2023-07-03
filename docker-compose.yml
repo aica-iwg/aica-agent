@@ -92,7 +92,7 @@ services:
       test: [ "CMD-SHELL", "wget http://localhost:7474/" ]
       interval: 10s
       timeout: 10s
-      retries: 5
+      retries: 10 
 
 volumes:
   mongo_data:
