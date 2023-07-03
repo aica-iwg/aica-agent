@@ -9,7 +9,7 @@ env:
   ENV_FILE: ${{ secrets.ENV_FILE }}
 
 jobs:
-  build:
+  BuildAndTest:
 
     runs-on: ubuntu-latest
 
@@ -21,5 +21,15 @@ jobs:
         auto-update-conda: true
         python-version: ${{ matrix.python-version }}
       
+    - name: Set up environment 
+      run:  echo $ENV_FILE | base64 --decode > manager/.env && make deps
+    
+    - name: Build Containers 
+      run:  make build
+
     - name: Run tests
-      run:  echo $ENV_FILE | base64 --decode > manager/.env && make deps && make build && make test
+      run:  make test
+
+    - name: Dump docker logs on failure
+      if: failure()
+      uses: jwalton/gh-docker-logs@v2
