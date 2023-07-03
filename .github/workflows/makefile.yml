@@ -9,7 +9,7 @@ env:
   ENV_FILE: ${{ secrets.ENV_FILE }}
 
 jobs:
-  setup:
+  BuildAndTest:
 
     runs-on: ubuntu-latest
 
