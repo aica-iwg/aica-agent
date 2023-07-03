@@ -24,23 +24,11 @@ jobs:
     - name: Set up environment 
       run:  echo $ENV_FILE | base64 --decode > manager/.env && make deps
 
-    - name: Upload env file for subsequent stages 
-      uses: actions/upload-artifact@v3
-      with:
-        name: env-file 
-        path: manager/.env 
-        retention-days: 1 
-
   build:
     needs: setup
     runs-on: ubuntu-latest
 
     steps:
-    - name: Download env file 
-      uses: actions/download-artifact@v3
-      with:
-        name: env-file 
-
     - uses: actions/checkout@v3
 
     - uses: conda-incubator/setup-miniconda@v2
@@ -49,7 +37,7 @@ jobs:
         python-version: ${{ matrix.python-version }}
     
     - name: Build Containers 
-      run:  make build
+      run:  echo $ENV_FILE | base64 --decode > manager/.env && make build
 
     - name: Dump docker logs on failure
       if: failure()
@@ -67,11 +55,6 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Download env file 
-      uses: actions/download-artifact@v3
-      with:
-        name: env-file 
-    
     - name: Download Conda Environment 
       uses: actions/download-artifact@v3
       with:
@@ -85,7 +68,7 @@ jobs:
         python-version: ${{ matrix.python-version }}
       
     - name: Run tests
-      run:  make test
+      run:  echo $ENV_FILE | base64 --decode > manager/.env && make test
 
     - name: Dump docker logs on failure
       if: failure()
