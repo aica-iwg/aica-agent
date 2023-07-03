@@ -37,6 +37,10 @@ jobs:
       
     - name: Build Containers 
       run:  echo $ENV_FILE | base64 --decode > manager/.env && make build
+    - name: Dump docker logs on failure
+      if: failure()
+      uses: jwalton/gh-docker-logs@v2
+
   test:
     needs: build
     runs-on: ubuntu-latest
@@ -51,3 +55,7 @@ jobs:
       
     - name: Run tests
       run:  echo $ENV_FILE | base64 --decode > manager/.env && make test
+
+    - name: Dump docker logs on failure
+      if: failure()
+      uses: jwalton/gh-docker-logs@v2
