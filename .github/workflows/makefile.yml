@@ -23,29 +23,60 @@ jobs:
       
     - name: Set up environment 
       run:  echo $ENV_FILE | base64 --decode > manager/.env && make deps
+
+    - name: Upload env file for subsequent stages 
+      uses: actions/upload-artifact@v3
+      with:
+        name: env-file 
+        path: manager/.env 
+        retention-days: 1 
+
   build:
     needs: setup
     runs-on: ubuntu-latest
 
     steps:
+    - name: Download env file 
+      uses: actions/download-artifact@v3
+      with:
+        name: env-file 
+
     - uses: actions/checkout@v3
 
     - uses: conda-incubator/setup-miniconda@v2
       with:
         auto-update-conda: true
         python-version: ${{ matrix.python-version }}
-      
+    
     - name: Build Containers 
-      run:  echo $ENV_FILE | base64 --decode > manager/.env && make build
+      run:  make build
+
     - name: Dump docker logs on failure
       if: failure()
       uses: jwalton/gh-docker-logs@v2
+    
+    - name: Upload Conda Environment 
+      uses: actions/upload-artifact@v3
+      with:
+        name: conda-env
+        path: /usr/share/miniconda/envs/aica 
+        retention-days: 1 
 
   test:
     needs: build
     runs-on: ubuntu-latest
 
     steps:
+    - name: Download env file 
+      uses: actions/download-artifact@v3
+      with:
+        name: env-file 
+    
+    - name: Download Conda Environment 
+      uses: actions/download-artifact@v3
+      with:
+        name: conda-env 
+
     - uses: actions/checkout@v3
 
     - uses: conda-incubator/setup-miniconda@v2
@@ -54,7 +85,7 @@ jobs:
         python-version: ${{ matrix.python-version }}
       
     - name: Run tests
-      run:  echo $ENV_FILE | base64 --decode > manager/.env && make test
+      run:  make test
 
     - name: Dump docker logs on failure
       if: failure()
