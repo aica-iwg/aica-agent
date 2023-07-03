@@ -23,6 +23,13 @@ jobs:
       
     - name: Set up environment 
       run:  echo $ENV_FILE | base64 --decode > manager/.env && make deps
+    
+    - name: Upload Conda Environment 
+      uses: actions/upload-artifact@v3
+      with:
+        name: conda-env
+        path: /usr/share/miniconda/envs/aica 
+        retention-days: 1 
 
   build:
     needs: setup
@@ -36,6 +43,11 @@ jobs:
         auto-update-conda: true
         python-version: ${{ matrix.python-version }}
     
+    - name: Download Conda Environment 
+      uses: actions/download-artifact@v3
+      with:
+        name: conda-env 
+    
     - name: Build Containers 
       run:  echo $ENV_FILE | base64 --decode > manager/.env && make build
 
@@ -43,13 +55,6 @@ jobs:
       if: failure()
       uses: jwalton/gh-docker-logs@v2
     
-    - name: Upload Conda Environment 
-      uses: actions/upload-artifact@v3
-      with:
-        name: conda-env
-        path: /usr/share/miniconda/envs/aica 
-        retention-days: 1 
-
   test:
     needs: build
     runs-on: ubuntu-latest
