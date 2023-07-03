@@ -24,7 +24,7 @@ jobs:
     - name: Set up environment 
       run:  echo $ENV_FILE | base64 --decode > manager/.env && make deps
   build:
-
+    needs: setup
     runs-on: ubuntu-latest
 
     steps:
@@ -38,7 +38,7 @@ jobs:
     - name: Build Containers 
       run:  make build
   test:
-
+    needs: build
     runs-on: ubuntu-latest
 
     steps:
