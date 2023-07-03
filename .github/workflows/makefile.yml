@@ -9,6 +9,20 @@ env:
   ENV_FILE: ${{ secrets.ENV_FILE }}
 
 jobs:
+  setup:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - uses: conda-incubator/setup-miniconda@v2
+      with:
+        auto-update-conda: true
+        python-version: ${{ matrix.python-version }}
+      
+    - name: Set up environment 
+      run:  echo $ENV_FILE | base64 --decode > manager/.env && make deps
   build:
 
     runs-on: ubuntu-latest
@@ -21,5 +35,19 @@ jobs:
         auto-update-conda: true
         python-version: ${{ matrix.python-version }}
       
+    - name: Build Containers 
+      run:  make build
+  test:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - uses: conda-incubator/setup-miniconda@v2
+      with:
+        auto-update-conda: true
+        python-version: ${{ matrix.python-version }}
+      
     - name: Run tests
-      run:  echo $ENV_FILE | base64 --decode > manager/.env && make deps && make build && make test
+      run:  make test
