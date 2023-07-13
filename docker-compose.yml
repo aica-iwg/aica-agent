@@ -45,6 +45,8 @@ services:
     build: manager_mq
     container_name: manager_mq
     restart: unless-stopped
+    env_file:
+      - manager/.env
     volumes:
       - ./manager_mq/enabled_plugins:/etc/rabbitmq/enabled_plugins
     networks:
