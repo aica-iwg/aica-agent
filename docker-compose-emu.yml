@@ -42,6 +42,8 @@ services:
       interval: 10s
       timeout: 10s
       retries: 5
+    ports:
+      - "80:80"
 
   node_red_target:
     build: node_red_target
@@ -77,7 +79,7 @@ services:
       - node.name=elasticsearch
       - cluster.name=aica
       - discovery.type=single-node
-      - ELASTIC_PASSWORD=aicaelastic
+      - ELASTIC_PASSWORD=passwordpassword123
       - xpack.security.enabled=true
       - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
     ulimits:
@@ -90,7 +92,7 @@ services:
           memory: 1g
     healthcheck:
       test: ["CMD-SHELL",
-              "curl --insecure -u elastic:aicaelastic -s -X GET 'http://localhost:9200/_cluster/health?pretty' 
+              "curl --insecure -u elastic:passwordpassword123 -s -X GET 'http://localhost:9200/_cluster/health?pretty' 
               | grep '\"status\" : \"green\"'"]
       interval: 10s
       timeout: 30s

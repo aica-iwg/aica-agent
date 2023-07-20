@@ -1,0 +1,21 @@
+{
+	order coraza_waf first
+	log default {
+		output file /var/log/juice/alerts.log
+		format json
+	}
+}
+
+:81 {
+	coraza_waf {
+		include /coraza/sites/localhost/*.conf
+		include /coraza/coreruleset/rules/*.conf
+		include /coraza/coraza.conf
+	}
+	log {
+		output file /var/log/juice/juiceshop-access.log
+		format json
+	}
+	reverse_proxy localhost:3000 {
+	}
+}
