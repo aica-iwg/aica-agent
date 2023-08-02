@@ -17,12 +17,14 @@ class TestAntiVirus(TestCase):
         self.graph = AicaNeo4j()
 
     def test010_parse_clamav_found_alert(self):
-        fake_alert = (
-            "943acdb73f35 clamav: Wed Oct 26 07:20:48 2022 -> /root/quarantine/eica.com.txt: "
-            "Eicar-Test-Signature(44d88612fea8a8f36de82e1278abb02f:68) FOUND"
-        )
+        fake_alert = {
+            "message": "943acdb73f35 clamav: Wed Oct 26 07:20:48 2022 -> /root/quarantine/eica.com.txt: "
+            "Eicar-Test-Signature(44d88612fea8a8f36de82e1278abb02f:68) FOUND",
+            "source_ip": "127.0.0.1",
+        }
         parsed_alert = parse_clamav_alert(fake_alert)
         self.assertEqual(parsed_alert["hostname"], "943acdb73f35")
+        self.assertEqual(parsed_alert["source_ip"], "127.0.0.1")
         self.assertEqual(parsed_alert["date"], "Wed Oct 26 07:20:48 2022")
         self.assertEqual(parsed_alert["path"], "/root/quarantine/eica.com.txt")
         self.assertEqual(parsed_alert["platform"], "Eicar")
@@ -32,7 +34,10 @@ class TestAntiVirus(TestCase):
         self.assertEqual(parsed_alert["revision"], "68")
 
     def test020_parse_clamav_non_alert(self):
-        fake_alert = "943acdb73f35 clamav: Wed Oct 26 07:20:28 2022 -> Limits: PCRERecMatchLimit limit set to 2000."
+        fake_alert = {
+            "message": "943acdb73f35 clamav: Wed Oct 26 07:20:28 2022 -> Limits: PCRERecMatchLimit limit set to 2000.",
+            "source_ip": "127.0.0.1",
+        }
         try:
             parse_clamav_alert(fake_alert)
             self.fail()
@@ -41,12 +46,25 @@ class TestAntiVirus(TestCase):
                 self.fail()
 
     def test030_parse_clamav_bad_alert(self):
-        fake_alert = "this is not a real alert"
+        fake_alert = {"message": "this is not a real alert", "source_ip": "127.0.0.1"}
         try:
             parse_clamav_alert(fake_alert)
             self.fail()
         except ValueError as e:
             if str(e) != "Invalid ClamAV line encountered":
+                self.fail()
+
+    def test035_parse_clamav_bad_alert_ip(self):
+        fake_alert = {
+            "message": "943acdb73f35 clamav: Wed Oct 26 07:20:48 2022 -> /root/quarantine/eica.com.txt: "
+            "Eicar-Test-Signature(44d88612fea8a8f36de82e1278abb02f:68) FOUND",
+            "source_ip": "abcd",
+        }
+        try:
+            parse_clamav_alert(fake_alert)
+            self.fail()
+        except ValueError as e:
+            if str(e) != "Invalid IP address given for antivirus alert":
                 self.fail()
 
     def test040_poll_clamav_no_alert(self):

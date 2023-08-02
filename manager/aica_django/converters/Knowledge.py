@@ -46,7 +46,7 @@ from celery.utils.log import get_task_logger
 logger = get_task_logger(__name__)
 
 
-def dissect_time(timestamp: float, prefix: str = "") -> Dict[str, Any]:
+def dissect_time(timestamp: Union[int, float], prefix: str = "") -> Dict[str, Any]:
     """
     Converts a timestamp into a dictionary of timestamp attributes potentially relevant
     for classification.
@@ -764,76 +764,59 @@ def nginx_accesslog_to_knowledge(
 
     if not request_time:
         raise ValueError(f"Couldn't parse timestamp {log_dict['dateandtime']}")
-    else:
-        dissected_request_time = dissect_time(
-            request_time.timestamp(), prefix="last_seen"
-        )
 
-    request_timestamp = int(request_time.timestamp())
-    my_hostname = socket.gethostname()
+    dissected_request_time = dissect_time(request_time.timestamp(), prefix="last_seen")
+    target_ip = log_dict["server_ip"]
+
+    server_ip_knowledge = None
     try:
-        my_ipv4 = IPv4Address(socket.gethostbyname(my_hostname))
-        my_ipv4_knowledge = my_ipv4.to_knowledge_node()
-        knowledge_nodes.append(my_ipv4_knowledge)
+        server_ipv4 = IPv4Address(target_ip)
+        server_ipv4_knowledge = server_ipv4.to_knowledge_node()
+        server_ip_knowledge = server_ipv4_knowledge
+        knowledge_nodes.append(server_ipv4_knowledge)
     except:
         pass
 
-    try:
-        my_ipv6 = IPv6Address(
-            socket.getaddrinfo(my_hostname, None, socket.AF_INET6)[0][4][0]
-        )
-        my_ipv6_knowledge = my_ipv6.to_knowledge_node()
-        knowledge_nodes.append(my_ipv6_knowledge)
-    except:
-        pass
+    if not server_ip_knowledge:
+        try:
+            server_ipv6 = IPv6Address(target_ip)
+            server_ipv6_knowledge = server_ipv6.to_knowledge_node()
+            server_ip_knowledge = server_ipv6_knowledge
+            knowledge_nodes.append(server_ipv6_knowledge)
+        except:
+            raise ValueError("Could not parse server IP address")
 
     # Add requesting host
     value_dict = dissected_request_time
     requesting_host = Host(
         log_dict["src_ip"],
-        last_seen=request_timestamp,
+        last_seen=request_time.timestamp(),
         values=value_dict,
     )
+
     requesting_host_knowledge = requesting_host.to_knowledge_node()
     knowledge_nodes.append(requesting_host_knowledge)
 
-    # Add target NIC to target host
-    nic_knowledge = KnowledgeNode(
-        label="NetworkInterface",
-        name=str(
-            uuid.uuid4()
-        ),  # This results in hundreds of NIC's per host, does not make sense.
-        values=value_dict,
-    )
-    knowledge_nodes.append(nic_knowledge)
-    knowledge_relations.append(
-        KnowledgeRelation(
-            label="COMPONENT_OF",
-            source_node=nic_knowledge,
-            target_node=requesting_host_knowledge,
-        )
-    )
-
     if type(ipaddress.ip_address(log_dict["src_ip"])) is ipaddress.IPv4Address:
-        ip_addr_knowledge = IPv4Address(log_dict["src_ip"]).to_knowledge_node()
+        src_ip_addr_knowledge = IPv4Address(log_dict["src_ip"]).to_knowledge_node()
     elif type(ipaddress.ip_address(log_dict["src_ip"])) is ipaddress.IPv6Address:
-        ip_addr_knowledge = IPv6Address(log_dict["src_ip"]).to_knowledge_node()
+        src_ip_addr_knowledge = IPv6Address(log_dict["src_ip"]).to_knowledge_node()
     else:
         raise Exception(
             f"Unhandled address type: {type(ipaddress.ip_address(log_dict['src_ip'])) }"
         )
 
-    knowledge_nodes.append(ip_addr_knowledge)
+    knowledge_nodes.append(src_ip_addr_knowledge)
     knowledge_relations.append(
         KnowledgeRelation(
             label="HAS_ADDRESS",
-            source_node=nic_knowledge,
-            target_node=ip_addr_knowledge,
+            source_node=requesting_host_knowledge,
+            target_node=src_ip_addr_knowledge,
         )
     )
 
     value_dict = dissected_request_time
-    value_dict["request_time"] = request_time
+    value_dict["request_time"] = request_time.timestamp()
     value_dict["method"] = log_dict["method"]
     value_dict["url"] = log_dict["url"]
     value_dict["response_status"] = log_dict["statuscode"]
@@ -851,7 +834,7 @@ def nginx_accesslog_to_knowledge(
     knowledge_relations.append(
         KnowledgeRelation(
             label="COMMUNICATES_TO",
-            source_node=ip_addr_knowledge,
+            source_node=src_ip_addr_knowledge,
             target_node=http_request_knowledge,
         )
     )
@@ -859,7 +842,7 @@ def nginx_accesslog_to_knowledge(
         KnowledgeRelation(
             label="COMMUNICATES_TO",
             source_node=http_request_knowledge,
-            target_node=ip_addr_knowledge,
+            target_node=server_ip_knowledge,
         )
     )
 
@@ -1063,22 +1046,7 @@ def nmap_scan_to_knowledge(
         target_host_knowledge = target_host.to_knowledge_node()
         knowledge_nodes.append(target_host_knowledge)
 
-        # Add target NIC to target host
-        nic_knowledge = KnowledgeNode(
-            label="NetworkInterface",
-            name=str(uuid.uuid4()),
-            values={"last_seen": scan_time.timestamp()},
-        )
-        knowledge_nodes.append(nic_knowledge)
-        knowledge_relations.append(
-            KnowledgeRelation(
-                label="COMPONENT_OF",
-                source_node=nic_knowledge,
-                target_node=target_host_knowledge,
-            )
-        )
-
-        # Add target IPv4 to NIC
+        # Add target IPv4 to host
         if type(ipaddress.ip_address(host)) is ipaddress.IPv4Address:
             ip_addr = IPv4Address(host).to_knowledge_node()
             ip_addr_knowledge = ip_addr
@@ -1093,7 +1061,7 @@ def nmap_scan_to_knowledge(
         knowledge_relations.append(
             KnowledgeRelation(
                 label="HAS_ADDRESS",
-                source_node=nic_knowledge,
+                source_node=target_host_knowledge,
                 target_node=ip_addr_knowledge,
             )
         )
@@ -1111,13 +1079,12 @@ def nmap_scan_to_knowledge(
             knowledge_relations.append(
                 KnowledgeRelation(
                     label="HAS_ADDRESS",
-                    source_node=nic_knowledge,
+                    source_node=target_host_knowledge,
                     target_node=mac_addr_knowledge,
                 )
             )
 
             if "vendor" in scan_results[host]["macaddress"]:
-                # Add firmware to NIC
                 nic_manufacturer_knowledge = KnowledgeNode(
                     label="Vendor",
                     name=f"{scan_results[host]['macaddress']['vendor']}",
@@ -1130,7 +1097,7 @@ def nmap_scan_to_knowledge(
                     KnowledgeRelation(
                         label="MANUFACTURES",
                         source_node=nic_manufacturer_knowledge,
-                        target_node=nic_knowledge,
+                        target_node=mac_addr_knowledge,
                     )
                 )
 
@@ -1510,9 +1477,9 @@ def antivirus_alert_to_knowledge(
     )
     nodes.append(path_knowledge)
 
-    hostname = Host(alert["hostname"], last_seen=datetime.datetime.now().timestamp())
-    hostname_knowledge = hostname.to_knowledge_node()
-    nodes.append(hostname_knowledge)
+    host = Host(alert["source_ip"], last_seen=datetime.datetime.now().timestamp())
+    host_knowledge = host.to_knowledge_node()
+    nodes.append(host_knowledge)
 
     relations.append(
         KnowledgeRelation(
@@ -1526,7 +1493,7 @@ def antivirus_alert_to_knowledge(
         KnowledgeRelation(
             label="STORED_ON",
             source_node=path_knowledge,
-            target_node=hostname_knowledge,
+            target_node=host_knowledge,
         )
     )
 
@@ -1788,9 +1755,9 @@ def knowledge_to_neo(
     @rtype: bool
     """
 
-    neo_host = str(os.getenv("NEO4J_HOST"))
-    neo_user = str(os.getenv("NEO4J_USER"))
-    neo_password = str(os.getenv("NEO4J_PASSWORD"))
+    neo_host = str(os.getenv("N4J_HOST"))
+    neo_user = str(os.getenv("N4J_USER"))
+    neo_password = str(os.getenv("N4J_PASSWORD"))
 
     graph = AicaNeo4j()
 

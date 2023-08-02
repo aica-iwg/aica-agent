@@ -72,21 +72,21 @@ class AicaNeo4j:
         """
         Initialize a new AiceNeo4j object.
 
-        @param host: The Neo4j host, read from environment variable NEO4J_SERVER if not provided
+        @param host: The Neo4j host, read from environment variable N4J_SERVER if not provided
         @type host: str
-        @param user: The Neo4j user, read from environment variable NEO4J_USER if not provided
+        @param user: The Neo4j user, read from environment variable N4J_USER if not provided
         @type user: str
-        @param password: The Neo4j user password, read from environment variable NEO4J_PASS if not provided
+        @param password: The Neo4j user password, read from environment variable N4J_PASS if not provided
         @type password: str
-        @param port: The Neo4j server port, read from environment variable NEO4J_PORT or defaults to 7687
+        @param port: The Neo4j server port, read from environment variable N4J_PORT or defaults to 7687
         @type port: int
         """
 
-        host = host if host != "" else quote_plus(str(os.getenv("NEO4J_HOST")))
-        port = port if port >= 0 else int(quote_plus(str(os.getenv("NEO4J_PORT"))))
-        user = user if user != "" else quote_plus(str(os.getenv("NEO4J_USER")))
+        host = host if host != "" else quote_plus(str(os.getenv("N4J_HOST")))
+        port = port if port >= 0 else int(quote_plus(str(os.getenv("N4J_PORT"))))
+        user = user if user != "" else quote_plus(str(os.getenv("N4J_USER")))
         password = (
-            password if password != "" else quote_plus(str(os.getenv("NEO4J_PASSWORD")))
+            password if password != "" else quote_plus(str(os.getenv("N4J_PASSWORD")))
         )
         uri = f"bolt://{host}:{port}"
 

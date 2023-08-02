@@ -7,6 +7,7 @@ Functions:
 """
 
 import datetime
+import ipaddress
 import json
 import logging
 import re
@@ -29,34 +30,41 @@ clam_parser = re.compile(
 
 
 # ClamAV logs are not in json, so we need to format them into something like that
-def parse_clamav_alert(line: str) -> Dict[str, Any]:
+def parse_clamav_alert(alert: Dict[str, Any]) -> Dict[str, Any]:
     """
     Extract fields from ClamAV "FOUND" alert into a dictionary.
 
-    @param line: The log event to parse
-    @type line: str
+    @param message: The log event to parse
+    @type message: str
     @return: The extracted fields as a dictionary
     @rtype: dict or bool
-    @raise: ValueError: if the FOUND line cannot be parsed
+    @raise: ValueError: if the FOUND message cannot be parsed
     """
-    event_dict: Dict[str, Any] = dict()
+    alert_dict: Dict[str, Any] = dict()
 
-    if "FOUND" in line:
-        event_dict["event_type"] = "alert"
-        matcher = clam_parser.fullmatch(line)
+    try:
+        ipaddress.ip_address(alert["source_ip"])
+    except ValueError:
+        raise ValueError("Invalid IP address given for antivirus alert")
+
+    if "FOUND" in alert["message"]:
+        alert_dict["event_type"] = "alert"
+
+        alert_dict["source_ip"] = alert["source_ip"]
+        matcher = clam_parser.fullmatch(alert["message"])
         if matcher is None:
             raise ValueError("Invalid ClamAV line encountered")
 
-        event_dict["hostname"] = matcher.group(1)
-        event_dict["date"] = matcher.group(2)
-        event_dict["path"] = matcher.group(3)
-        event_dict["platform"] = matcher.group(4)
-        event_dict["category"] = matcher.group(5)
-        event_dict["name"] = matcher.group(6)
-        event_dict["signature"] = matcher.group(7)
-        event_dict["revision"] = matcher.group(8)
+        alert_dict["hostname"] = matcher.group(1)
+        alert_dict["date"] = matcher.group(2)
+        alert_dict["path"] = matcher.group(3)
+        alert_dict["platform"] = matcher.group(4)
+        alert_dict["category"] = matcher.group(5)
+        alert_dict["name"] = matcher.group(6)
+        alert_dict["signature"] = matcher.group(7)
+        alert_dict["revision"] = matcher.group(8)
 
-        return event_dict
+        return alert_dict
 
     else:
         raise ValueError("Invalid ClamAV line encountered")
@@ -85,7 +93,7 @@ def poll_clamav_alerts(frequency: int = 30, single: bool = False) -> None:
             "query": r"clamav\: AND FOUND",  # Required
             "from": from_time.strftime("%Y-%m-%d %H:%M:%S"),  # Required
             "to": to_time.strftime("%Y-%m-%d %H:%M:%S"),  # Required
-            "fields": ["message"],  # Required
+            "fields": "message, gl2_remote_ip",  # Required
             "limit": 150,  # Optional: Default limit is 150 in Graylog
         }
 
@@ -95,7 +103,10 @@ def poll_clamav_alerts(frequency: int = 30, single: bool = False) -> None:
             response.raise_for_status()
             if response.json()["total_results"] > 0:
                 for message in response.json()["messages"]:
-                    event = message["message"]["message"]
+                    event = {
+                        "message": message["message"]["message"],
+                        "source_ip": message["message"]["gl2_remote_ip"],
+                    }
                     alert_dict = parse_clamav_alert(event)
                     if alert_dict:
                         alert_dict = json.loads(json.dumps(alert_dict))
