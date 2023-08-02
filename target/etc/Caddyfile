@@ -13,7 +13,7 @@
 		include /coraza/coraza.conf
 	}
 	log {
-		output file /var/log/juice/juiceshop-access.log
+		output file /var/log/juice/combined-access.log
 		format json
 	}
 	reverse_proxy localhost:3000 {

@@ -18,19 +18,9 @@ headers = {
     'Sec-Fetch-Site': 'same-origin',
 }
 
-def test_b2b_xxe():
-    login = {
-        'email': 'admin@juice-sh.op',
-        'password': 'admin123'
-    }
+# https://pwning.owasp-juice.shop/appendix/solutions.html#perform-a-dom-xss-attack
+def test_dom_xss():
+    res = r.get(f"{config.JUICE_URL}")
 
-    res = r.post(f'{config.JUICE_URL}/rest/user/login', headers=headers, json=login)
-    token = json.loads(res.text.strip())['authentication']['token']
-
-    admin_headers = headers
-    admin_headers['Authorization'] = f'Bearer {token}'
-    admin_headers['Cookie'] = f'token={token}'
-    time.sleep(random.random() + random.randint(2,4))
-
-    
-
+def test_reflected_xss():
+    pass
