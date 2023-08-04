@@ -9,7 +9,7 @@ headers = {
     'Accept': 'application/json, text/plain, */*',
     'Accept-Language': 'en-US,en;q=0.5',
     'Accept-Encoding': 'gzip, deflate, br',
-    'Content-Type': 'application/json',
+    #'Content-Type': 'application/json',
     'Origin': f'{config.JUICE_URL}/',
     'Connection': 'keep-alive',
     'Referer': f'{config.JUICE_URL}/',
@@ -18,7 +18,7 @@ headers = {
     'Sec-Fetch-Site': 'same-origin',
 }
 
-def test_open_redirect_path_traversal():
+def test_path_traversal():
     res = r.get(f"{config.JUICE_URL}/redirect?to=https://github.com/juice-shop/juice-shop")
     time.sleep(random.random() + random.randint(3,5))
 

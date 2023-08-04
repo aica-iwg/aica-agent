@@ -9,7 +9,7 @@ headers = {
     'Accept': 'application/json, text/plain, */*',
     'Accept-Language': 'en-US,en;q=0.5',
     'Accept-Encoding': 'gzip, deflate, br',
-    'Content-Type': 'application/json',
+    #'Content-Type': 'application/json',
     'Origin': f'{config.JUICE_URL}/',
     'Connection': 'keep-alive',
     'Referer': f'{config.JUICE_URL}/',

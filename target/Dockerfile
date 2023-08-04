@@ -38,7 +38,7 @@ RUN mkdir -p /coraza/coreruleset && mkdir -p /coraza/sites/localhost && \
     cp /coraza/coreruleset/crs-setup.conf.example /coraza/sites/localhost/1_crs_setup.conf
 COPY etc/Caddyfile /coraza/Caddyfile
 COPY etc/coraza/coraza.conf /coraza/coraza.conf
-COPY ./caddy-upx /usr/bin/caddy
+COPY ./caddy /usr/bin/caddy
 
 RUN chmod 700 /usr/bin/caddy && mkdir -p /var/log/caddy && \ 
     git clone https://github.com/juice-shop/juice-shop.git --depth 1 && \
