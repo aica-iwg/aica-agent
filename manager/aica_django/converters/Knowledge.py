@@ -951,7 +951,12 @@ def caddy_accesslog_to_knowledge(
     except KeyError:
         value_dict["referer"] = "null" # TODO: change this to better data
 
-    value_dict["user_agent"] = log_dict["request"]["User-Agent"]
+    try:
+        value_dict["unique_id"] = log_dict["id"]
+    except KeyError:
+        value_dict["unique_id"] = "null" # TODO: change this to better data
+
+    value_dict["user_agent"] = log_dict["request"]["headers"]["User-Agent"]
 
     http_request_knowledge = KnowledgeNode(
         label="HttpRequest",
@@ -1514,26 +1519,17 @@ def waf_alert_to_knowledge(
     @rtype: Tuple[list, list]
     """
 
-    """
-    Converts a Suricata alert (as returned from aica_django.connectors.Suricata.poll_suricata_alerts)
-    to knowledge objects.
-
-    @param alert: A dictionary as returned by poll_suricata_alerts to be converted to knowledge objects
-    @type alert: Dict[str, Any]
-    @return: Knowledge nodes and relations resulting form this conversion
-    @rtype: Tuple[list, list]
-    """
-
     knowledge_nodes = []
     knowledge_relations = []
 
-    alert_dt: Optional[datetime.datetime] = dateparser.parse(alert["timestamp"])
+    # alert_dt: Optional[datetime.datetime] = dateparser.parse(alert["timestamp"])
+    alert_dt = float(alert["ts"])
     assert alert_dt is not None
 
-    dissected_time_tripped = dissect_time(alert_dt.timestamp(), prefix="time_tripped")
+    dissected_time_tripped = dissect_time(alert_dt, prefix="time_tripped")
     value_dict: Dict[str, Any] = dissected_time_tripped
-    value_dict["time_tripped"] = alert_dt.timestamp()
-    value_dict["flow_id"] = alert["flow_id"]
+    value_dict["time_tripped"] = alert_dt
+    value_dict["unique_id"] = alert["unique_id"]
 
     alert_knowledge = KnowledgeNode(
         label="Alert",
@@ -1543,13 +1539,12 @@ def waf_alert_to_knowledge(
     knowledge_nodes.append(alert_knowledge)
     alert_sig_knowledge = KnowledgeNode(
         label="AttackSignature",
-        name=f"Suricata {alert['alert']['gid']}: {alert['alert']['signature_id']}",
+        name=f"OWASP CRS {alert['id']}",
         values={
-            "gid": alert["alert"]["gid"],
-            "signature_id": alert["alert"]["signature_id"],
-            "rev": alert["alert"]["rev"],
-            "signature": alert["alert"]["signature"],
-            "severity": alert["alert"]["severity"],
+            "rule_id": alert["alert"]["id"],
+            "rev": alert["rev"],
+            "data": alert["data"],
+            "severity": alert["severity"],
         },
     )
     knowledge_nodes.append(alert_sig_knowledge)
@@ -1562,182 +1557,54 @@ def waf_alert_to_knowledge(
         )
     )
 
-    if alert["alert"]["category"] == "":
-        raise ValueError(f"Name must be non-empty|alert:" + str(alert))
-    alert_cat_knowledge = KnowledgeNode(
-        label="AttackSignatureCategory",
-        name=alert["alert"]["category"],
-        values={
-            "category": alert["alert"]["category"],
-        },
-    )
-    knowledge_nodes.append(alert_cat_knowledge)
-    knowledge_relations.append(
-        KnowledgeRelation(
-            label="MEMBER_OF",
-            source_node=alert_sig_knowledge,
-            target_node=alert_cat_knowledge,
+    for tag in alert["tags"]:
+        alert_cat_knowledge = KnowledgeNode(
+            label="AttackSignatureCategory",
+            name=tag,
+            values={
+                "tag": tag,
+            },
         )
-    )
+        knowledge_nodes.append(alert_cat_knowledge)
+        knowledge_relations.append(
+            KnowledgeRelation(
+                label="MEMBER_OF",
+                source_node=alert_sig_knowledge,
+                target_node=alert_cat_knowledge,
+            )
+        )
 
-    dissected_time = dissect_time(alert_dt.timestamp())
-    source_host = Host(
-        alert["src_ip"],
-        last_seen=alert_dt.timestamp(),
-        values=dissected_time,
-    )
-    source_host_knowledge = source_host.to_knowledge_node()
-    knowledge_nodes.append(source_host_knowledge)
+    # Make Cypher query and return node that contains the correct unique ID
+    graph = AicaNeo4j()
+    req_id = alert["unique_id"] # leaving this here because format strings
+    nodes = list(graph.run(f'MATCH (n:HttpRequest) WHERE n.unique_id = "{req_id}" RETURN n'))
 
-    if type(ipaddress.ip_address(alert["src_ip"])) is ipaddress.IPv4Address:
-        source_ip = IPv4Address(alert["src_ip"]).to_knowledge_node()
-    elif type(ipaddress.ip_address(alert["src_ip"])) is ipaddress.IPv6Address:
-        source_ip = IPv6Address(alert["src_ip"]).to_knowledge_node()
+    if len(nodes) > 0:
+        source_http_req = nodes[0]
+        # DO NOT APPEND THIS TO THE NODES LIST
+        source_http_knowledge = KnowledgeNode(
+            label="HttpRequest",
+            name=source_http_req['id']
+        )
+        knowledge_relations.append(
+            KnowledgeRelation(
+                label="TRIGGERED_BY",
+                source_node=source_http_knowledge,
+                target_node=alert_knowledge
+            )            
+        )
+
     else:
-        raise ValueError(
-            f"Unsupported src_ip type {type(ipaddress.ip_address(alert['src_ip'])) } for {alert['src_ip']}"
+        source_host = Host(alert["client"], last_seen=alert_dt)
+        knowledge_nodes.append(source_host.to_knowledge_node())
+        knowledge_relations.append(
+            KnowledgeRelation(
+                label="TRIGGERED_BY",
+                source_node=source_host,
+                target_node=alert_knowledge
+            )            
         )
 
-    source_ip_knowledge = source_ip
-    knowledge_nodes.append(source_ip_knowledge)
-    knowledge_relations.append(
-        KnowledgeRelation(
-            label="HAS_ADDRESS",
-            source_node=source_host_knowledge,
-            target_node=source_ip_knowledge,
-        )
-    )
-
-    dest_host = Host(
-        alert["dest_ip"],
-        last_seen=alert_dt.timestamp(),
-    )
-    dest_host_knowledge = dest_host.to_knowledge_node()
-    knowledge_nodes.append(dest_host_knowledge)
-
-    if type(ipaddress.ip_address(alert["dest_ip"])) is ipaddress.IPv4Address:
-        dest_ip = IPv4Address(alert["dest_ip"]).to_knowledge_node()
-    elif type(ipaddress.ip_address(alert["dest_ip"])) is ipaddress.IPv6Address:
-        dest_ip = IPv6Address(alert["dest_ip"]).to_knowledge_node()
-    else:
-        raise ValueError(
-            f"Unsupported dest_ip type {type(ipaddress.ip_address(alert['dest_ip'])) } for {alert['dest_ip']}"
-        )
-
-    dest_ip_knowledge = dest_ip
-    knowledge_nodes.append(dest_ip_knowledge)
-
-    knowledge_relations.append(
-        KnowledgeRelation(
-            label="HAS_ADDRESS",
-            source_node=dest_host_knowledge,
-            target_node=dest_ip_knowledge,
-        )
-    )
-
-    source_port = NetworkEndpoint(
-        alert["src_ip"], alert["src_port"], alert["proto"], endpoint="source"
-    )
-    source_port_ref = source_port.to_network_port_ref()
-    source_port_knowledge = source_port.to_knowledge_node()
-    source_port_ref_knowledge = source_port_ref.to_knowledge_node()
-    knowledge_nodes.append(source_port_knowledge)
-    knowledge_nodes.append(source_port_ref_knowledge)
-
-    knowledge_relations.append(
-        KnowledgeRelation(
-            label="HAS_PORT",
-            source_node=source_ip_knowledge,
-            target_node=source_port_knowledge,
-        )
-    )
-    knowledge_relations.append(
-        KnowledgeRelation(
-            label="IS_TYPE",
-            source_node=source_port_knowledge,
-            target_node=source_port_ref_knowledge,
-        )
-    )
-
-    dest_port = NetworkEndpoint(
-        alert["dest_ip"], alert["dest_port"], alert["proto"], endpoint="dest"
-    )
-    dest_port_ref = dest_port.to_network_port_ref()
-    dest_port_knowledge = dest_port.to_knowledge_node()
-    dest_port_ref_knowledge = dest_port_ref.to_knowledge_node()
-    knowledge_nodes.append(dest_port_knowledge)
-    knowledge_nodes.append(dest_port_ref_knowledge)
-    knowledge_relations.append(
-        KnowledgeRelation(
-            label="HAS_PORT",
-            source_node=dest_ip_knowledge,
-            target_node=dest_port_knowledge,
-        )
-    )
-
-    knowledge_relations.append(
-        KnowledgeRelation(
-            label="IS_TYPE",
-            source_node=dest_port_knowledge,
-            target_node=dest_port_ref_knowledge,
-        )
-    )
-
-    flow_start_dt: Optional[datetime.datetime] = dateparser.parse(
-        alert["flow"]["start"]
-    )
-    assert flow_start_dt is not None
-
-    dissected_start: Dict[str, Any] = dissect_time(
-        flow_start_dt.timestamp(), prefix="start"
-    )
-    value_dict = dissected_start
-    value_dict["source"] = "suricata"
-
-    network_flow = NetworkTraffic(
-        int(alert["flow"]["pkts_toserver"]),
-        int(alert["flow"]["bytes_toserver"]),
-        flow_start_dt.timestamp(),
-        values=value_dict,
-    )
-    network_flow_knowledge = network_flow.to_knowledge_node()
-    knowledge_nodes.append(network_flow_knowledge)
-
-    knowledge_relations.append(
-        KnowledgeRelation(
-            label="HAS_PORT",
-            source_node=source_ip_knowledge,
-            target_node=source_port_knowledge,
-        )
-    )
-    knowledge_relations.append(
-        KnowledgeRelation(
-            label="HAS_PORT",
-            source_node=dest_ip_knowledge,
-            target_node=dest_port_knowledge,
-        )
-    )
-    knowledge_relations.append(
-        KnowledgeRelation(
-            label="COMMUNICATES_TO",
-            source_node=source_port_knowledge,
-            target_node=network_flow_knowledge,
-        )
-    )
-    knowledge_relations.append(
-        KnowledgeRelation(
-            label="COMMUNICATES_TO",
-            source_node=network_flow_knowledge,
-            target_node=dest_port_knowledge,
-        )
-    )
-    knowledge_relations.append(
-        KnowledgeRelation(
-            label="TRIGGERED_BY",
-            source_node=alert_knowledge,
-            target_node=network_flow_knowledge,
-        )
-    )
 
     return knowledge_nodes, knowledge_relations
 

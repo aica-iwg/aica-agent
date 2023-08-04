@@ -175,17 +175,17 @@ def record_nginx_accesslog(log_entry: Dict[str, str]) -> bool:
 
     return knowledge_to_neo(nodes=nodes, relations=relations)
 
-# @shared_task(name="ma-knowledge_base-record_caddy_accesslog")
-# def record_caddy_accesslog(log_entry: Dict[str, str]) -> bool:
-#     """
-#     Convert an HTTP access log entry to Knowledge objects and store in the knowledge graph database.
+@shared_task(name="ma-knowledge_base-record_caddy_accesslog")
+def record_caddy_accesslog(log_entry: Dict[str, str]) -> bool:
+    """
+    Convert an HTTP access log entry to Knowledge objects and store in the knowledge graph database.
 
-#     @param log_entry: The log entry to be recorded.
-#     @type log_entry: dict
-#     @return: Return status of the attempt to add items to graph database.
-#     @rtype: bool
-#     """
-#     logger.info(f"Running {__name__}: record_nginx_accesslog")
-#     nodes, relations = caddy_accesslog_to_knowledge(log_entry)
+    @param log_entry: The log entry to be recorded.
+    @type log_entry: dict
+    @return: Return status of the attempt to add items to graph database.
+    @rtype: bool
+    """
+    logger.info(f"Running {__name__}: record_nginx_accesslog")
+    nodes, relations = caddy_accesslog_to_knowledge(log_entry)
 
-#     return knowledge_to_neo(nodes=nodes, relations=relations)
+    return knowledge_to_neo(nodes=nodes, relations=relations)

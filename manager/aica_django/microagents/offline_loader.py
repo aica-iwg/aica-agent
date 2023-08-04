@@ -245,7 +245,7 @@ def initialize(**kwargs: Dict[Any, Any]) -> bool:
     poll_nginx_accesslogs.apply_async()
 
     # Start polling for Caddy access logs
-    #poll_caddy_accesslogs.apply_async()
+    poll_caddy_accesslogs.apply_async()
 
     # Start polling for IDS alerts in background
     poll_suricata_alerts.apply_async()

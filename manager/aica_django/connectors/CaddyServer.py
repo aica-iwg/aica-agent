@@ -21,14 +21,6 @@ from aica_django.connectors.SIEM import Graylog
 
 logger = get_task_logger(__name__)
 
-# nginx_regex = (
-#     r"(?P<src_ip>\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}) - - "
-#     r"\[(?P<dateandtime>\d{2}\/[A-Za-z]{3}\/\d{4}:\d{2}:\d{2}:\d{2} "
-#     r"(\+|\-)\d{4})\] ((\"(?P<method>(GET|POST)) )(?P<url>.+)"
-#     r"(HTTP\/1\.1\")) (?P<statuscode>\d{3}) (?P<bytes_sent>\d+) "
-#     r"(\"(?P<referer>(\-)|(.+))\") (\"(?P<useragent>[^\"]+)\")"
-# )
-
 
 @shared_task(name="poll-caddy-accesslogs")
 def poll_caddy_accesslogs(frequency: int = 30) -> None:
@@ -49,7 +41,7 @@ def poll_caddy_accesslogs(frequency: int = 30) -> None:
         from_time = to_time - datetime.timedelta(seconds=frequency)
 
         query_params: Dict[str, Union[str, int, List[str]]] = {
-            "query": r"caddy\: AND http.log.access",  # Required
+            "query": r"(caddy\: AND http) OR (caddy\: AND OWASP_CRS)",  # Required
             "from": from_time.strftime("%Y-%m-%d %H:%M:%S"),  # Required
             "to": to_time.strftime("%Y-%m-%d %H:%M:%S"),  # Required
             "fields": ["message"],  # Required
@@ -58,14 +50,42 @@ def poll_caddy_accesslogs(frequency: int = 30) -> None:
 
         response = gl.query_graylog(query_params)
 
+        """
+            TODO: See if it's possible to send data from Caddy's access.log
+            and Coraza's audit.log together to represent one request, instead
+            of having to manage two Graylog entries per HTTP request. This will
+            make everything else way cleaner. (the key is getting the unique id
+            from the audit log into the access log, don't know how to do this)
+            
+
+            The current solution is to assume the graylog entries are going to come
+            back chronologically and in pairs, we're risking a lot of timing-based issues
+            here, but it's way easier.
+        """
         try:
             response.raise_for_status()
             if response.json()["total_results"] > 0:
-                for message in response.json()["messages"]:
-                    event = message["message"]["message"]
-                    #event = re.sub(r"^\S+ nginx: ", "", event)
-                    #log_dict = matcher.match(event)
-                    log_dict = json.loads(event)
+                # group requests into pairs
+                msg_pairs = [response.json()["messages"][i:i+2] for i in range(0, response.json()["messages"], 2)]
+                for message in msg_pairs:
+                    # parse the graylog entry for both the access.log and audit.log events
+                    event1, event2 = message[0]["message"]["message"], message[1]["message"]["message"]
+                    event1, event2 = [re.sub(r"^\S+ caddy: ", "", event) for event in [event1, event2]]
+
+                    # load both entries as json objects
+                    event1_dict, event2_dict = json.loads(event1), json.loads(event2)
+                    # check if the first event is the access and the second is audit
+                    if event1_dict.get("logger", "") == "http.log.access.log0" and event2_dict.get("transaction", None) is not None:
+                        log_dict = event1_dict
+                        log_dict["unique_id"] = event2_dict["transaction"]["id"]
+                    # in the case that vice versa is true
+                    elif event2_dict.get("logger", "") == "http.log.access.log0" and event1_dict.get("transaction", None) is not None:
+                        log_dict = event2_dict
+                        log_dict["unique_id"] = event1_dict["transaction"]["id"]
+                    # otherwise just drop the request
+                    else:
+                        log_dict = None
+                    
                     if log_dict:
                         current_app.send_task(
                             "ma-knowledge_base-record_caddy_accesslog",

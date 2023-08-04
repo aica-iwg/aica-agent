@@ -21,13 +21,22 @@ from aica_django.connectors.SIEM import Graylog
 
 logger = get_task_logger(__name__)
 
-# nginx_regex = (
-#     r"(?P<src_ip>\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}) - - "
-#     r"\[(?P<dateandtime>\d{2}\/[A-Za-z]{3}\/\d{4}:\d{2}:\d{2}:\d{2} "
-#     r"(\+|\-)\d{4})\] ((\"(?P<method>(GET|POST)) )(?P<url>.+)"
-#     r"(HTTP\/1\.1\")) (?P<statuscode>\d{3}) (?P<bytes_sent>\d+) "
-#     r"(\"(?P<referer>(\-)|(.+))\") (\"(?P<useragent>[^\"]+)\")"
-# )
+def parse_coraza_alert(event_dict: dict) -> dict:
+    msg = event_dict["msg"]
+    bracket_data = re.findall(r'\[(.*?)\]', msg)
+
+    tags = []
+    for val in bracket_data:
+        split = val.split(" ")
+        key, value = split[0], "".join(split[1:]).strip()
+        # print(f"{key}: {value}") # debug
+        if key == "tag" and value != '"OWASP_CRS"':
+            tags.append(value.replace('"', ''))
+        else:
+            event_dict[key] = value.replace('"', '')
+
+    event_dict["tags"] = tags
+    return event_dict
 
 
 @shared_task(name="poll-waf-alerts")
@@ -40,7 +49,6 @@ def poll_waf_alerts(frequency: int = 30) -> None:
     """
 
     logger.info(f"Running {__name__}: poll_waf_alerts")
-    #matcher = re.compile(nginx_regex)
 
     gl = Graylog("coraza")
 
@@ -49,7 +57,7 @@ def poll_waf_alerts(frequency: int = 30) -> None:
         from_time = to_time - datetime.timedelta(seconds=frequency)
 
         query_params: Dict[str, Union[str, int, List[str]]] = {
-            "query": r"coraza\: AND Warning",  # Required
+            "query": r"coraza\: AND http.handlers.waf",  # Required
             "from": from_time.strftime("%Y-%m-%d %H:%M:%S"),  # Required
             "to": to_time.strftime("%Y-%m-%d %H:%M:%S"),  # Required
             "fields": ["message"],  # Required
@@ -63,13 +71,14 @@ def poll_waf_alerts(frequency: int = 30) -> None:
             if response.json()["total_results"] > 0:
                 for message in response.json()["messages"]:
                     event = message["message"]["message"]
-                    #event = re.sub(r"^\S+ nginx: ", "", event)
-                    #log_dict = matcher.match(event)
+                    event = re.sub(r"^\S+ coraza: ", "", event)
+
                     log_dict = json.loads(event)
+                    log_dict = parse_coraza_alert(log_dict)
                     if log_dict and log_dict.get("logger", None) == "http.handlers.waf":
                         current_app.send_task(
                             "ma-knowledge_base-record_waf_alert",
-                            [log_dict.groupdict()],
+                            [log_dict],
                         )
         except requests.exceptions.HTTPError as e:
             logging.error(f"{e}\n{response.text}")

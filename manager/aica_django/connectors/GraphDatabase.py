@@ -231,3 +231,4 @@ class AicaNeo4j:
         results = list(self.graph.run(query))
 
         return results
+    
