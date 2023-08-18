@@ -75,11 +75,12 @@ services:
     container_name: elasticsearch
     # Required so that ES generates an acceptable SAN in its HTTPS Cert
     hostname: "elasticsearch"
+    env_file:
+      - manager/.env
     environment:
       - node.name=elasticsearch
       - cluster.name=aica
       - discovery.type=single-node
-      - ELASTIC_PASSWORD=passwordpassword123
       - xpack.security.enabled=true
       - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
     networks:

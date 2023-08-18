@@ -21,19 +21,21 @@ from aica_django.connectors.SIEM import Graylog
 
 logger = get_task_logger(__name__)
 
-def parse_coraza_alert(event_dict: dict) -> dict:
-    msg = event_dict["msg"]
-    bracket_data = re.findall(r'\[(.*?)\]', msg)
+
+def parse_coraza_alert(
+    event_dict: dict[str, Union[str, List[str]]]
+) -> dict[str, Union[str, List[str]]]:
+    msg = str(event_dict["msg"])
+    bracket_data = re.findall(r"\[(.*?)\]", msg)
 
     tags = []
     for val in bracket_data:
         split = val.split(" ")
         key, value = split[0], "".join(split[1:]).strip()
-        # print(f"{key}: {value}") # debug
         if key == "tag" and value != '"OWASP_CRS"':
-            tags.append(value.replace('"', ''))
+            tags.append(value.replace('"', ""))
         else:
-            event_dict[key] = value.replace('"', '')
+            event_dict[key] = value.replace('"', "")
 
     event_dict["tags"] = tags
     return event_dict

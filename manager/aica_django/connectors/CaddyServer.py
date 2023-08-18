@@ -32,7 +32,7 @@ def poll_caddy_accesslogs(frequency: int = 30) -> None:
     """
 
     logger.info(f"Running {__name__}: poll_caddy_accesslogs")
-    #matcher = re.compile(nginx_regex)
+    # matcher = re.compile(nginx_regex)
 
     gl = Graylog("caddy")
 
@@ -66,26 +66,40 @@ def poll_caddy_accesslogs(frequency: int = 30) -> None:
             response.raise_for_status()
             if response.json()["total_results"] > 0:
                 # group requests into pairs
-                msg_pairs = [response.json()["messages"][i:i+2] for i in range(0, response.json()["messages"], 2)]
+                msg_pairs = [
+                    response.json()["messages"][i : i + 2]
+                    for i in range(0, response.json()["messages"], 2)
+                ]
                 for message in msg_pairs:
                     # parse the graylog entry for both the access.log and audit.log events
-                    event1, event2 = message[0]["message"]["message"], message[1]["message"]["message"]
-                    event1, event2 = [re.sub(r"^\S+ caddy: ", "", event) for event in [event1, event2]]
+                    event1, event2 = (
+                        message[0]["message"]["message"],
+                        message[1]["message"]["message"],
+                    )
+                    event1, event2 = [
+                        re.sub(r"^\S+ caddy: ", "", event) for event in [event1, event2]
+                    ]
 
                     # load both entries as json objects
                     event1_dict, event2_dict = json.loads(event1), json.loads(event2)
                     # check if the first event is the access and the second is audit
-                    if event1_dict.get("logger", "") == "http.log.access.log0" and event2_dict.get("transaction", None) is not None:
+                    if (
+                        event1_dict.get("logger", "") == "http.log.access.log0"
+                        and event2_dict.get("transaction", None) is not None
+                    ):
                         log_dict = event1_dict
                         log_dict["unique_id"] = event2_dict["transaction"]["id"]
                     # in the case that vice versa is true
-                    elif event2_dict.get("logger", "") == "http.log.access.log0" and event1_dict.get("transaction", None) is not None:
+                    elif (
+                        event2_dict.get("logger", "") == "http.log.access.log0"
+                        and event1_dict.get("transaction", None) is not None
+                    ):
                         log_dict = event2_dict
                         log_dict["unique_id"] = event1_dict["transaction"]["id"]
                     # otherwise just drop the request
                     else:
                         log_dict = None
-                    
+
                     if log_dict:
                         current_app.send_task(
                             "ma-knowledge_base-record_caddy_accesslog",

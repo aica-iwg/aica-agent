@@ -29,8 +29,8 @@ security:
 build: check-env
 		@docker compose -f docker-compose.yml -f docker-compose-${MODE}.yml build
 
-test: check-env lint security
-		@MODE=emu docker compose -f docker-compose.yml -f docker-compose-${MODE}.yml \
+test: lint security
+		@MODE=emu docker compose -f docker-compose.yml -f docker-compose-emu.yml \
 			run -e SKIP_TASKS=true --rm \
 			manager /bin/bash -c " \
 				/opt/venv/bin/coverage run --omit='*test*' manage.py test --noinput && \

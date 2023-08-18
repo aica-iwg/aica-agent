@@ -866,9 +866,7 @@ def caddy_accesslog_to_knowledge(
     knowledge_relations = []
 
     # dateparser can't seem to handle this format
-    request_time = datetime.datetime.utcfromtimestamp(
-        log_dict["ts"], "%d/%b/%Y:%H:%M:%S %z"
-    )
+    request_time = datetime.datetime.strptime(log_dict["ts"], "%d/%b/%Y:%H:%M:%S %z")
 
     if not request_time:
         raise ValueError(f"Couldn't parse timestamp {log_dict['ts']}")
@@ -949,12 +947,12 @@ def caddy_accesslog_to_knowledge(
     try:
         value_dict["referer"] = log_dict["request"]["headers"]["Referer"]
     except KeyError:
-        value_dict["referer"] = "null" # TODO: change this to better data
+        value_dict["referer"] = "null"  # TODO: change this to better data
 
     try:
         value_dict["unique_id"] = log_dict["id"]
     except KeyError:
-        value_dict["unique_id"] = "null" # TODO: change this to better data
+        value_dict["unique_id"] = "null"  # TODO: change this to better data
 
     value_dict["user_agent"] = log_dict["request"]["headers"]["User-Agent"]
 
@@ -981,6 +979,7 @@ def caddy_accesslog_to_knowledge(
     )
 
     return knowledge_nodes, knowledge_relations
+
 
 def nmap_scan_to_knowledge(
     scan_results: Dict[str, Any]
@@ -1504,6 +1503,7 @@ def antivirus_alert_to_knowledge(
 
     return nodes, relations
 
+
 def waf_alert_to_knowledge(
     alert: Dict[str, Any]
 ) -> Tuple[List[KnowledgeNode], List[KnowledgeRelation]]:
@@ -1576,22 +1576,25 @@ def waf_alert_to_knowledge(
 
     # Make Cypher query and return node that contains the correct unique ID
     graph = AicaNeo4j()
-    req_id = alert["unique_id"] # leaving this here because format strings
-    nodes = list(graph.run(f'MATCH (n:HttpRequest) WHERE n.unique_id = "{req_id}" RETURN n'))
+    req_id = alert["unique_id"]  # leaving this here because format strings
+    nodes = list(
+        graph.graph.run(
+            f'MATCH (n:HttpRequest) WHERE n.unique_id = "{req_id}" RETURN n'
+        )
+    )
 
     if len(nodes) > 0:
         source_http_req = nodes[0]
         # DO NOT APPEND THIS TO THE NODES LIST
         source_http_knowledge = KnowledgeNode(
-            label="HttpRequest",
-            name=source_http_req['id']
+            label="HttpRequest", name=source_http_req["id"]
         )
         knowledge_relations.append(
             KnowledgeRelation(
                 label="TRIGGERED_BY",
                 source_node=source_http_knowledge,
-                target_node=alert_knowledge
-            )            
+                target_node=alert_knowledge,
+            )
         )
 
     else:
@@ -1601,12 +1604,12 @@ def waf_alert_to_knowledge(
             KnowledgeRelation(
                 label="TRIGGERED_BY",
                 source_node=source_host,
-                target_node=alert_knowledge
-            )            
+                target_node=alert_knowledge,
+            )
         )
 
-
     return knowledge_nodes, knowledge_relations
+
 
 def knowledge_to_neo(
     nodes: List[KnowledgeNode], relations: List[KnowledgeRelation]

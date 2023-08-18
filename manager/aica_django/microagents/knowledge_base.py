@@ -144,6 +144,7 @@ def record_antivirus_alert(alert: Dict[str, str]) -> bool:
     nodes, relations = antivirus_alert_to_knowledge(alert)
     return knowledge_to_neo(nodes=nodes, relations=relations)
 
+
 @shared_task(name="ma-knowledge_base-record_waf_alert")
 def record_waf_alert(alert: Dict[str, str]) -> bool:
     """
@@ -174,6 +175,7 @@ def record_nginx_accesslog(log_entry: Dict[str, str]) -> bool:
     nodes, relations = nginx_accesslog_to_knowledge(log_entry)
 
     return knowledge_to_neo(nodes=nodes, relations=relations)
+
 
 @shared_task(name="ma-knowledge_base-record_caddy_accesslog")
 def record_caddy_accesslog(log_entry: Dict[str, str]) -> bool:
