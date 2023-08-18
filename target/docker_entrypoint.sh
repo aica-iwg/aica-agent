@@ -18,7 +18,7 @@ echo "$(hostname),$(hostname -i)" > /var/log/clamav/hostinfo.txt
 supervisord -c /etc/supervisord.conf &
 
 # Start Nginx
-nginx #-g "daemon off;"
+nginx
+
 # Start caddy
-/usr/bin/caddy run --config /coraza/Caddyfile --adapter caddyfile --watch #| tee /var/log/juice/waf.log
-#sleep infinity;
+/usr/bin/caddy run --config /coraza/Caddyfile --adapter caddyfile --watch
