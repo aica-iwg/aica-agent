@@ -21,8 +21,12 @@ services:
   attacker:
     build: attacker
     container_name: attacker
+    env_file:
+      - manager/.env
     command: /usr/local/bin/docker_entrypoint.sh
     networks:
+      - target
+    depends_on:
       - target
 
   target:

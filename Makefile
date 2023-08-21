@@ -6,19 +6,20 @@ CONDA := conda run --no-capture-output -n aica
 check-env:
 ifndef MODE
 		$(error MODE is undefined)
+
 endif
 
 deps: environment.yml
 		@conda env update -f environment.yml
 
 black:
-		@${CONDA} black -q manager/
+		@${CONDA} black -q manager/ attacker/
 
 lint:
 		@${CONDA} yamllint .
 		@${CONDA} bashlint .
 		@${CONDA} pylint -E --disable=all --enable=missing-docstring --ignore-patterns=__init__.py,test manager
-		@${CONDA} black --check --diff -q manager/
+		@${CONDA} black --check --diff -q manager/ attacker/
 		@MYPYPATH=manager ${CONDA} mypy --install-types --warn-unreachable --strict --non-interactive --exclude test manager/
 
 security:
@@ -45,6 +46,11 @@ stop: check-env
 rebuild: build stop start
 
 restart: stop start
+
+web_attack: check-env
+		@docker compose -f docker-compose.yml -f docker-compose-emu.yml exec target /bin/bash -c "ipset add allowlist attacker"
+		@docker compose -f docker-compose.yml -f docker-compose-emu.yml exec attacker /bin/bash -c "python -m unittest discover -s /root/tests -p 'test_*.py'"
+		@docker compose -f docker-compose.yml -f docker-compose-emu.yml exec target /bin/bash -c "ipset del allowlist attacker"
 
 logs: check-env
 		@docker compose -f docker-compose.yml -f docker-compose-${MODE}.yml logs -f
