@@ -38,7 +38,7 @@ class TestInjections(unittest.TestCase):
                 f"{juice_url}/file-upload",
                 files={"file": infile},
                 headers=admin_headers,
-        )
+            )
         self.assertIn("root:x:0:0:root:/root", res.text)
 
     def test_open_redirect_path_traversal(self):

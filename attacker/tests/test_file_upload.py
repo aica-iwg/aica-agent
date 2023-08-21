@@ -24,5 +24,5 @@ class TestFileUpload(unittest.TestCase):
             res = r.post(
                 f"{juice_url}/file-upload",
                 files={"files": infile},
-        )
+            )
         self.assertEqual(res.status_code, 204)
