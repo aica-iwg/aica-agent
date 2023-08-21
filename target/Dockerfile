@@ -1,7 +1,9 @@
 FROM node:20-alpine3.18
 
+ENV NODE_ENV=aica-config
+
 RUN apk update && apk upgrade && \
-    apk --no-cache add openssh iptables ipset nginx bind-tools bash syslog-ng clamav supervisor git
+    apk --no-cache add openssh iptables ipset nginx bind-tools bash syslog-ng clamav supervisor git go
 
 # Allow manager to access via SSH commands
 RUN ssh-keygen -A && mkdir -p /root/.ssh
@@ -12,18 +14,39 @@ RUN chown -R root:root /root && \
 
 RUN wget https://secure.eicar.org/eicar.com.txt -O /tmp/eicar.com.txt
 
-COPY clamonacc.sh /usr/local/bin
-COPY etc/clamav /etc/clamav/
-
 # This is to bootstrap the virus definitions, as trying to start clamd without
 # any just causes the process to die, upon the container starting it updates
 # these immediately again.
+COPY clamonacc.sh /usr/local/bin
+COPY etc/clamav /etc/clamav/
 RUN sed -i 's/^Foreground .*$/Foreground true/g' /etc/clamav/clamd.conf && \
     sed -i 's/^Foreground .*$/Foreground true/g' /etc/clamav/freshclam.conf && \
     freshclam && \
     mkdir /run/clamav && mkdir /root/quarantine && \
     chown root:root /run/clamav && chown root:root /root/quarantine && \
     chmod +x /usr/local/bin/clamonacc.sh
+
+WORKDIR /root
+RUN go install github.com/caddyserver/xcaddy/cmd/xcaddy@latest && \
+    /root/go/bin/xcaddy build --with github.com/corazawaf/coraza-caddy/v2 && \
+    mkdir -p /coraza/coreruleset && mkdir -p /coraza/sites/localhost && \
+    git clone https://github.com/coreruleset/coreruleset.git /coraza/coreruleset && \ 
+    cp /coraza/coreruleset/crs-setup.conf.example /coraza/sites/localhost/1_crs_setup.conf
+
+RUN git clone https://github.com/juice-shop/juice-shop.git --depth 1 && \
+    mkdir -p /var/log/juice/ && \
+    touch /var/log/juice/juiceshop.log && \
+    touch /var/log/juice/juiceshop.err.log
+
+WORKDIR /root/juice-shop
+RUN npm i -g typescript ts-node && \
+    npm install --omit=dev --unsafe-perm && \
+    npm dedupe && \
+    mkdir logs && \
+    rm -rf frontend/node_modules && rm -rf frontend/.angular && rm -rf frontend/src/assets && \
+    rm -f data/chatbot/botDefaultTrainingData.json ftp/legal.md i18n/*.json
+
+COPY etc/aica-config.yml /juice-shop/config/aica-config.yml
 
 COPY etc/supervisor.d /etc/supervisor.d/
 COPY etc/supervisord.conf /etc/supervisord.conf
@@ -32,33 +55,8 @@ COPY index.html /var/www/localhost/htdocs/
 COPY aica-nginx.conf /etc/nginx/http.d/default.conf
 COPY aica-syslog.conf /etc/syslog-ng/conf.d/aica-syslog.conf
 
-WORKDIR /
-RUN mkdir -p /coraza/coreruleset && mkdir -p /coraza/sites/localhost && \
-    git clone https://github.com/coreruleset/coreruleset.git /coraza/coreruleset && \ 
-    cp /coraza/coreruleset/crs-setup.conf.example /coraza/sites/localhost/1_crs_setup.conf
 COPY etc/Caddyfile /coraza/Caddyfile
 COPY etc/coraza/coraza.conf /coraza/coraza.conf
-COPY ./caddy /usr/bin/caddy
-
-RUN chmod 700 /usr/bin/caddy && mkdir -p /var/log/caddy && \ 
-    git clone https://github.com/juice-shop/juice-shop.git --depth 1 && \
-    mkdir -p /var/log/juice/ && touch /var/log/juice/juiceshop.log && touch /var/log/juice/juiceshop.err.log
-
-# ARG CACHEBUST=1 # For debugging
-WORKDIR /juice-shop
-RUN npm i -g typescript ts-node && \
-    npm install --omit=dev --unsafe-perm && \
-    npm dedupe && \
-    rm -rf frontend/node_modules && rm -rf frontend/.angular && rm -rf frontend/src/assets
-
-RUN mkdir logs && \
-    rm data/chatbot/botDefaultTrainingData.json || true && \
-    rm ftp/legal.md || true && \
-    rm i18n/*.json || true
-
-COPY etc/aica-config.yml /juice-shop/config/aica-config.yml
-ENV NODE_ENV=aica-config
-EXPOSE 81
 
 COPY docker_entrypoint.sh /usr/local/bin/
 RUN chmod +x /usr/local/bin/docker_entrypoint.sh

@@ -44,14 +44,16 @@ services:
     ports:
       - "80:80"
       - "81:81"
+    depends_on:
+      - honeypot
 
-  node_red_target:
-    build: node_red_target
-    container_name: node_red_target
-    env_file:
-      - node_red_target/.env
-    networks:
-      - target
+  # node_red_target:
+  #   build: node_red_target
+  #   container_name: node_red_target
+  #   env_file:
+  #     - node_red_target/.env
+  #   networks:
+  #     - target
 
   honeypot:
     build: honeypot
@@ -95,7 +97,7 @@ services:
           memory: 1g
     healthcheck:
       test: ["CMD-SHELL",
-              "curl --insecure -u elastic:passwordpassword123 -s -X GET 'http://localhost:9200/_cluster/health?pretty' 
+              "curl --insecure -u elastic:$${ELASTIC_PASSWORD} -s -X GET 'http://localhost:9200/_cluster/health?pretty' 
               | grep '\"status\" : \"green\"'"]
       interval: 10s
       timeout: 30s

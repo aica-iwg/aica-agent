@@ -21,4 +21,4 @@ supervisord -c /etc/supervisord.conf &
 nginx
 
 # Start caddy
-/usr/bin/caddy run --config /coraza/Caddyfile --adapter caddyfile --watch
+/root/caddy run --config /coraza/Caddyfile --adapter caddyfile --watch
