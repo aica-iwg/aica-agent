@@ -51,13 +51,13 @@ services:
     depends_on:
       - honeypot
 
-  # node_red_target:
-  #   build: node_red_target
-  #   container_name: node_red_target
-  #   env_file:
-  #     - node_red_target/.env
-  #   networks:
-  #     - target
+  node_red_target:
+    build: node_red_target
+    container_name: node_red_target
+    env_file:
+      - node_red_target/.env
+    networks:
+      - target
 
   honeypot:
     build: honeypot
