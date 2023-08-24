@@ -36,9 +36,11 @@ from aica_django.connectors.DocumentDatabase import AicaMongo
 from aica_django.connectors.GraphDatabase import AicaNeo4j
 from aica_django.connectors.Netflow import network_flow_capture
 from aica_django.connectors.HTTPServer import poll_nginx_accesslogs
+from aica_django.connectors.CaddyServer import poll_caddy_accesslogs
 from aica_django.connectors.NetworkScan import periodic_network_scan
 from aica_django.connectors.IntrusionDetection import poll_suricata_alerts
 from aica_django.connectors.Antivirus import poll_clamav_alerts
+from aica_django.connectors.WAF import poll_waf_alerts
 from aica_django.converters.Knowledge import KnowledgeNode, knowledge_to_neo
 
 logger = get_task_logger(__name__)
@@ -242,10 +244,16 @@ def initialize(**kwargs: Dict[Any, Any]) -> bool:
     # Start polling for Nginx access logs
     poll_nginx_accesslogs.apply_async()
 
+    # Start polling for Caddy access logs
+    poll_caddy_accesslogs.apply_async()
+
     # Start polling for IDS alerts in background
     poll_suricata_alerts.apply_async()
 
     # Start polling for AV alerts in background
     poll_clamav_alerts.apply_async()
+
+    # Start polling for WAF alerts in background
+    poll_waf_alerts.apply_async()
 
     return True

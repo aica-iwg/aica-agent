@@ -30,9 +30,11 @@ from aica_django.connectors.DocumentDatabase import AicaMongo
 from aica_django.converters.Knowledge import (
     netflow_to_knowledge,
     nginx_accesslog_to_knowledge,
+    caddy_accesslog_to_knowledge,
     nmap_scan_to_knowledge,
     suricata_alert_to_knowledge,
     antivirus_alert_to_knowledge,
+    waf_alert_to_knowledge,
     knowledge_to_neo,
 )
 
@@ -143,6 +145,22 @@ def record_antivirus_alert(alert: Dict[str, str]) -> bool:
     return knowledge_to_neo(nodes=nodes, relations=relations)
 
 
+@shared_task(name="ma-knowledge_base-record_waf_alert")
+def record_waf_alert(alert: Dict[str, str]) -> bool:
+    """
+    Convert an WAF alert to Knowledge objects and store in the knowledge graph database.
+
+    @param alert: The alert to be recorded.
+    @type alert: dict
+    @return: Return status of the attempt to add items to graph database.
+    @rtype: bool
+    """
+
+    logger.info(f"Running{__name__}: record_alert")
+    nodes, relations = waf_alert_to_knowledge(alert)
+    return knowledge_to_neo(nodes=nodes, relations=relations)
+
+
 @shared_task(name="ma-knowledge_base-record_nginx_accesslog")
 def record_nginx_accesslog(log_entry: Dict[str, str]) -> bool:
     """
@@ -155,5 +173,21 @@ def record_nginx_accesslog(log_entry: Dict[str, str]) -> bool:
     """
     logger.info(f"Running {__name__}: record_nginx_accesslog")
     nodes, relations = nginx_accesslog_to_knowledge(log_entry)
+
+    return knowledge_to_neo(nodes=nodes, relations=relations)
+
+
+@shared_task(name="ma-knowledge_base-record_caddy_accesslog")
+def record_caddy_accesslog(log_entry: Dict[str, str]) -> bool:
+    """
+    Convert an HTTP access log entry to Knowledge objects and store in the knowledge graph database.
+
+    @param log_entry: The log entry to be recorded.
+    @type log_entry: dict
+    @return: Return status of the attempt to add items to graph database.
+    @rtype: bool
+    """
+    logger.info(f"Running {__name__}: record_nginx_accesslog")
+    nodes, relations = caddy_accesslog_to_knowledge(log_entry)
 
     return knowledge_to_neo(nodes=nodes, relations=relations)

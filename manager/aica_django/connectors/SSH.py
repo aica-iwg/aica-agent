@@ -62,6 +62,7 @@ def redirect_to_honeypot_iptables(
     """
 
     mode = os.getenv("MODE")
+
     logger.info(f"Running {__name__}: redirect_to_honeypot_iptables")
 
     try:

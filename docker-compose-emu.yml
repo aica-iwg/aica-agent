@@ -21,8 +21,12 @@ services:
   attacker:
     build: attacker
     container_name: attacker
+    env_file:
+      - manager/.env
     command: /usr/local/bin/docker_entrypoint.sh
     networks:
+      - target
+    depends_on:
       - target
 
   target:
@@ -41,6 +45,11 @@ services:
       interval: 10s
       timeout: 10s
       retries: 5
+    ports:
+      - "80:80"
+      - "81:81"
+    depends_on:
+      - honeypot
 
   node_red_target:
     build: node_red_target
@@ -72,11 +81,12 @@ services:
     container_name: elasticsearch
     # Required so that ES generates an acceptable SAN in its HTTPS Cert
     hostname: "elasticsearch"
+    env_file:
+      - manager/.env
     environment:
       - node.name=elasticsearch
       - cluster.name=aica
       - discovery.type=single-node
-      - ELASTIC_PASSWORD=aicaelastic
       - xpack.security.enabled=true
       - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
     networks:
@@ -91,7 +101,7 @@ services:
           memory: 1g
     healthcheck:
       test: ["CMD-SHELL",
-              "curl --insecure -u elastic:aicaelastic -s -X GET 'http://localhost:9200/_cluster/health?pretty' 
+              "curl --insecure -u elastic:$${ELASTIC_PASSWORD} -s -X GET 'http://localhost:9200/_cluster/health?pretty' 
               | grep '\"status\" : \"green\"'"]
       interval: 10s
       timeout: 30s
