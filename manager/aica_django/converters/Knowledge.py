@@ -849,6 +849,138 @@ def nginx_accesslog_to_knowledge(
     return knowledge_nodes, knowledge_relations
 
 
+def caddy_accesslog_to_knowledge(
+    log_dict: Dict[str, Any]
+) -> Tuple[List[KnowledgeNode], List[KnowledgeRelation]]:
+    """
+    Converts an HTTP access log dictionary (as returned by aica_django.connectors.CaddyServer.poll_caddy_accesslogs)
+    to knowledge objects.
+
+    @param log_dict: An HTTP access log dictionary to be converted to knowledge objects
+    @type log_dict: Dict[str, Any]
+    @return: Knowledge nodes and relations resulting form this conversion
+    @rtype: Tuple[list, list]
+    """
+
+    knowledge_nodes = []
+    knowledge_relations = []
+
+    # dateparser can't seem to handle this format
+    request_time = datetime.datetime.strptime(log_dict["ts"], "%d/%b/%Y:%H:%M:%S %z")
+
+    if not request_time:
+        raise ValueError(f"Couldn't parse timestamp {log_dict['ts']}")
+    else:
+        dissected_request_time = dissect_time(
+            request_time.timestamp(), prefix="last_seen"
+        )
+
+    request_timestamp = int(request_time.timestamp())
+    my_hostname = socket.gethostname()
+    try:
+        my_ipv4 = IPv4Address(socket.gethostbyname(my_hostname))
+        my_ipv4_knowledge = my_ipv4.to_knowledge_node()
+        knowledge_nodes.append(my_ipv4_knowledge)
+    except:
+        pass
+
+    try:
+        my_ipv6 = IPv6Address(
+            socket.getaddrinfo(my_hostname, None, socket.AF_INET6)[0][4][0]
+        )
+        my_ipv6_knowledge = my_ipv6.to_knowledge_node()
+        knowledge_nodes.append(my_ipv6_knowledge)
+    except:
+        pass
+
+    # Add requesting host
+    value_dict = dissected_request_time
+    requesting_host = Host(
+        log_dict["request"]["remote_ip"],
+        last_seen=request_timestamp,
+        values=value_dict,
+    )
+    requesting_host_knowledge = requesting_host.to_knowledge_node()
+    knowledge_nodes.append(requesting_host_knowledge)
+
+    # Add target NIC to target host
+    nic_knowledge = KnowledgeNode(
+        label="NetworkInterface",
+        name=str(
+            uuid.uuid4()
+        ),  # This results in hundreds of NIC's per host, does not make sense.
+        values=value_dict,
+    )
+    knowledge_nodes.append(nic_knowledge)
+    knowledge_relations.append(
+        KnowledgeRelation(
+            label="COMPONENT_OF",
+            source_node=nic_knowledge,
+            target_node=requesting_host_knowledge,
+        )
+    )
+
+    if type(ipaddress.ip_address(log_dict["src_ip"])) is ipaddress.IPv4Address:
+        ip_addr_knowledge = IPv4Address(log_dict["src_ip"]).to_knowledge_node()
+    elif type(ipaddress.ip_address(log_dict["src_ip"])) is ipaddress.IPv6Address:
+        ip_addr_knowledge = IPv6Address(log_dict["src_ip"]).to_knowledge_node()
+    else:
+        raise Exception(
+            f"Unhandled address type: {type(ipaddress.ip_address(log_dict['src_ip'])) }"
+        )
+
+    knowledge_nodes.append(ip_addr_knowledge)
+    knowledge_relations.append(
+        KnowledgeRelation(
+            label="HAS_ADDRESS",
+            source_node=nic_knowledge,
+            target_node=ip_addr_knowledge,
+        )
+    )
+
+    value_dict = dissected_request_time
+    value_dict["request_time"] = request_time
+    value_dict["method"] = log_dict["request"]["method"]
+    value_dict["url"] = log_dict["request"]["host"] + log_dict["uri"]
+    value_dict["response_status"] = log_dict["status"]
+    value_dict["bytes"] = log_dict["size"]
+    try:
+        value_dict["referer"] = log_dict["request"]["headers"]["Referer"]
+    except KeyError:
+        value_dict["referer"] = "null"  # TODO: change this to better data
+
+    try:
+        value_dict["unique_id"] = log_dict["id"]
+    except KeyError:
+        value_dict["unique_id"] = "null"  # TODO: change this to better data
+
+    value_dict["user_agent"] = log_dict["request"]["headers"]["User-Agent"]
+
+    http_request_knowledge = KnowledgeNode(
+        label="HttpRequest",
+        name=str(uuid.uuid4()),
+        values=value_dict,
+    )
+    knowledge_nodes.append(http_request_knowledge)
+
+    knowledge_relations.append(
+        KnowledgeRelation(
+            label="COMMUNICATES_TO",
+            source_node=ip_addr_knowledge,
+            target_node=http_request_knowledge,
+        )
+    )
+    knowledge_relations.append(
+        KnowledgeRelation(
+            label="COMMUNICATES_TO",
+            source_node=http_request_knowledge,
+            target_node=ip_addr_knowledge,
+        )
+    )
+
+    return knowledge_nodes, knowledge_relations
+
+
 def nmap_scan_to_knowledge(
     scan_results: Dict[str, Any]
 ) -> Tuple[List[KnowledgeNode], List[KnowledgeRelation]]:
@@ -1370,6 +1502,113 @@ def antivirus_alert_to_knowledge(
     )
 
     return nodes, relations
+
+
+def waf_alert_to_knowledge(
+    alert: Dict[str, Any]
+) -> Tuple[List[KnowledgeNode], List[KnowledgeRelation]]:
+    """
+    Converts an waf alert (as returned from aica_django.connectors.WAF.poll_waf_alerts)
+    to knowledge objects.
+
+    **TODO**
+
+    @param alert: A dictionary as returned by poll_waf_alerts to be converted to knowledge objects
+    @type alert: Dict[str, Any]
+    @return: Knowledge nodes and relations resulting form this conversion
+    @rtype: Tuple[list, list]
+    """
+
+    knowledge_nodes = []
+    knowledge_relations = []
+
+    # alert_dt: Optional[datetime.datetime] = dateparser.parse(alert["timestamp"])
+    alert_dt = float(alert["ts"])
+    assert alert_dt is not None
+
+    dissected_time_tripped = dissect_time(alert_dt, prefix="time_tripped")
+    value_dict: Dict[str, Any] = dissected_time_tripped
+    value_dict["time_tripped"] = alert_dt
+    value_dict["unique_id"] = alert["unique_id"]
+
+    alert_knowledge = KnowledgeNode(
+        label="Alert",
+        name=str(uuid.uuid4()),
+        values=value_dict,
+    )
+    knowledge_nodes.append(alert_knowledge)
+    alert_sig_knowledge = KnowledgeNode(
+        label="AttackSignature",
+        name=f"OWASP CRS {alert['id']}",
+        values={
+            "rule_id": alert["alert"]["id"],
+            "rev": alert["rev"],
+            "data": alert["data"],
+            "severity": alert["severity"],
+        },
+    )
+    knowledge_nodes.append(alert_sig_knowledge)
+
+    knowledge_relations.append(
+        KnowledgeRelation(
+            label="IS_TYPE",
+            source_node=alert_knowledge,
+            target_node=alert_sig_knowledge,
+        )
+    )
+
+    for tag in alert["tags"]:
+        alert_cat_knowledge = KnowledgeNode(
+            label="AttackSignatureCategory",
+            name=tag,
+            values={
+                "tag": tag,
+            },
+        )
+        knowledge_nodes.append(alert_cat_knowledge)
+        knowledge_relations.append(
+            KnowledgeRelation(
+                label="MEMBER_OF",
+                source_node=alert_sig_knowledge,
+                target_node=alert_cat_knowledge,
+            )
+        )
+
+    # Make Cypher query and return node that contains the correct unique ID
+    graph = AicaNeo4j()
+    req_id = alert["unique_id"]  # leaving this here because format strings
+    nodes = list(
+        graph.graph.run(
+            f'MATCH (n:HttpRequest) WHERE n.unique_id = "{req_id}" RETURN n'
+        )
+    )
+
+    if len(nodes) > 0:
+        source_http_req = nodes[0]
+        # DO NOT APPEND THIS TO THE NODES LIST
+        source_http_knowledge = KnowledgeNode(
+            label="HttpRequest", name=source_http_req["id"]
+        )
+        knowledge_relations.append(
+            KnowledgeRelation(
+                label="TRIGGERED_BY",
+                source_node=source_http_knowledge,
+                target_node=alert_knowledge,
+            )
+        )
+
+    else:
+        source_host = Host(alert["client"], last_seen=alert_dt)
+        knowledge_nodes.append(source_host.to_knowledge_node())
+        knowledge_relations.append(
+            KnowledgeRelation(
+                label="TRIGGERED_BY",
+                source_node=source_host,
+                target_node=alert_knowledge,
+            )
+        )
+
+    return knowledge_nodes, knowledge_relations
 
 
 def knowledge_to_neo(
