@@ -46,8 +46,6 @@ rebuild: build stop start
 
 restart: stop start
 
-retest: stop build test
-
 logs: check-env
 		@docker compose -f docker-compose.yml -f docker-compose-${MODE}.yml logs -f
 
