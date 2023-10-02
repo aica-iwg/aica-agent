@@ -12,7 +12,7 @@ flower==2.0.1
 gunicorn==21.2.0
 json2table==1.1.5
 kombu==5.3.1
-neo4j==5.10.0
+neo4j==5.13.0
 neomodel==5.1.0
 netaddr==0.8.0
 netflow==0.12.2
