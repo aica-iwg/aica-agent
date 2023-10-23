@@ -1,4 +1,4 @@
-FROM node:20-alpine3.18
+FROM node:21-alpine3.18
 
 ENV NODE_ENV=aica-config
 
