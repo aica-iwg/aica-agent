@@ -18,6 +18,7 @@ Functions:
     create_suricata: Load Suricata's list (from web) of alert categories into the graph.
 """
 
+import json
 import logging
 import os
 import pandas as pd  # type: ignore
@@ -30,6 +31,7 @@ from celery.signals import worker_ready
 from celery.utils.log import get_task_logger
 from io import StringIO
 from py2neo import ConnectionUnavailable  # type: ignore
+from stix2 import AttackPattern, Note, Software
 from typing import Any, Dict
 
 from aica_django.connectors.DocumentDatabase import AicaMongo
@@ -41,7 +43,7 @@ from aica_django.connectors.NetworkScan import periodic_network_scan
 from aica_django.connectors.IntrusionDetection import poll_suricata_alerts
 from aica_django.connectors.Antivirus import poll_clamav_alerts
 from aica_django.connectors.WAF import poll_waf_alerts
-from aica_django.converters.Knowledge import KnowledgeNode, knowledge_to_neo
+from aica_django.converters.Knowledge import knowledge_to_neo
 
 logger = get_task_logger(__name__)
 
@@ -83,19 +85,12 @@ def create_clamav() -> bool:
         "Spyware",
         "Test",
     ]
-    class_objects = []
+    malware_categories = []
     for category in clamav_categories:
-        class_object = KnowledgeNode(
-            label="AttackSignatureCategory",
-            name=category,
-            values={
-                "name": category,
-                "source": "https://docs.clamav.net/manual/Signatures/SignatureNames.html",
-            },
-        )
-        class_objects.append(class_object)
+        malware_signature = AttackPattern(name=f"clamav:{category}")
+        malware_categories.append(malware_signature)
 
-    knowledge_to_neo(class_objects, [])
+    knowledge_to_neo(malware_categories)
 
     return True
 
@@ -127,33 +122,41 @@ def create_ports() -> bool:
     nmap_df[["port_number", "protocol"]] = nmap_df["port"].str.split("/", expand=True)
     nmap_df.drop(columns=["comment", "port"], axis=1, inplace=True)
     nmap_df.sort_values(by="frequency", inplace=True, ascending=False)
+
     port_objects = []
+
+    # Not proud of this, but no other good way to add this info to the graph that I've found
+    port_parent = Software(name="Generic Port Usage Info")
+    port_objects.append(port_parent)
+
     for index, row in nmap_df.iterrows():
         rank = nmap_df.index.get_loc(key=index)
-        port_object = KnowledgeNode(
-            label="NetworkPort",
-            name=f"{row['port_number']}/{row['protocol']}",
-            values={
-                "port": row["port_number"],
-                "protocol": row["protocol"],
-                "service": row["service"],
-                "frequency": row["frequency"],
-                "rank": rank,
-                "top10": rank < 10,
-                "top100": rank < 100,
-                "top1000": rank < 1000,
-                "source": nmap_services_url,
-            },
+        port_object = Note(
+            abstract=f"{row['port_number']}/{row['protocol']}",
+            content=json.dumps(
+                {
+                    "port": row["port_number"],
+                    "protocol": row["protocol"],
+                    "service": row["service"],
+                    "frequency": row["frequency"],
+                    "rank": rank,
+                    "top10": rank < 10,
+                    "top100": rank < 100,
+                    "top1000": rank < 1000,
+                    "source": nmap_services_url,
+                }
+            ),
+            object_refs=[port_parent.id],
         )
         port_objects.append(port_object)
 
-    knowledge_to_neo(port_objects, [])
+    knowledge_to_neo(port_objects)
 
     return True
 
 
 @shared_task(name="ma-offline_loader-create_suricata")
-def create_suricata() -> bool:
+def create_suricata_categories() -> bool:
     """
     Load Suricata's list (from web) of alert categories into the graph.
 
@@ -174,21 +177,18 @@ def create_suricata() -> bool:
         header=None,
         names=["name", "description", "priority"],
     )
-    class_objects = []
-    for index, row in suricata_df.iterrows():
-        class_object = KnowledgeNode(
-            label="AttackSignatureCategory",
-            name=row["name"],
-            values={
-                "name": row["name"],
-                "description": row["description"],
-                "priority": row["priority"],
-                "source": suricata_classes_url,
-            },
-        )
-        class_objects.append(class_object)
 
-    knowledge_to_neo(class_objects, [])
+    attack_patterns = []
+    for _, row in suricata_df.iterrows():
+        attack_pattern = AttackPattern(
+            type="attack-pattern",
+            name=row["name"],
+            description=row["description"],
+            custom_properties={"severity": row["priority"]},
+        )
+        attack_patterns.append(attack_pattern)
+
+    knowledge_to_neo(attack_patterns)
 
     return True
 
@@ -221,7 +221,6 @@ def initialize(**kwargs: Dict[Any, Any]) -> bool:
     while True:
         try:
             graph = AicaNeo4j()
-            graph.create_constraints()
             break
         except ConnectionUnavailable:
             time.sleep(1)
@@ -233,7 +232,7 @@ def initialize(**kwargs: Dict[Any, Any]) -> bool:
     create_ports.apply_async()
 
     # Get Suricata rule classes and load into Graph
-    create_suricata.apply_async()
+    create_suricata_categories.apply_async()
 
     # Start netflow collector
     network_flow_capture.apply_async()

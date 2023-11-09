@@ -57,10 +57,16 @@ def network_scan(
             addresses = netifaces.ifaddresses(interface)
             for k, v in addresses.items():
                 if k == netifaces.AF_INET:
-                    for address in v:
-                        cidr = IPAddress(address["netmask"]).netmask_bits()
-                        target = f"{address['addr']}/{cidr}"
-                        targets.append(target)
+                    try:
+                        for address in v:
+                            cidr = IPAddress(address["mask"]).netmask_bits()
+                            target = f"{address['addr']}/{cidr}"
+                            targets.append(target)
+                    except KeyError:
+                        logger.warning(
+                            f"Couldn't add interface {interface}'s ({v}) subnet to initial scans"
+                        )
+
     else:
         # Scan requested target
         targets.append(nmap_target)

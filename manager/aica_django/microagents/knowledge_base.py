@@ -33,8 +33,8 @@ from aica_django.converters.Knowledge import (
     caddy_accesslog_to_knowledge,
     nmap_scan_to_knowledge,
     suricata_alert_to_knowledge,
-    antivirus_alert_to_knowledge,
     waf_alert_to_knowledge,
+    clamav_alert_to_knowledge,
     knowledge_to_neo,
 )
 
@@ -141,7 +141,7 @@ def record_antivirus_alert(alert: Dict[str, str]) -> bool:
     """
 
     logger.info(f"Running{__name__}: record_alert")
-    nodes, relations = antivirus_alert_to_knowledge(alert)
+    nodes, relations = clamav_alert_to_knowledge(alert)
     return knowledge_to_neo(nodes=nodes, relations=relations)
 
 

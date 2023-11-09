@@ -19,7 +19,7 @@ netflow==0.12.2
 netifaces2==0.0.18
 pandas==2.0.3
 paramiko==3.3.1
-psycopg[binary,pool]==3.1.10
+psycopg2-binary==2.9.7
 pymongo==4.4.1
 py2neo==2021.2.3
 python-dotenv==1.0.0
@@ -27,5 +27,6 @@ python3-nmap==1.6.0
 pyyaml==6.0.1
 requests==2.31.0
 sqlalchemy==2.0.20
+stix2==3.0.1
 supervisor-stdout==0.1.1
 vt-py==0.17.5

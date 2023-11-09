@@ -9,56 +9,9 @@ import logging
 import os
 import py2neo.errors  # type: ignore
 
-from py2neo import Graph, Node, NodeMatcher, Relationship
+from py2neo import Graph, Node, Relationship
 from urllib.parse import quote_plus
-from typing import Any, Dict, List
-
-# Try to keep these as minimal and orthogonal as possible
-defined_node_labels = [
-    "Alert",
-    "AttackSignature",
-    "AttackSignatureCategory",
-    "AutonomousSystemNumber",
-    "DNSRecord",
-    "FilePath",
-    "Firmware",
-    "PhysicalLocation",
-    "Host",
-    "HttpRequest",
-    "Identity",  # i.e., an actual human
-    "IPv4Address",
-    "IPv6Address",
-    "MACAddress",
-    "NetworkInterface",
-    "NetworkEndpoint",  # Observed source/destination port/ip pair
-    "NetworkPort",  # Static reference to port info
-    "NetworkProtocol",
-    "NetworkTraffic",
-    "Organization",  # e.g., corporation, agency
-    "Process",
-    "Subnet",
-    "Software",
-    "User",  # i.e., principal on a system
-    "Vendor",
-]
-defined_relation_labels = [
-    "CONNECTED_TO",
-    "COMMUNICATES_TO",
-    "COMPONENT_OF",
-    "HAS_ADDRESS",
-    "HAS_PORT",
-    "IS_TYPE",
-    "LOCATED_IN",
-    "MANUFACTURES",
-    "MEMBER_OF",
-    "RESIDES_IN",
-    "RESOLVES_TO",
-    "RUNS_ON",
-    "STORED_ON",
-    "TRIGGERED_BY",
-    "USED_BY",
-    "WORKS_IN",
-]
+from typing import Any, Dict, List, Union
 
 
 class AicaNeo4j:
@@ -101,11 +54,22 @@ class AicaNeo4j:
         """
 
         tx = self.graph.begin()
-        for label in defined_node_labels:
-            unique_id = f"""CREATE CONSTRAINT unique_id_{label} IF NOT EXISTS
-                            FOR (n:{label})
-                            REQUIRE n.id IS UNIQUE"""
-            tx.run(unique_id)
+
+        unique_id = f"""CREATE CONSTRAINT unique_abstract_note IF NOT EXISTS
+                        FOR (n:note)
+                        REQUIRE n.abstract IS UNIQUE"""
+        tx.run(unique_id)
+
+        unique_ipv4 = f"""CREATE CONSTRAINT unique_addr_ipv4 IF NOT EXISTS
+                        FOR (n:`ipv4-addr`)
+                        REQUIRE n.value IS UNIQUE"""
+        tx.run(unique_ipv4)
+
+        unique_ipv6 = f"""CREATE CONSTRAINT unique_addr_ipv6 IF NOT EXISTS
+                        FOR (n:`ipv6-addr`)
+                        REQUIRE n.value IS UNIQUE"""
+        tx.run(unique_ipv6)
+
         self.graph.commit(tx)
 
         return True
@@ -127,17 +91,26 @@ class AicaNeo4j:
         @raise: ValueError: if node_label is not a predefined type in defined_node_labels
         """
 
-        if node_label not in defined_node_labels:
-            raise ValueError(f"Invalid node label: {node_label}")
-
         if not node_properties:
             node_properties = dict()
 
         n = Node(node_label, id=node_name, **node_properties)
         n.__primarylabel__ = node_label
         n.__primarykey__ = "id"
+
         try:
-            self.graph.merge(n)
+            if node_label.lower() == "note":
+                # We use notes as global information references, based on unique abstract values,
+                # so they need special handling
+                create_property_list = ", ".join(
+                    [f"n.{x} = '{node_properties[x]}'" for x in node_properties.keys()]
+                )
+                query = f"""MERGE (n:note {{abstract: '{node_properties['abstract']}'}})
+                            ON CREATE SET {create_property_list}
+                            RETURN n"""
+                self.graph.run(query)
+            else:
+                self.graph.merge(n)
         except py2neo.errors.ClientError as e:
             logging.error(str(e))
             return False
@@ -146,63 +119,40 @@ class AicaNeo4j:
 
     def add_relation(
         self,
-        node_a_name: str,
-        node_a_label: str,
-        node_b_name: str,
-        node_b_label: str,
+        node_a_id: str,
+        node_b_id: str,
         relation_label: str,
-        relation_properties: Dict[str, Any],
+        relation_properties: Union[None, Dict[str, Any]] = None,
     ) -> bool:
         """
         Adds a relation with specified parameters to the graph database.
 
-        @param node_a_name: First (source) node for relation
-        @type node_a_name: str
-        @param node_a_label: Label of first (source) node, must be defined in defined_relation_labels
-        @type node_a_label: str
-        @param node_b_name: Second (target) node for relation
-        @type node_b_name: str
-        @param node_b_label: Label of first (source) node, must be defined in defined_relation_labels
-        @type node_b_label: str
-        @param relation_label: Label to use for this node, must be defined in defined_relation_labels
+        @param node_a_id: First (source) node for relation
+        @type node_a_id: str
+        @param node_b_id: Second (target) node for relation
+        @type node_b_id: str
+        @param relation_label: Label to use for this node
         @type relation_label: str
         @param relation_properties: Any other metadata to store with this relation
         @type relation_properties: dict
         @return: True if addition was successful, false otherwise.
         @rtype: bool
-        @raise: ValueError: if node or relation labels are not a predefined type in defined_node/relation_labels
         """
-
-        if node_a_label not in defined_node_labels:
-            raise ValueError(f"Invalid node A label: {node_a_label}")
-
-        if node_b_label not in defined_node_labels:
-            raise ValueError(f"Invalid node B label: {node_a_label}")
-
-        if relation_label not in defined_relation_labels:
-            raise ValueError(f"Invalid relation label: {relation_label}")
 
         if not relation_properties:
             relation_properties = dict()
 
-        n = NodeMatcher(self.graph)
-        node_a = n.match(node_a_label, id=node_a_name).first()
-        node_b = n.match(node_b_label, id=node_b_name).first()
+        node_a = self.graph.find_one(id=node_a_id)
+        node_b = self.graph.find_one(id=node_b_id)
 
-        if node_a and node_b:
-            r = Relationship(node_a, relation_label, node_b, **relation_properties)
-            try:
-                self.graph.merge(r, label=relation_label)
-            except py2neo.errors.ClientError as e:
-                logging.error(str(e))
-                return False
+        r = Relationship(node_a, relation_label, node_b, **relation_properties)
+        try:
+            self.graph.merge(r, label=relation_label)
+        except py2neo.errors.ClientError as e:
+            logging.error(str(e))
+            return False
 
-            return True
-        else:
-            raise ValueError(
-                f"Couldn't find {node_a_name} ({node_a}) "
-                f"or {node_b_name} ({node_b})"
-            )
+        return True
 
     def get_nodes_by_label(self, label: str) -> List[Node]:
         """
@@ -213,7 +163,7 @@ class AicaNeo4j:
         @return:
         @rtype:
         """
-        query = f"MATCH (n:{label}) return n"
+        query = f"MATCH (n:{label}) RETURN n"
         results = list(self.graph.run(query))
 
         return results
@@ -227,7 +177,72 @@ class AicaNeo4j:
         @return:
         @rtype:
         """
-        query = f"MATCH ()-[r:{label}]-() return r"
+        query = f"MATCH ()-[r:{label}]-() RETURN r"
+        results = list(self.graph.run(query))
+
+        return results
+
+    def get_attack_pattern_by_name(self, name: str) -> List[Node]:
+        """
+        Get all relations from graph with a given label.
+
+        @param label: Type (label) of nodes to retrieve.
+        @type label: str
+        @return:
+        @rtype:
+        """
+        query = f"MATCH (n:AttackPattern WHERE n.name = '{name}') RETURN n"
+        results = list(self.graph.run(query))
+
+        return results
+
+    def get_indicators_by_name(self, name: str) -> List[Node]:
+        """
+        Get all relations from graph with a given label.
+
+        @param label: Type (label) of nodes to retrieve.
+        @type label: str
+        @return:
+        @rtype:
+        """
+        query = f"MATCH (n:Indicator WHERE n.name = '{name}') RETURN n"
+        results = list(self.graph.run(query))
+
+        return results
+
+    def get_note_by_abstract(self, abstract: str) -> List[Node]:
+        """
+        Get all port notes from graph with a given port/proto.
+
+        @param label: Type (label) of nodes to retrieve.
+        @type label: str
+        @return:
+        @rtype:
+        """
+        query = f"MATCH (n:note WHERE n.abstract = '{abstract}') RETURN n"
+        results = list(self.graph.run(query))
+
+        return results
+
+    def get_port_note(self, port: int, proto: str) -> List[Node]:
+        """
+        Get all port notes from graph with a given port/proto.
+
+        @param label: Type (label) of nodes to retrieve.
+        @type label: str
+        @return:
+        @rtype:
+        """
+        return self.get_note_by_abstract(f"{port}/{proto}")
+
+    def get_ipv4_by_addr(self, addr: str) -> List[Node]:
+        query = f"MATCH (n:`ipv4-addr` WHERE n.value = '{addr}') RETURN n"
+        results = list(self.graph.run(query))
+
+        return results
+
+    def get_ipv6_by_addr(self, addr: str) -> List[Node]:
+        query = f"MATCH (n:`ipv6-addr` WHERE n.value = '{addr}') RETURN n"
         results = list(self.graph.run(query))
 
         return results
