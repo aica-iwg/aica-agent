@@ -22,8 +22,8 @@ import pytz
 import re
 
 from celery.utils.log import get_task_logger
-from stix2.base import _STIXBase
-from stix2 import (
+from stix2.base import _STIXBase  # type: ignore
+from stix2 import (  # type: ignore
     AttackPattern,
     Directory,
     DomainName,
@@ -197,7 +197,7 @@ ip_protos = {
 }
 
 
-def get_ipv4(ip_addr: str):
+def get_ipv4(ip_addr: str) -> Union[str, None]:
     ip_addresses = graph.get_ipv4_ids_by_addr(ip_addr)
     if len(ip_addresses) > 0:
         return list(ip_addresses)[0]
@@ -205,7 +205,7 @@ def get_ipv4(ip_addr: str):
         return None
 
 
-def get_ipv6(ip_addr: str):
+def get_ipv6(ip_addr: str) -> Union[str, None]:
     ip_addresses = graph.get_ipv6_ids_by_addr(ip_addr)
     if len(ip_addresses) > 0:
         return list(ip_addresses)[0]
@@ -213,7 +213,7 @@ def get_ipv6(ip_addr: str):
         return None
 
 
-def get_attack_pattern(attack_pattern: str):
+def get_attack_pattern(attack_pattern: str) -> Union[str, None]:
     attack_patterns = graph.get_attack_pattern_ids_by_name(attack_pattern)
     if len(attack_patterns) > 0:
         return list(attack_patterns)[0]
@@ -335,7 +335,7 @@ def netflow_to_knowledge(
     end_time = dateparser.parse(str(flow["LAST_SWITCHED"]))
 
     try:
-        protocol = ip_protos[flow["PROTO"]]
+        protocol = ip_protos[int(flow["PROTO"])]
     except KeyError:
         protocol = "unknown"
 
@@ -357,7 +357,7 @@ def netflow_to_knowledge(
     knowledge_nodes.append(traffic)
 
     dst_port_note_ids = graph.get_port_note_ids_by_abstract(
-        flow["DST_PORT"], flow["PROTO"]
+        int(flow["DST_PORT"]), protocol
     )
     label = f"{flow['DST_PORT']}/{protocol}"
     if len(dst_port_note_ids) > 0:
@@ -399,8 +399,9 @@ def nginx_accesslog_to_knowledge(
         raise ValueError(f"Couldn't parse timestamp {log_dict['dateandtime']}")
 
     # Create source host and port nodes (and link to protocol node)
-    ip_src_addr = ipaddress.ip_address(log_dict["src_ip"])
-    if ip_src_addr.version == 4:
+    ip_version = ipaddress.ip_address(log_dict["src_ip"]).version
+    ip_src_addr = log_dict["src_ip"]
+    if ip_version == 4:
         source_addr_id = get_ipv4(ip_src_addr)
         if source_addr_id:
             source_addr = IPv4Address(id=source_addr_id, value=ip_src_addr)
@@ -416,7 +417,7 @@ def nginx_accesslog_to_knowledge(
             dest_addr = IPv4Address(value=ip_dst_addr)
             knowledge_nodes.append(dest_addr)
 
-    elif ip_src_addr.version == 6:
+    elif ip_version == 6:
         ip_src_addr = str(ipaddress.ip_address(log_dict["src_ip"]))
         source_addr_id = get_ipv6(ip_src_addr)
         if source_addr_id:
@@ -588,10 +589,14 @@ def nmap_scan_to_knowledge(scan_results: Dict[str, Any]) -> List[_STIXBase]:
 
             try:
                 vendor_abstract = f"vendor: {scan_results[host]['vendor']}"
-                vendors = graph.get_note_by_abstract(vendor_abstract)
+                vendors = graph.get_note_ids_by_abstract(vendor_abstract)
                 if len(vendors) > 0:
-                    vendor_note = list(vendors)[0]
-                    vendor_note["object_refs"].append(mac_addr)
+                    vendor_note = Note(
+                        id=list(vendors)[0],
+                        abstract=vendor_abstract,
+                        content=vendor_abstract,
+                        object_refs=[mac_addr],
+                    )
                 else:
                     vendor_note = Note(
                         abstract=vendor_abstract,
@@ -764,9 +769,7 @@ def suricata_alert_to_knowledge(alert: Dict[str, Any]) -> List[_STIXBase]:
     )
     knowledge_nodes.append(alert_stix)
 
-    alert_name = (
-        f"suricata:{alert['alert']['signature_id']}/{alert['alert']['rev']}"
-    )
+    alert_name = f"suricata:{alert['alert']['signature_id']}/{alert['alert']['rev']}"
 
     # Check for existing indicator in DB. Create if it doesn't exist, reference if it does.
     alert_sig_ids = graph.get_indicator_ids_by_name(alert_name)

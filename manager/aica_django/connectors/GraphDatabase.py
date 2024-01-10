@@ -185,7 +185,7 @@ class AicaNeo4j:
 
         return True
 
-    def get_node_ids_by_label(self, label: str) -> List[Node]:
+    def get_node_ids_by_label(self, label: str) -> List[str]:
         """
         Get all nodes from graph with a given label.
 
@@ -195,11 +195,11 @@ class AicaNeo4j:
         @rtype:
         """
         query = f"MATCH (n:{label}) RETURN n"
-        results = {result["n"]["identifier"] for result in list(self.graph.run(query))}
+        results = [result["n"]["identifier"] for result in list(self.graph.run(query))]
 
         return results
 
-    def get_relation_ids_by_label(self, label: str) -> List[Node]:
+    def get_relation_ids_by_label(self, label: str) -> List[str]:
         """
         Get all relations from graph with a given label.
 
@@ -209,11 +209,11 @@ class AicaNeo4j:
         @rtype:
         """
         query = f"MATCH ()-[r:{label}]-() RETURN r"
-        results = {result["n"]["identifier"] for result in list(self.graph.run(query))}
+        results = [result["n"]["identifier"] for result in list(self.graph.run(query))]
 
         return results
 
-    def get_attack_pattern_ids_by_name(self, name: str) -> List[Node]:
+    def get_attack_pattern_ids_by_name(self, name: str) -> List[str]:
         """
         Get all relations from graph with a given label.
 
@@ -223,7 +223,7 @@ class AicaNeo4j:
         @rtype:
         """
         query = f"MATCH (n:AttackPattern WHERE n.name = '{name}') RETURN n"
-        results = {result["n"]["identifier"] for result in list(self.graph.run(query))}
+        results = [result["n"]["identifier"] for result in list(self.graph.run(query))]
 
         return results
 
@@ -237,7 +237,7 @@ class AicaNeo4j:
         @rtype:
         """
         query = f"MATCH (n:Indicator WHERE n.name = '{name}') RETURN n"
-        results = {result["n"]["identifier"] for result in list(self.graph.run(query))}
+        results = [result["n"]["identifier"] for result in list(self.graph.run(query))]
 
         return results
 
@@ -251,7 +251,7 @@ class AicaNeo4j:
         @rtype:
         """
         query = f"MATCH (n:note WHERE n.abstract = '{abstract}') RETURN n"
-        results = {result["n"]["identifier"] for result in list(self.graph.run(query))}
+        results = [result["n"]["identifier"] for result in list(self.graph.run(query))]
 
         return results
 
@@ -266,18 +266,18 @@ class AicaNeo4j:
         """
         return self.get_note_ids_by_abstract(f"{port}/{proto}")
 
-    def get_ipv4_ids_by_addr(self, addr: str) -> List[Node]:
+    def get_ipv4_ids_by_addr(self, addr: str) -> List[str]:
         query = f"MATCH (n:`ipv4-addr` WHERE n.value = '{addr}') RETURN n"
         query_results = list(self.graph.run(query))
         if query_results:
-            return {result["n"]["identifier"] for result in query_results}
+            return [result["n"]["identifier"] for result in query_results]
         else:
             return []
 
-    def get_ipv6_ids_by_addr(self, addr: str) -> List[Node]:
+    def get_ipv6_ids_by_addr(self, addr: str) -> List[str]:
         query = f"MATCH (n:`ipv6-addr` WHERE n.value = '{addr}') RETURN n"
         query_results = list(self.graph.run(query))
         if query_results:
-            return {result["n"]["identifier"] for result in query_results}
+            return [result["n"]["identifier"] for result in query_results]
         else:
             return []

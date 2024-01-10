@@ -31,7 +31,7 @@ from celery.signals import worker_ready
 from celery.utils.log import get_task_logger
 from io import StringIO
 from py2neo import ConnectionUnavailable  # type: ignore
-from stix2 import AttackPattern, Note, Software
+from stix2 import AttackPattern, Note, Software  # type: ignore
 from typing import Any, Dict
 
 from aica_django.connectors.DocumentDatabase import AicaMongo
