@@ -19,5 +19,5 @@ app = Celery("aica_django")
 app.config_from_object("django.conf:settings", namespace="CELERY")
 
 # Discover apps
-app.autodiscover_tasks(lambda: settings.INSTALLED_APPS)  # type: ignore
+app.autodiscover_tasks(lambda: settings.INSTALLED_APPS)
 app.conf.timezone = "UTC"

@@ -68,43 +68,43 @@ class TestAntiVirus(TestCase):
                 self.fail()
 
     def test040_poll_clamav_no_alert(self):
-        hosts_before = self.graph.get_nodes_by_label("Host").sort(key=hash)
-        alerts_before = self.graph.get_nodes_by_label("Alert").sort(key=hash)
-        attack_signatures_before = self.graph.get_nodes_by_label(
+        hosts_before = self.graph.get_node_ids_by_label("Host").sort(key=hash)
+        alerts_before = self.graph.get_node_ids_by_label("Alert").sort(key=hash)
+        attack_signatures_before = self.graph.get_node_ids_by_label(
             "AttackSignature"
         ).sort(key=hash)
-        attack_signature_categories_before = self.graph.get_nodes_by_label(
+        attack_signature_categories_before = self.graph.get_node_ids_by_label(
             "AttackSignatureCategory"
         ).sort(key=hash)
-        file_paths_before = self.graph.get_nodes_by_label("FilePath").sort(key=hash)
-        triggered_relations_before = self.graph.get_relations_by_label(
+        file_paths_before = self.graph.get_node_ids_by_label("FilePath").sort(key=hash)
+        triggered_relations_before = self.graph.get_relation_ids_by_label(
             "TRIGGERED_BY"
         ).sort(key=hash)
-        storage_relations_before = self.graph.get_relations_by_label("STORED_ON").sort(
-            key=hash
-        )
-        type_relations_before = self.graph.get_relations_by_label("IS_TYPE").sort(
+        storage_relations_before = self.graph.get_relation_ids_by_label(
+            "STORED_ON"
+        ).sort(key=hash)
+        type_relations_before = self.graph.get_relation_ids_by_label("IS_TYPE").sort(
             key=hash
         )
 
         poll_clamav_alerts(single=True)
 
-        hosts_after = self.graph.get_nodes_by_label("Host").sort(key=hash)
-        alerts_after = self.graph.get_nodes_by_label("Alert").sort(key=hash)
-        attack_signatures_after = self.graph.get_nodes_by_label("AttackSignature").sort(
-            key=hash
-        )
-        attack_signature_categories_after = self.graph.get_nodes_by_label(
+        hosts_after = self.graph.get_node_ids_by_label("Host").sort(key=hash)
+        alerts_after = self.graph.get_node_ids_by_label("Alert").sort(key=hash)
+        attack_signatures_after = self.graph.get_node_ids_by_label(
+            "AttackSignature"
+        ).sort(key=hash)
+        attack_signature_categories_after = self.graph.get_node_ids_by_label(
             "AttackSignatureCategory"
         ).sort(key=hash)
-        file_paths_after = self.graph.get_nodes_by_label("FilePath").sort(key=hash)
-        triggered_relations_after = self.graph.get_relations_by_label(
+        file_paths_after = self.graph.get_node_ids_by_label("FilePath").sort(key=hash)
+        triggered_relations_after = self.graph.get_relation_ids_by_label(
             "TRIGGERED_BY"
         ).sort(key=hash)
-        storage_relations_after = self.graph.get_relations_by_label("STORED_ON").sort(
-            key=hash
-        )
-        type_relations_after = self.graph.get_relations_by_label("IS_TYPE").sort(
+        storage_relations_after = self.graph.get_relation_ids_by_label(
+            "STORED_ON"
+        ).sort(key=hash)
+        type_relations_after = self.graph.get_relation_ids_by_label("IS_TYPE").sort(
             key=hash
         )
 
