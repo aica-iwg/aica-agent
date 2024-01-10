@@ -11,6 +11,7 @@ import socket
 from typing import Tuple, Union
 
 from paramiko import SSHClient, AutoAddPolicy
+from paramiko.ssh_exception import NoValidConnectionsError
 from celery.app import shared_task
 from celery.utils.log import get_task_logger
 
@@ -36,7 +37,7 @@ def send_ssh_command(target: str, command: str) -> Tuple[int, str, str]:
     client.connect(target, username="root")
     logger.debug(f"Sending command: {command}")
 
-    stdin, stdout, stderr = client.exec_command(command)  # nosec
+    _, stdout, stderr = client.exec_command(command)  # nosec
     retval = stdout.channel.recv_exit_status()
 
     return retval, "".join(stdout.readlines()), "".join(stderr.readlines())
@@ -81,9 +82,12 @@ def redirect_to_honeypot_iptables(
 
     if mode == "emu":
         command = f"ipset add honeypot [{attacker}] timeout {timeout}"
-        retval, stdout, stderr = send_ssh_command(target, command)
-        if retval:
-            logger.error(stderr)
-            return False
+        try:
+            retval, _, stderr = send_ssh_command(target, command)
+            if retval:
+                logger.error(stderr)
+                return False
+        except NoValidConnectionsError as e:
+            logger.warning(f"Unable to complete SSH command: {e}")
 
     return True

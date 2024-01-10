@@ -38,7 +38,7 @@ class IPv4Address(SemiStructuredNode):  # type: ignore
     The IPv4 address corresponding to a host, potentially with listening ports (NetworkEndpoints)
     """
 
-    id = StringProperty(required=True)
+    identifier = StringProperty(required=True)
     address = StringProperty(required=True)
     class_a = StringProperty()
     class_b = StringProperty()
@@ -54,7 +54,7 @@ class IPv6Address(SemiStructuredNode):  # type: ignore
     The IPv4 address corresponding to a host, potentially with listening ports (NetworkEndpoints)
     """
 
-    id = StringProperty(required=True)
+    identifier = StringProperty(required=True)
     address = StringProperty(required=True)
     class_16 = StringProperty()
     class_32 = StringProperty()
@@ -73,7 +73,7 @@ class AttackSignatureCategory(SemiStructuredNode):  # type: ignore
     Broader buckets of attack signatures
     """
 
-    id = StringProperty(required=True)
+    identifier = StringProperty(required=True)
     category = StringProperty(required=True)
 
 
@@ -82,7 +82,7 @@ class AttackSignature(SemiStructuredNode):  # type: ignore
     Types of attacks that an alert might fall into
     """
 
-    id = StringProperty(required=True)
+    identifier = StringProperty(required=True)
     gid = IntegerProperty(required=True)
     signature_id = IntegerProperty(required=True)
     rev = IntegerProperty(required=True)
@@ -106,7 +106,7 @@ class Host(SemiStructuredNode):  # type: ignore
     A physical/virtual system, potentially with multiple addresses
     """
 
-    id = StringProperty(required=True)
+    identifier = StringProperty(required=True)
     last_seen = DateTimeProperty(required=True)
     ipv4_address = RelationshipTo("IPv4Address", "HAS_ADDRESS")
     ipv6_address = RelationshipTo("IPv6Address", "HAS_ADDRESS")
@@ -130,7 +130,7 @@ class Host(SemiStructuredNode):  # type: ignore
                 "(:NetworkEndpoint)-[:`COMMUNICATES_TO`]->"
                 "(:NetworkTraffic)<-[:`TRIGGERED_BY`]-"
                 "(a:Alert) "
-                f"WHERE a.time_tripped >= (dateTime().epochMillis / 1000) - {since} AND h.id = '{ip}' "
+                f"WHERE a.time_tripped >= (dateTime().epochMillis / 1000) - {since} AND h.identifier = '{ip}' "
                 "RETURN a"
             )
             all_results.extend(results)
@@ -142,7 +142,7 @@ class Host(SemiStructuredNode):  # type: ignore
                 "(:NetworkEndpoint)-[:`COMMUNICATES_TO`]->"
                 "(:NetworkTraffic)<-[:`TRIGGERED_BY`]-"
                 "(a:Alert) "
-                f"WHERE a.time_tripped >= (dateTime().epochMillis / 1000) - {since} AND h.id = '{ip}' "
+                f"WHERE a.time_tripped >= (dateTime().epochMillis / 1000) - {since} AND h.identifier = '{ip}' "
                 "RETURN a"
             )
             all_results.extend(results)
@@ -168,7 +168,7 @@ class Host(SemiStructuredNode):  # type: ignore
                 "(n:NetworkTraffic)"
                 "WHERE NOT EXISTS {MATCH (:Alert)-[:`TRIGGERED_BY`]->(n:NetworkTraffic)} AND "
                 f"n.start >= (dateTime().epochMillis / 1000) - {since} "
-                f"AND h.id = '{ip}' "
+                f"AND h.identifier = '{ip}' "
                 "RETURN n"
             )
             all_results.extend(results)
@@ -181,7 +181,7 @@ class Host(SemiStructuredNode):  # type: ignore
                 "(n:NetworkTraffic)"
                 "WHERE NOT EXISTS {MATCH (:Alert)-[:`TRIGGERED_BY`]->(n:NetworkTraffic)} AND "
                 f"n.start >= (dateTime().epochMillis / 1000) - {since} "
-                f"AND h.id = '{ip}' "
+                f"AND h.identifier = '{ip}' "
                 "RETURN n"
             )
             all_results.extend(results)
@@ -208,7 +208,7 @@ class Host(SemiStructuredNode):  # type: ignore
                 "(n:NetworkTraffic)"
                 "WHERE EXISTS {MATCH (:Alert)-[:`TRIGGERED_BY`]->(n:NetworkTraffic)} AND "
                 f"n.start >= (dateTime().epochMillis / 1000) - {since} "
-                f"AND h.id = '{ip}' "
+                f"AND h.identifier = '{ip}' "
                 "RETURN n"
             )
             all_results.extend(results)
@@ -221,7 +221,7 @@ class Host(SemiStructuredNode):  # type: ignore
                 "(n:NetworkTraffic)"
                 "WHERE EXISTS {MATCH (:Alert)-[:`TRIGGERED_BY`]->(n:NetworkTraffic)} AND "
                 f"n.start >= (dateTime().epochMillis / 1000) - {since} "
-                f"AND h.id = '{ip}' "
+                f"AND h.identifier = '{ip}' "
                 "RETURN n"
             )
             all_results.extend(results)
@@ -268,7 +268,7 @@ class Host(SemiStructuredNode):  # type: ignore
                 "(n:NetworkTraffic)"
                 "WHERE NOT EXISTS {MATCH (:Alert)-[:`TRIGGERED_BY`]->(n:NetworkTraffic)} AND "
                 f"n.start >= (dateTime().epochMillis / 1000) - {since} "
-                f"AND h.id = '{ip}' "
+                f"AND h.identifier = '{ip}' "
                 "RETURN n"
             )
             all_results.extend(results)
@@ -280,7 +280,7 @@ class Host(SemiStructuredNode):  # type: ignore
                 "(n:NetworkTraffic)"
                 "WHERE NOT EXISTS {MATCH (:Alert)-[:`TRIGGERED_BY`]->(n:NetworkTraffic)} AND "
                 f"n.start >= (dateTime().epochMillis / 1000) - {since} "
-                f"AND h.id = '{ip}' "
+                f"AND h.identifier = '{ip}' "
                 "RETURN n"
             )
             all_results.extend(results)
@@ -307,7 +307,7 @@ class Host(SemiStructuredNode):  # type: ignore
                 "(n:NetworkTraffic)"
                 "WHERE EXISTS {MATCH (:Alert)-[:`TRIGGERED_BY`]->(n:NetworkTraffic)} AND "
                 f"n.start >= (dateTime().epochMillis / 1000) - {since} "
-                f"AND h.id = '{ip}' "
+                f"AND h.identifier = '{ip}' "
                 "RETURN n"
             )
             all_results.extend(results)
@@ -320,7 +320,7 @@ class Host(SemiStructuredNode):  # type: ignore
                 "(n:NetworkTraffic)"
                 "WHERE EXISTS {MATCH (:Alert)-[:`TRIGGERED_BY`]->(n:NetworkTraffic)} AND "
                 f"n.start >= (dateTime().epochMillis / 1000) - {since} "
-                f"AND h.id = '{ip}' "
+                f"AND h.identifier = '{ip}' "
                 "RETURN n"
             )
             all_results.extend(results)
@@ -353,7 +353,7 @@ class NetworkEndpoint(SemiStructuredNode):  # type: ignore
     A listening or transmitting NetworkPort tied to a specific address
     """
 
-    id = StringProperty(required=True)
+    identifier = StringProperty(required=True)
     protocol = IntegerProperty(required=True)
     port = IntegerProperty(required=True)
     ip_address = StringProperty(required=True)
@@ -365,7 +365,7 @@ class NetworkTraffic(SemiStructuredNode):  # type: ignore
     A record of a transmission over the network
     """
 
-    id = StringProperty(required=True)
+    identifier = StringProperty(required=True)
     in_packets = IntegerProperty(required=True)
     in_octets = IntegerProperty(required=True)
     start = DateTimeProperty(required=True)

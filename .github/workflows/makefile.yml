@@ -22,7 +22,7 @@ jobs:
         python-version: ${{ matrix.python-version }}
       
     - name: Set up environment 
-      run:  echo $ENV_FILE | base64 --decode > manager/.env && make deps
+      run:  echo $ENV_FILE | base64 --decode > manager/.env && make init 
     
     - name: Build Containers 
       run:  make build

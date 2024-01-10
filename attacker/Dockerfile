@@ -1,4 +1,4 @@
-FROM alpine:3.18
+FROM alpine:3.19
 
 COPY requirements.txt .
 RUN apk update && apk upgrade && \
@@ -12,10 +12,13 @@ RUN apk update && apk upgrade && \
         py3-pip \
         build-base \
         python3-dev \
-        libffi-dev && \
-    pip install -U pip wheel && \
-    pip install -Ur requirements.txt && \
-    ssh-keygen -A
+        libffi-dev
+
+RUN python3 -m venv attacker && \
+    source attacker/bin/activate && \
+    pip install -Ur requirements.txt
+
+RUN ssh-keygen -A
 
 RUN adduser -D ssh_user
 

@@ -51,18 +51,10 @@ services:
     depends_on:
       - honeypot
 
-  node_red_target:
-    build: node_red_target
-    container_name: node_red_target
-    env_file:
-      - node_red_target/.env
-    networks:
-      - target
-
   honeypot:
     build: honeypot
     container_name: honeypot
-    command: /usr/bin/opencanaryd --dev
+    command: bash -c "source canary/bin/activate && /canary/bin/opencanaryd --dev"
     volumes:
       - ./honeypot/opencanary.conf:/etc/opencanaryd/opencanary.conf
     networks:

@@ -2,23 +2,13 @@
 This module defines objects representing nodes and relations in the Knowledge graph, and functions for
 handling them (e.g., parsing/converting).
 
-Classes:
-    KnowledgeNode: Base/generic class for representing a knowledge object
-    KnowledgeRelation: Base/generic class for representing a knowledge relationship
-    Host: A physical/virtual system, potentially with multiple addresses
-    IPv4Address: The IPv4 address corresponding to a host, potentially with listening ports (NetworkEndpoints)
-    IPv6Address: The IPv6 address corresponding to a host, potentially with listening ports (NetworkEndpoints)
-    NetworkEndpoint: A listening or transmitting NetworkPort tied to a specific address
-    NetworkPort: A global representation a network port and associated attributes
-    NetworkTraffic: A record of a transmission over the network
-
 Functions:
-    antivirus_alert_to_knowledge: Converts an alert from the antivirus system to KnowledgeNodes/Relations
-    netflow_to_knowledge: Converts a network flow record to KnowledgeNodes/Relations
-    nginx_accesslog_to_knowledge: Converts an HTTP access log entry to KnowledgeNodes/Relations
-    nmap_scan_to_knowledge: Converts a network scan result to KnowledgeNodes/Relations
-    suricata_alert_to_knowledge: Converts an alert from the IDS to KnowledgeNodes/Relations
-    knowledge_to_neo: Stores lists of KnowledgeNodes and KnowledgeRelations in the knowledge graph database
+    antivirus_alert_to_knowledge: Converts an alert from the antivirus system to STIX objects 
+    netflow_to_knowledge: Converts a network flow record to STIX objects 
+    nginx_accesslog_to_knowledge: Converts an HTTP access log entry to STIX objects
+    nmap_scan_to_knowledge: Converts a network scan result to STIX objects
+    suricata_alert_to_knowledge: Converts an alert from the IDS to STIX objects 
+    knowledge_to_neo: Stores lists of STIX objects in the knowledge graph database
     normalize_mac_addr: Converts MAC address to standard lowercase hex value without separators
     dissect_time: Converts a timestamp value into a dictionary of time attributes potential relevant for classification
 
@@ -27,23 +17,208 @@ Functions:
 import dateparser
 import datetime
 import ipaddress
-import logging
-import os
+import json
 import pytz
 import re
-import socket
-import uuid
 
-from typing import Any, Dict, List, Optional, Tuple, Union
-
-from aica_django.connectors.GraphDatabase import (
-    AicaNeo4j,
-    defined_node_labels,
-    defined_relation_labels,
-)
 from celery.utils.log import get_task_logger
+from stix2.base import _STIXBase  # type: ignore
+from stix2 import (  # type: ignore
+    AttackPattern,
+    Directory,
+    DomainName,
+    File,
+    HTTPRequestExt,
+    Indicator,
+    Infrastructure,
+    IPv4Address,
+    IPv6Address,
+    Malware,
+    MACAddress,
+    NetworkTraffic,
+    Note,
+    ObservedData,
+    Relationship,
+    Sighting,
+    Software,
+)
+from typing import Any, Dict, List, Optional, Union
+
+from aica_django.connectors.GraphDatabase import AicaNeo4j
+
 
 logger = get_task_logger(__name__)
+
+graph = AicaNeo4j()
+
+ip_protos = {
+    0: "hopopt",
+    1: "icmp",
+    2: "igmp",
+    3: "ggp",
+    4: "ip-in-ip",
+    5: "st",
+    6: "tcp",
+    7: "cbt",
+    8: "egp",
+    9: "igp",
+    10: "bbn-rcc-mon",
+    11: "nvp-ii",
+    12: "pup",
+    13: "argus",
+    14: "emcon",
+    15: "xnet",
+    16: "chaos",
+    17: "udp",
+    18: "mux",
+    19: "dcn-meas",
+    20: "hmp",
+    21: "prm",
+    22: "xns-idp",
+    23: "trunk-1",
+    24: "trunk-2",
+    25: "leaf-1",
+    26: "leaf-2",
+    27: "rdp",
+    28: "irtp",
+    29: "iso-tp4",
+    30: "netblt",
+    31: "mfe-nsp",
+    32: "merit-inp",
+    33: "dccp",
+    34: "3pc",
+    35: "idpr",
+    36: "xtp",
+    37: "ddp",
+    38: "idpr-cmtp",
+    39: "tp++",
+    40: "il",
+    41: "ipv6",
+    42: "sdrp",
+    43: "ipv6-route",
+    44: "ipv6-frag",
+    45: "idrp",
+    46: "rsvp",
+    47: "gre",
+    48: "dsr",
+    49: "bna",
+    50: "esp",
+    51: "ah",
+    52: "i-nlsp",
+    53: "swipe",
+    54: "narp",
+    55: "mobile",
+    56: "tlsp",
+    57: "skip",
+    58: "ipv6-icmp",
+    59: "ipv6-nonxt",
+    60: "ipv6-opts",
+    62: "cftp",
+    64: "sat-expak",
+    65: "kryptolan",
+    66: "rvd",
+    67: "ippc",
+    69: "sat-mon",
+    70: "visa",
+    71: "ipcu",
+    72: "cpnx",
+    73: "cphb",
+    74: "wsn",
+    75: "pvp",
+    76: "br-sat-mon",
+    77: "sun-nd",
+    78: "wb-mon",
+    79: "wb-expak",
+    80: "iso-ip",
+    81: "vmtp",
+    82: "secure-vmtp",
+    83: "vines",
+    84: "ttp",
+    84: "iptm",
+    85: "nsfnet-igp",
+    86: "dgp",
+    87: "tcf",
+    88: "eigrp",
+    89: "ospf",
+    90: "sprite-rpc",
+    91: "larp",
+    92: "mtp",
+    93: "ax.25",
+    94: "os",
+    95: "micp",
+    96: "scc-sp",
+    97: "etherip",
+    98: "encap",
+    100: "gmtp",
+    101: "ifmp",
+    102: "pnni",
+    103: "pim",
+    104: "aris",
+    105: "scps",
+    106: "qnx",
+    107: "a/n",
+    108: "ipcomp",
+    109: "snp",
+    110: "compaq-peer",
+    111: "ipx-in-ip",
+    112: "vrrp",
+    113: "pgm",
+    115: "l2tp",
+    116: "ddx",
+    117: "iatp",
+    118: "stp",
+    119: "srp",
+    120: "uti",
+    121: "smp",
+    122: "sm",
+    123: "ptp",
+    124: "is-is over ipv4",
+    125: "fire",
+    126: "crtp",
+    127: "crudp",
+    128: "sscopmce",
+    129: "iplt",
+    130: "sps",
+    131: "pipe",
+    132: "sctp",
+    133: "fc",
+    134: "rsvp-e2e-ignore",
+    135: "mobility header",
+    136: "udplite",
+    137: "mpls-in-ip",
+    138: "manet",
+    139: "hip",
+    140: "shim6",
+    141: "wesp",
+    142: "rohc",
+    143: "ethernet",
+    144: "aggfrag",
+    145: "nsh",
+}
+
+
+def get_ipv4(ip_addr: str) -> Union[str, None]:
+    ip_addresses = graph.get_ipv4_ids_by_addr(ip_addr)
+    if len(ip_addresses) > 0:
+        return list(ip_addresses)[0]
+    else:
+        return None
+
+
+def get_ipv6(ip_addr: str) -> Union[str, None]:
+    ip_addresses = graph.get_ipv6_ids_by_addr(ip_addr)
+    if len(ip_addresses) > 0:
+        return list(ip_addresses)[0]
+    else:
+        return None
+
+
+def get_attack_pattern(attack_pattern: str) -> Union[str, None]:
+    attack_patterns = graph.get_attack_pattern_ids_by_name(attack_pattern)
+    if len(attack_patterns) > 0:
+        return list(attack_patterns)[0]
+    else:
+        return None
 
 
 def dissect_time(timestamp: Union[int, float], prefix: str = "") -> Dict[str, Any]:
@@ -89,494 +264,6 @@ def dissect_time(timestamp: Union[int, float], prefix: str = "") -> Dict[str, An
     return time_details
 
 
-class KnowledgeNode:
-    """
-    Represents an arbitrary knowledge object, intended mainly for sub-classing
-    """
-
-    def __init__(
-        self, label: str, name: str, values: Union[None, Dict[str, Any]] = None
-    ):
-        """
-        Initialize a new KnowledgeNode object.
-
-        @param label: The type of node, of the types specified in aica_django.connectors.GraphDatabase
-        @type label: str
-        @param name: A human-readable name for this node
-        @type name: str
-        @param values: Any metadata values that should be stored with this node
-        @type values: dict
-        @raise ValueError: If an unsupported node label or invalid name is provided.
-        """
-
-        if label not in defined_node_labels:
-            raise ValueError(f"Unsupported node label {label} for {name}")
-
-        if name == "":
-            raise ValueError(f"Name must be non-empty")
-
-        self.values = values if values else {}
-        if label == "MACAddress":
-            name = normalize_mac_addr(name)
-            self.values["value"] = name
-
-        self.label = label
-        self.name = name
-
-
-class NetworkPort(KnowledgeNode):
-    """
-    Represents a global reference for an IP port that may contain additional metadata useful
-    for classification.
-    """
-
-    def __init__(
-        self,
-        port: int,
-        protocol: Union[int, str],
-        values: Union[None, Dict[str, Any]] = None,
-    ):
-        """
-        Initialize this NetworkPort object
-
-        @param port: The port number (0-65535)
-        @type port: int
-        @param protocol: The protocol name or numerical representation (e.g., TCP or 6)
-        @type protocol: Union[int, str]
-        @param values: Any metadata values that should be stored with this node
-        @type values: dict
-        @raise: ValueError: if the specific port or protocol numbers are out of bounds
-        """
-
-        self.label = "NetworkPort"
-
-        if 0 <= port < 65535:
-            self.port = port
-        else:
-            raise ValueError("Invalid port number")
-
-        if type(protocol) == int:
-            if 0 <= protocol < 256:
-                self.protocol = protocol
-            else:
-                raise ValueError("Invalid protocol number")
-        else:
-            assert type(protocol) == str
-            try:
-                proto_num = socket.getprotobyname(protocol)
-                self.protocol = proto_num
-            except OSError:
-                raise ValueError("Invalid protocol name")
-
-        self.name = f"{self.port}/{self.protocol}"
-        self.values = values if values else {}
-        super().__init__(self.label, self.name, values=self.values)
-
-    def to_knowledge_node(self) -> KnowledgeNode:
-        """
-        Convert this NetworkPort object to a KnowledgeNode representation.
-
-        @return: KnowledgeNode version of this object.
-        @rtype: KnowledgeNode
-        """
-
-        values = self.values
-        values["port"] = self.port
-        values["protocol"] = self.protocol
-        values["privileged"] = self.port < 1024
-        return KnowledgeNode(
-            label=self.label,
-            name=self.name,
-            values=values,
-        )
-
-
-class NetworkEndpoint(KnowledgeNode):
-    """
-    Represents a specific reference to a communicating IP port on a host (source or destination).
-    """
-
-    def __init__(
-        self,
-        ip_address: str,
-        port: int,
-        protocol: Union[str, int],
-        endpoint: str = "",
-        values: Union[None, Dict[str, Any]] = None,
-    ):
-        """
-        Initialize this NetworkEndpoint object.
-
-        @param ip_address: The string representation of the IP address associated with this port
-        @type ip_address: str
-        @param port: The port number (0-65535)
-        @type port: int
-        @param protocol: The protocol name or numerical representation (e.g., TCP or 6)
-        @type protocol: Union[int, str]
-        @param endpoint: Whether this endpoint is the source ("src") or destination ("dst") of the flow
-        @type endpoint: str
-        @param values: Any metadata values that should be stored with this node
-        @type values: dict
-        @raise: ValueError: if the specific port or protocol numbers are out of bounds
-        """
-        self.label = "NetworkEndpoint"
-
-        try:
-            self.ip_addr = ipaddress.ip_address(ip_address)
-            self.ip_address = ip_address
-        except ValueError:
-            raise ValueError("Provided IP address was not a valid IPv4 or IPv6 address")
-
-        if 0 <= port < 65535:
-            self.port = port
-        else:
-            raise ValueError("Invalid port number")
-
-        if type(protocol) == int:
-            if 0 <= protocol < 256:
-                self.protocol = protocol
-            else:
-                raise ValueError("Invalid protocol number")
-        else:
-            assert type(protocol) == str
-            try:
-                proto_num = socket.getprotobyname(protocol)
-                self.protocol = proto_num
-            except OSError:
-                raise ValueError("Invalid protocol name")
-
-        self.endpoint = endpoint if endpoint in ["src", "dst"] else None
-
-        self.name = f"{self.ip_address}:{self.port}/{self.protocol}"
-        self.values = values if values else {}
-        super().__init__(self.label, self.name, values=self.values)
-
-    def to_network_port_ref(self) -> NetworkPort:
-        """
-        Convert to genericized NetworkPort reference (remove specific Host/IP info)
-        @return: Generic NetworkPort object
-        @rtype: NetworkPort
-        """
-
-        return NetworkPort(self.port, self.protocol, values=self.values)
-
-    def to_knowledge_node(self) -> KnowledgeNode:
-        """
-        Convert this NetworkEndpoint object to a KnowledgeNode representation.
-
-        @return: KnowledgeNode version of this object.
-        @rtype: KnowledgeNode
-        """
-
-        values = self.values
-        values["port"] = self.port
-        values["protocol"] = self.protocol
-        values["ip_address"] = self.ip_address
-        values["endpoint"] = self.endpoint
-
-        return KnowledgeNode(
-            label=self.label,
-            name=self.name,
-            values=values,
-        )
-
-
-class IPv4Address(KnowledgeNode):
-    """
-    Represents an IPv4 address
-    """
-
-    def __init__(self, ip_addr: str, values: Union[None, Dict[str, Any]] = None):
-        """
-        Initialize this IPv4Address object
-
-        @param ip_addr: A string representation (dotted quad) of this IP
-        @type ip_addr: str
-        @param values: Any metadata values that should be stored with this relationship
-        @type values: dict
-        """
-
-        self.label = "IPv4Address"
-
-        try:
-            socket.inet_pton(socket.AF_INET, ip_addr)
-        except socket.error:
-            logging.error(f"Invalid IPv4 Address: {ip_addr}")
-        self.ip_addr = ipaddress.ip_address(ip_addr)
-        self.name = ip_addr
-
-        self.values = values if values else {}
-        super().__init__(self.label, self.name, values=self.values)
-
-    def to_knowledge_node(self) -> KnowledgeNode:
-        """
-        Convert this IPv4Address object to a KnowledgeNode representation.
-
-        @return: KnowledgeNode version of this object.
-        @rtype: KnowledgeNode
-        """
-
-        values = self.values
-        values["address"] = str(self.ip_addr)
-        values["is_private"] = self.ip_addr.is_private
-        values["reserved"] = self.ip_addr.is_reserved
-        values["multicast"] = self.ip_addr.is_multicast
-        values["loopback"] = self.ip_addr.is_loopback
-        # Hex to discourage use as continuous value
-        int_value = int(self.ip_addr)
-        values["int_value"] = hex(int_value)
-        values["class_a"] = str(ipaddress.ip_address(int_value & 0xFF000000))
-        values["class_b"] = str(ipaddress.ip_address(int_value & 0xFFFF0000))
-        values["class_c"] = str(ipaddress.ip_address(int_value & 0xFFFFFF00))
-
-        return KnowledgeNode(
-            label=self.label,
-            name=self.name,
-            values=values,
-        )
-
-
-class IPv6Address(KnowledgeNode):
-    """
-    Represents an IPv6 address
-    """
-
-    def __init__(self, ip_addr: str, values: Union[None, Dict[str, Any]] = None):
-        """
-        Initialize this IPv6Address object
-
-        @param ip_addr: A string representation (colon-separated) of this IP
-        @type ip_addr: str
-        @param values: Any metadata values that should be stored with this relationship
-        @type values: dict
-        """
-
-        self.label = "IPv6Address"
-
-        try:
-            socket.inet_pton(socket.AF_INET6, ip_addr)
-        except socket.error:
-            logging.error(f"Invalid IPv6 Address: {ip_addr}")
-        self.ip_addr = ipaddress.ip_address(ip_addr)
-        self.name = ip_addr
-
-        self.values = values if values else {}
-        super().__init__(self.label, self.name, values=self.values)
-
-    def to_knowledge_node(self) -> KnowledgeNode:
-        """
-        Convert this IPv6Address object to a KnowledgeNode representation.
-
-        @return: KnowledgeNode version of this object.
-        @rtype: KnowledgeNode
-        """
-
-        values = self.values
-        values["address"] = str(self.ip_addr)
-        values["is_private"] = self.ip_addr.is_private
-        values["reserved"] = self.ip_addr.is_reserved
-        values["multicast"] = self.ip_addr.is_multicast
-        values["loopback"] = self.ip_addr.is_loopback
-        values["link_local"] = self.ip_addr.is_link_local
-        # Hex to discourage use as continuous value
-        int_value = int(self.ip_addr)
-        values["int_value"] = hex(int_value)
-        values["class_16"] = hex(int_value & 0xFFFF0000000000000000000000000000)
-        values["class_32"] = hex(int_value & 0xFFFFFFFF000000000000000000000000)
-        values["class_48"] = hex(int_value & 0xFFFFFFFFFFFF00000000000000000000)
-        values["class_56"] = hex(int_value & 0xFFFFFFFFFFFFFF000000000000000000)
-        values["class_64"] = hex(int_value & 0xFFFFFFFFFFFFFFFF0000000000000000)
-
-        return KnowledgeNode(
-            label=self.label,
-            name=self.name,
-            values=values,
-        )
-
-
-class NetworkTraffic(KnowledgeNode):
-    """
-    Represents a specific network communication observed on the network
-    """
-
-    def __init__(
-        self,
-        in_packets: int,
-        in_octets: int,
-        start_ts: float,
-        end_ts: float = 0,
-        flags: int = 0,
-        tos: int = 0,
-        values: Union[None, Dict[str, Any]] = None,
-    ):
-        """
-        Initialize this NetworkTraffic object.
-
-        @param in_packets: Number of ingress packets, per Netflow
-        @type in_packets: int
-        @param in_octets: Number of ingress bytes, per Netflow
-        @type in_octets: int
-        @param start_ts: Start timestamp for flow
-        @type start_ts: float
-        @param end_ts: End timestamp for flow, defaults to "0"
-        @type end_ts: float
-        @param flags: Integer representation of flags field, per Netflow
-        @type flags: int
-        @param tos: Integer representation of TOS field, per Netflow
-        @type tos: int
-        @param values: Any metadata values that should be stored with this relationship
-        @type values: dict
-        @raises: ValueError: if the provided flags or tos values are invalid
-        """
-
-        self.label = "NetworkTraffic"
-        self.in_packets = in_packets
-        self.in_octets = in_octets
-        self.start = start_ts
-        self.end = end_ts if end_ts else None
-
-        if 0 <= flags < 513:
-            self.tcp_flags_fin = bool(flags & 0x1)
-            self.tcp_flags_syn = bool(flags & 0x2)
-            self.tcp_flags_rst = bool(flags & 0x4)
-            self.tcp_flags_psh = bool(flags & 0x8)
-            self.tcp_flags_ack = bool(flags & 0x16)
-            self.tcp_flags_urg = bool(flags & 0x32)
-            self.tcp_flags_ece = bool(flags & 0x64)
-            self.tcp_flags_cwr = bool(flags & 0x128)
-            self.tcp_flags_ns = bool(flags & 0x256)
-        else:
-            raise ValueError(f"Invalid flags value specified: {flags}")
-
-        if 0 <= tos < 256:
-            # Hex to discourage use as continuous value
-            self.tos = hex(tos)
-        else:
-            raise ValueError(f"Invalid TOS/DSCP value specified: {tos}")
-
-        self.values = values if values else {}
-        self.name = str(uuid.uuid4())
-        super().__init__(self.label, self.name, values=self.values)
-
-    def to_knowledge_node(self) -> KnowledgeNode:
-        """
-        Convert this NetworkTraffic object to a KnowledgeNode representation.
-
-        @return: KnowledgeNode version of this object.
-        @rtype: KnowledgeNode
-        """
-
-        return KnowledgeNode(
-            label="NetworkTraffic",
-            name=self.name,
-            values={
-                "in_packets": self.in_packets,
-                "in_octets": self.in_octets,
-                "start": self.start,
-                "end": self.end,
-                "tcp_flags_fin": self.tcp_flags_fin,
-                "tcp_flags_syn": self.tcp_flags_syn,
-                "tcp_flags_rst": self.tcp_flags_rst,
-                "tcp_flags_psh": self.tcp_flags_psh,
-                "tcp_flags_ack": self.tcp_flags_ack,
-                "tcp_flags_urg": self.tcp_flags_urg,
-                "tcp_flags_ece": self.tcp_flags_ece,
-                "tcp_flags_cwr": self.tcp_flags_cwr,
-                "tcp_flags_ns": self.tcp_flags_ns,
-                "tos": self.tos,
-            },
-        )
-
-
-class Host(KnowledgeNode):
-    """
-    Represents a specific (physical/virtual) system, potentially with multiple IP addresses.
-    """
-
-    def __init__(
-        self,
-        identifier: str,
-        last_seen: float,
-        values: Union[None, Dict[str, Any]] = None,
-    ):
-        """
-        Initialize this Host object.
-
-        @param identifier: A unique identifier for this host.
-        @type identifier: str
-        @param last_seen: A timestamp value for the last time this host was observed.
-        @type last_seen: float
-        @param values: Any metadata values that should be stored with this relationship
-        @type values: dict
-        """
-        self.label = "Host"
-        self.name = identifier
-        self.values = values if values else {}
-        self.values["last_seen"] = last_seen
-        super().__init__(self.label, self.name, values=self.values)
-
-    def to_knowledge_node(self) -> KnowledgeNode:
-        """
-        Convert this Host object to a KnowledgeNode representation.
-
-        @return: KnowledgeNode version of this object.
-        @rtype: KnowledgeNode
-        """
-
-        return KnowledgeNode(
-            label=self.label,
-            name=self.name,
-            values=self.values,
-        )
-
-
-class KnowledgeRelation:
-    """
-    Represents an arbitrary knowledge relationship object, intended mainly for sub-classing
-    """
-
-    def __init__(
-        self,
-        label: str,
-        source_node: KnowledgeNode,
-        target_node: KnowledgeNode,
-        values: Union[None, Dict[str, Any]] = None,
-    ):
-        """
-        Initialize this knowledge relation
-
-        @param label: The type of relation, of the types specified in aica_django.connectors.GraphDatabase
-        @type label: str
-        @param source_node: The originating point for this relationship
-        @type source_node: KnowledgeNode
-        @param target_node: The terminating point for this relationship
-        @type target_node: KnowledgeNode
-        @param values: Any metadata values that should be stored with this relationship
-        @type values: dict
-        """
-
-        if label not in defined_relation_labels:
-            raise ValueError(
-                f"Unsupported relation label {label} from {source_node}->{target_node}"
-            )
-
-        if not (isinstance(source_node, KnowledgeNode)):
-            raise ValueError(
-                f"Source node must be a KnowledgeNode, not {type(source_node)}"
-            )
-        if not (isinstance(target_node, KnowledgeNode)):
-            raise ValueError(
-                f"Target node must be a KnowledgeNode, not {type(target_node)}"
-            )
-
-        self.label = label
-        self.source_node = source_node.name
-        self.source_label = source_node.label
-        self.target_node = target_node.name
-        self.target_label = target_node.label
-        self.values = values if values else {}
-
-
 def normalize_mac_addr(mac_addr: str) -> str:
     """
 
@@ -596,166 +283,112 @@ def normalize_mac_addr(mac_addr: str) -> str:
 
 def netflow_to_knowledge(
     flow: Dict[str, str]
-) -> Tuple[List[KnowledgeNode], List[KnowledgeRelation]]:
+) -> List[Union[NetworkTraffic, IPv4Address, IPv6Address]]:
     """
     Converts a netflow dictionary (from the Python netflow library) to knowledge objects.
 
     @param flow: A netflow dictionary to be converted to knowledge objects
     @type flow: Dict[str, str]
-    @return: Knowledge nodes and relations resulting form this conversion
-    @rtype: Tuple[list, list]
+    @return: Knowledge nodes resulting form this conversion
+    @rtype: list
     """
 
     knowledge_nodes = []
-    knowledge_relations = []
 
     # Create source host and port nodes (and link to protocol node)
     if "IPV4_SRC_ADDR" in flow and flow["IPV4_SRC_ADDR"] is not None:
         ip_src_addr = str(ipaddress.ip_address(flow["IPV4_SRC_ADDR"]))
-        source_addr = IPv4Address(ip_src_addr).to_knowledge_node()
+        source_addr_id = get_ipv4(ip_src_addr)
+        if source_addr_id:
+            source_addr = IPv4Address(id=source_addr_id, value=ip_src_addr)
+        else:
+            source_addr = IPv4Address(value=ip_src_addr)
+            knowledge_nodes.append(source_addr)
 
-        ip_dst_addr_obj = ipaddress.ip_address(flow["IPV4_DST_ADDR"])
-        ip_dst_addr = str(ip_dst_addr_obj)
-        dest_addr = IPv4Address(ip_dst_addr).to_knowledge_node()
+        ip_dst_addr = str(ipaddress.ip_address(flow["IPV4_DST_ADDR"]))
+        dest_addr_id = get_ipv4(ip_dst_addr)
+        if dest_addr_id:
+            dest_addr = IPv4Address(id=dest_addr_id, value=ip_dst_addr)
+        else:
+            dest_addr = IPv4Address(value=ip_dst_addr)
+            knowledge_nodes.append(dest_addr)
 
     elif "IPV6_SRC_ADDR" in flow and flow["IPV6_SRC_ADDR"] is not None:
         ip_src_addr = str(ipaddress.ip_address(flow["IPV6_SRC_ADDR"]))
-        source_addr = IPv6Address(ip_src_addr).to_knowledge_node()
+        source_addr_id = get_ipv6(ip_src_addr)
+        if source_addr_id:
+            source_addr = IPv6Address(id=source_addr_id, value=ip_src_addr)
+        else:
+            source_addr = IPv6Address(value=ip_src_addr)
+            knowledge_nodes.append(source_addr)
 
-        ip_dst_addr_obj = ipaddress.ip_address(flow["IPV6_DST_ADDR"])
-        ip_dst_addr = str(ip_dst_addr_obj)
-        dest_addr = IPv6Address(ip_dst_addr).to_knowledge_node()
+        ip_dst_addr = str(ipaddress.ip_address(flow["IPV6_DST_ADDR"]))
+        dest_addr_id = get_ipv6(ip_dst_addr)
+        if dest_addr_id:
+            dest_addr = IPv6Address(id=dest_addr_id, value=dest_addr_id)
+        else:
+            dest_addr = IPv6Address(value=ip_dst_addr)
+            knowledge_nodes.append(dest_addr)
 
-    source_host = Host(ip_src_addr, last_seen=float(flow["LAST_SWITCHED"]))
-    source_port = NetworkEndpoint(
-        ip_src_addr, int(flow["SRC_PORT"]), flow["PROTO"], endpoint="src"
+    # STIX 2.0 Mandated format
+    start_time = dateparser.parse(str(flow["FIRST_SWITCHED"]))
+    end_time = dateparser.parse(str(flow["LAST_SWITCHED"]))
+
+    try:
+        protocol = ip_protos[int(flow["PROTO"])]
+    except KeyError:
+        protocol = "unknown"
+
+    params = {
+        "protocols": [protocol],
+        "src_ref": source_addr,
+        "src_port": int(flow["SRC_PORT"]),
+        "src_packets": int(flow["IN_PACKETS"]),
+        "src_byte_count": int(flow["IN_OCTETS"]),
+        "dst_ref": dest_addr,
+        "dst_port": int(flow["DST_PORT"]),
+        "start": start_time,
+        "end": end_time,
+    }
+
+    # is_active must be false if end_time is set (per STIX)
+    traffic = NetworkTraffic(is_active=False, **params)
+
+    knowledge_nodes.append(traffic)
+
+    dst_port_note_ids = graph.get_port_note_ids_by_abstract(
+        int(flow["DST_PORT"]), protocol
     )
-    dest_port = NetworkEndpoint(
-        ip_dst_addr, int(flow["DST_PORT"]), flow["PROTO"], endpoint="dst"
-    )
-
-    source_addr_knowledge = source_addr
-    knowledge_nodes.append(source_addr_knowledge)
-
-    source_port_ref = source_port.to_network_port_ref()
-    source_port_knowledge = source_port.to_knowledge_node()
-    source_port_ref_knowledge = source_port_ref.to_knowledge_node()
-
-    knowledge_nodes.append(source_port_knowledge)
-    knowledge_nodes.append(source_port_ref_knowledge)
-
-    knowledge_relations.append(
-        KnowledgeRelation(
-            label="IS_TYPE",
-            source_node=source_port_knowledge,
-            target_node=source_port_ref_knowledge,
+    label = f"{flow['DST_PORT']}/{protocol}"
+    if len(dst_port_note_ids) > 0:
+        dst_port_note = Note(
+            id=list(dst_port_note_ids)[0],
+            object_refs=[traffic],
+            abstract=label,
+            content=label,
         )
-    )
-    knowledge_relations.append(
-        KnowledgeRelation(
-            label="HAS_PORT",
-            source_node=source_addr_knowledge,
-            target_node=source_port_knowledge,
-        )
-    )
+    else:
+        dst_port_note = Note(object_refs=[traffic], abstract=label, content=label)
 
-    source_host_knowledge = source_host.to_knowledge_node()
-    knowledge_nodes.append(source_host_knowledge)
-    knowledge_relations.append(
-        KnowledgeRelation(
-            label="HAS_ADDRESS",
-            source_node=source_host_knowledge,
-            target_node=source_addr_knowledge,
-        )
-    )
+    knowledge_nodes.append(dst_port_note)
 
-    # Create destination host and port nodes (and link to protocol node)
-
-    dest_addr_knowledge = dest_addr
-    knowledge_nodes.append(dest_addr_knowledge)
-
-    dest_port_ref = dest_port.to_network_port_ref()
-    dest_port_knowledge = dest_port.to_knowledge_node()
-    dest_port_ref_knowledge = dest_port_ref.to_knowledge_node()
-    knowledge_nodes.append(dest_port_knowledge)
-    knowledge_nodes.append(dest_port_ref_knowledge)
-
-    knowledge_relations.append(
-        KnowledgeRelation(
-            label="IS_TYPE",
-            source_node=dest_port_knowledge,
-            target_node=dest_port_ref_knowledge,
-        )
-    )
-    knowledge_relations.append(
-        KnowledgeRelation(
-            label="HAS_PORT",
-            source_node=dest_addr_knowledge,
-            target_node=dest_port_knowledge,
-        )
-    )
-
-    if not (ip_dst_addr_obj.is_multicast or ip_dst_addr_obj.is_reserved):
-        dest_host = Host(
-            ip_dst_addr,
-            last_seen=float(flow["LAST_SWITCHED"]),
-        )
-        dest_host_knowledge = dest_host.to_knowledge_node()
-        knowledge_nodes.append(dest_host_knowledge)
-        knowledge_relations.append(
-            KnowledgeRelation(
-                label="HAS_ADDRESS",
-                source_node=dest_host_knowledge,
-                target_node=dest_addr_knowledge,
-            )
-        )
-
-    # Create NetworkTraffic node
-    flow_knowledge = NetworkTraffic(
-        int(flow["IN_PACKETS"]),
-        int(flow["IN_OCTETS"]),
-        int(flow["FIRST_SWITCHED"]),
-        int(flow["LAST_SWITCHED"]),
-        int(flow["TCP_FLAGS"]),
-        int(flow["TOS"]),
-        values={
-            "source": "netflow",
-        },
-    ).to_knowledge_node()
-    knowledge_nodes.append(flow_knowledge)
-    knowledge_relations.append(
-        KnowledgeRelation(
-            label="COMMUNICATES_TO",
-            source_node=source_port_knowledge,
-            target_node=flow_knowledge,
-        )
-    )
-    knowledge_relations.append(
-        KnowledgeRelation(
-            label="COMMUNICATES_TO",
-            source_node=flow_knowledge,
-            target_node=dest_port_knowledge,
-        )
-    )
-
-    return knowledge_nodes, knowledge_relations
+    return knowledge_nodes
 
 
 def nginx_accesslog_to_knowledge(
     log_dict: Dict[str, Any]
-) -> Tuple[List[KnowledgeNode], List[KnowledgeRelation]]:
+) -> List[Union[IPv4Address, IPv6Address, HTTPRequestExt]]:
     """
     Converts an HTTP access log dictionary (as returned by aica_django.connectors.Nginx.poll_nginx_accesslogs)
     to knowledge objects.
 
     @param log_dict: An HTTP access log dictionary to be converted to knowledge objects
     @type log_dict: Dict[str, Any]
-    @return: Knowledge nodes and relations resulting form this conversion
-    @rtype: Tuple[list, list]
+    @return: Knowledge nodes resulting form this conversion
+    @rtype: list
     """
 
     knowledge_nodes = []
-    knowledge_relations = []
 
     # dateparser can't seem to handle this format
     request_time = datetime.datetime.strptime(
@@ -765,264 +398,174 @@ def nginx_accesslog_to_knowledge(
     if not request_time:
         raise ValueError(f"Couldn't parse timestamp {log_dict['dateandtime']}")
 
-    dissected_request_time = dissect_time(request_time.timestamp(), prefix="last_seen")
-    target_ip = log_dict["server_ip"]
+    # Create source host and port nodes (and link to protocol node)
+    ip_version = ipaddress.ip_address(log_dict["src_ip"]).version
+    ip_src_addr = log_dict["src_ip"]
+    if ip_version == 4:
+        source_addr_id = get_ipv4(ip_src_addr)
+        if source_addr_id:
+            source_addr = IPv4Address(id=source_addr_id, value=ip_src_addr)
+        else:
+            source_addr = IPv4Address(value=ip_src_addr)
+            knowledge_nodes.append(source_addr)
 
-    server_ip_knowledge = None
-    try:
-        server_ipv4 = IPv4Address(target_ip)
-        server_ipv4_knowledge = server_ipv4.to_knowledge_node()
-        server_ip_knowledge = server_ipv4_knowledge
-        knowledge_nodes.append(server_ipv4_knowledge)
-    except:
-        pass
+        ip_dst_addr = str(ipaddress.ip_address(log_dict["server_ip"]))
+        dest_addr_id = get_ipv4(ip_dst_addr)
+        if dest_addr_id:
+            dest_addr = IPv4Address(id=dest_addr_id, value=ip_dst_addr)
+        else:
+            dest_addr = IPv4Address(value=ip_dst_addr)
+            knowledge_nodes.append(dest_addr)
 
-    if not server_ip_knowledge:
-        try:
-            server_ipv6 = IPv6Address(target_ip)
-            server_ipv6_knowledge = server_ipv6.to_knowledge_node()
-            server_ip_knowledge = server_ipv6_knowledge
-            knowledge_nodes.append(server_ipv6_knowledge)
-        except:
-            raise ValueError("Could not parse server IP address")
+    elif ip_version == 6:
+        ip_src_addr = str(ipaddress.ip_address(log_dict["src_ip"]))
+        source_addr_id = get_ipv6(ip_src_addr)
+        if source_addr_id:
+            source_addr = IPv6Address(id=source_addr_id, value=ip_src_addr)
+        else:
+            source_addr = IPv6Address(value=ip_src_addr)
+            knowledge_nodes.append(source_addr)
 
-    # Add requesting host
-    value_dict = dissected_request_time
-    requesting_host = Host(
-        log_dict["src_ip"],
-        last_seen=request_time.timestamp(),
-        values=value_dict,
+        ip_dst_addr = str(ipaddress.ip_address(log_dict["server_ip"]))
+        dest_addr_id = get_ipv6(ip_dst_addr)
+        if dest_addr_id:
+            dest_addr = IPv6Address(id=dest_addr_id, value=ip_dst_addr)
+        else:
+            dest_addr = IPv6Address(value=ip_dst_addr)
+            knowledge_nodes.append(dest_addr)
+
+    extensions = [
+        HTTPRequestExt(
+            request_method=log_dict["method"],
+            request_value=log_dict["url"],
+            request_header={
+                "User-Agent": log_dict["useragent"],
+                "Referer": log_dict["referer"],
+            },
+        )
+    ]
+    traffic = NetworkTraffic(
+        start=request_time,
+        src_ref=source_addr,
+        dst_ref=dest_addr,
+        dst_byte_count=log_dict["bytes_sent"],
+        extensions=extensions,
     )
+    knowledge_nodes.append(traffic)
 
-    requesting_host_knowledge = requesting_host.to_knowledge_node()
-    knowledge_nodes.append(requesting_host_knowledge)
+    http_status_abstract = f"status: {log_dict['status']}"
 
-    if type(ipaddress.ip_address(log_dict["src_ip"])) is ipaddress.IPv4Address:
-        src_ip_addr_knowledge = IPv4Address(log_dict["src_ip"]).to_knowledge_node()
-    elif type(ipaddress.ip_address(log_dict["src_ip"])) is ipaddress.IPv6Address:
-        src_ip_addr_knowledge = IPv6Address(log_dict["src_ip"]).to_knowledge_node()
+    http_status_ids = graph.get_note_ids_by_abstract(http_status_abstract)
+    label = f"status: {log_dict['status']}"
+    if len(http_status_ids) > 0:
+        http_status = Note(
+            id=list(http_status_ids)[0],
+            abstract=label,
+            content=label,
+            object_refs=[traffic],
+        )
     else:
-        raise Exception(
-            f"Unhandled address type: {type(ipaddress.ip_address(log_dict['src_ip'])) }"
+        http_status = Note(
+            abstract=label,
+            content=label,
+            object_refs=[traffic],
         )
 
-    knowledge_nodes.append(src_ip_addr_knowledge)
-    knowledge_relations.append(
-        KnowledgeRelation(
-            label="HAS_ADDRESS",
-            source_node=requesting_host_knowledge,
-            target_node=src_ip_addr_knowledge,
-        )
-    )
+    knowledge_nodes.append(http_status)
 
-    value_dict = dissected_request_time
-    value_dict["request_time"] = request_time.timestamp()
-    value_dict["method"] = log_dict["method"]
-    value_dict["url"] = log_dict["url"]
-    value_dict["response_status"] = log_dict["statuscode"]
-    value_dict["bytes"] = log_dict["bytes_sent"]
-    value_dict["referer"] = log_dict["referer"]
-    value_dict["user_agent"] = log_dict["useragent"]
-
-    http_request_knowledge = KnowledgeNode(
-        label="HttpRequest",
-        name=str(uuid.uuid4()),
-        values=value_dict,
-    )
-    knowledge_nodes.append(http_request_knowledge)
-
-    knowledge_relations.append(
-        KnowledgeRelation(
-            label="COMMUNICATES_TO",
-            source_node=src_ip_addr_knowledge,
-            target_node=http_request_knowledge,
-        )
-    )
-    knowledge_relations.append(
-        KnowledgeRelation(
-            label="COMMUNICATES_TO",
-            source_node=http_request_knowledge,
-            target_node=server_ip_knowledge,
-        )
-    )
-
-    return knowledge_nodes, knowledge_relations
+    return knowledge_nodes
 
 
-def caddy_accesslog_to_knowledge(
-    log_dict: Dict[str, Any]
-) -> Tuple[List[KnowledgeNode], List[KnowledgeRelation]]:
+def caddy_accesslog_to_knowledge(log_dict: Dict[str, Any]) -> List[_STIXBase]:
     """
     Converts an HTTP access log dictionary (as returned by aica_django.connectors.CaddyServer.poll_caddy_accesslogs)
     to knowledge objects.
 
     @param log_dict: An HTTP access log dictionary to be converted to knowledge objects
     @type log_dict: Dict[str, Any]
-    @return: Knowledge nodes and relations resulting form this conversion
-    @rtype: Tuple[list, list]
+    @return: Knowledge nodes resulting from this conversion
+    @rtype: list
     """
 
     knowledge_nodes = []
-    knowledge_relations = []
 
     # dateparser can't seem to handle this format
     request_time = datetime.datetime.strptime(log_dict["ts"], "%d/%b/%Y:%H:%M:%S %z")
 
     if not request_time:
         raise ValueError(f"Couldn't parse timestamp {log_dict['ts']}")
-    else:
-        dissected_request_time = dissect_time(
-            request_time.timestamp(), prefix="last_seen"
-        )
-
-    request_timestamp = int(request_time.timestamp())
-    my_hostname = socket.gethostname()
-    try:
-        my_ipv4 = IPv4Address(socket.gethostbyname(my_hostname))
-        my_ipv4_knowledge = my_ipv4.to_knowledge_node()
-        knowledge_nodes.append(my_ipv4_knowledge)
-    except:
-        pass
-
-    try:
-        my_ipv6 = IPv6Address(
-            socket.getaddrinfo(my_hostname, None, socket.AF_INET6)[0][4][0]
-        )
-        my_ipv6_knowledge = my_ipv6.to_knowledge_node()
-        knowledge_nodes.append(my_ipv6_knowledge)
-    except:
-        pass
-
-    # Add requesting host
-    value_dict = dissected_request_time
-    requesting_host = Host(
-        log_dict["request"]["remote_ip"],
-        last_seen=request_timestamp,
-        values=value_dict,
-    )
-    requesting_host_knowledge = requesting_host.to_knowledge_node()
-    knowledge_nodes.append(requesting_host_knowledge)
-
-    # Add target NIC to target host
-    nic_knowledge = KnowledgeNode(
-        label="NetworkInterface",
-        name=str(
-            uuid.uuid4()
-        ),  # This results in hundreds of NIC's per host, does not make sense.
-        values=value_dict,
-    )
-    knowledge_nodes.append(nic_knowledge)
-    knowledge_relations.append(
-        KnowledgeRelation(
-            label="COMPONENT_OF",
-            source_node=nic_knowledge,
-            target_node=requesting_host_knowledge,
-        )
-    )
 
     if type(ipaddress.ip_address(log_dict["src_ip"])) is ipaddress.IPv4Address:
-        ip_addr_knowledge = IPv4Address(log_dict["src_ip"]).to_knowledge_node()
-    elif type(ipaddress.ip_address(log_dict["src_ip"])) is ipaddress.IPv6Address:
-        ip_addr_knowledge = IPv6Address(log_dict["src_ip"]).to_knowledge_node()
+        src_addr_id = get_ipv4(log_dict["src_ip"])
+        if src_addr_id:
+            src_addr = IPv4Address(id=src_addr_id, value=log_dict["src_ip"])
+        else:
+            src_addr = IPv4Address(value=log_dict["src_ip"])
+            knowledge_nodes.append(src_addr)
+
+        dst_addr_id = get_ipv4(log_dict["dest_ip"])
+        if dst_addr_id:
+            dst_addr = IPv4Address(id=dst_addr_id, value=log_dict["dest_ip"])
+        else:
+            dst_addr = IPv4Address(value=log_dict["dest_ip"])
+            knowledge_nodes.append(dst_addr)
     else:
-        raise Exception(
-            f"Unhandled address type: {type(ipaddress.ip_address(log_dict['src_ip'])) }"
-        )
+        src_addr_id = get_ipv6(log_dict["src_ip"])
+        if src_addr_id:
+            src_addr = IPv6Address(id=src_addr_id, value=log_dict["src_ip"])
+        else:
+            src_addr = IPv6Address(value=log_dict["src_ip"])
+            knowledge_nodes.append(src_addr)
+        dst_addr_id = get_ipv6(log_dict["dest_ip"])
+        if dst_addr_id:
+            dst_addr = IPv6Address(id=dst_addr_id, value=log_dict["dest_ip"])
+        else:
+            dst_addr = IPv6Address(value=log_dict["dest_ip"])
+            knowledge_nodes.append(dst_addr)
 
-    knowledge_nodes.append(ip_addr_knowledge)
-    knowledge_relations.append(
-        KnowledgeRelation(
-            label="HAS_ADDRESS",
-            source_node=nic_knowledge,
-            target_node=ip_addr_knowledge,
-        )
+    traffic = HTTPRequestExt(
+        start=request_time,
+        src_ref=src_addr,
+        dst_ref=dst_addr,
+        request_method=log_dict["request"]["method"],
+        request_value=log_dict["url"],
+        dst_byte_count=log_dict["request"]["host"] + log_dict["uri"],
+        request_header={
+            "User-Agent": log_dict["request"]["headers"]["User-Agent"],
+            "Referer": log_dict["request"]["headers"]["Referer"],
+        },
+        custom_properties={
+            "caddy_id": log_dict["id"],
+            "http_response_stats": log_dict["status"],
+        },
     )
+    knowledge_nodes.append(traffic)
 
-    value_dict = dissected_request_time
-    value_dict["request_time"] = request_time
-    value_dict["method"] = log_dict["request"]["method"]
-    value_dict["url"] = log_dict["request"]["host"] + log_dict["uri"]
-    value_dict["response_status"] = log_dict["status"]
-    value_dict["bytes"] = log_dict["size"]
-    try:
-        value_dict["referer"] = log_dict["request"]["headers"]["Referer"]
-    except KeyError:
-        value_dict["referer"] = "null"  # TODO: change this to better data
-
-    try:
-        value_dict["unique_id"] = log_dict["id"]
-    except KeyError:
-        value_dict["unique_id"] = "null"  # TODO: change this to better data
-
-    value_dict["user_agent"] = log_dict["request"]["headers"]["User-Agent"]
-
-    http_request_knowledge = KnowledgeNode(
-        label="HttpRequest",
-        name=str(uuid.uuid4()),
-        values=value_dict,
-    )
-    knowledge_nodes.append(http_request_knowledge)
-
-    knowledge_relations.append(
-        KnowledgeRelation(
-            label="COMMUNICATES_TO",
-            source_node=ip_addr_knowledge,
-            target_node=http_request_knowledge,
-        )
-    )
-    knowledge_relations.append(
-        KnowledgeRelation(
-            label="COMMUNICATES_TO",
-            source_node=http_request_knowledge,
-            target_node=ip_addr_knowledge,
-        )
-    )
-
-    return knowledge_nodes, knowledge_relations
+    return knowledge_nodes
 
 
-def nmap_scan_to_knowledge(
-    scan_results: Dict[str, Any]
-) -> Tuple[List[KnowledgeNode], List[KnowledgeRelation]]:
+def nmap_scan_to_knowledge(scan_results: Dict[str, Any]) -> List[_STIXBase]:
     """
     Converts an nmap scan result (from the Python nmap3 library) to knowledge objects.
 
     @param scan_results: A dictionary as returned by nmap3 to be converted to knowledge objects
     @type scan_results: Dict[str, str]
-    @return: Knowledge nodes and relations resulting form this conversion
-    @rtype: Tuple[list, list]
+    @return: Knowledge nodes resulting form this conversion
+    @rtype: list
     """
 
     knowledge_nodes = []
-    knowledge_relations = []
-
-    assert "runtime" in scan_results
 
     scan_time: Optional[datetime.datetime] = dateparser.parse(
         scan_results["runtime"]["time"]
     )
-    assert scan_time is not None
 
-    # Not needed and make iteration below messy
+    # Not needed and makes iteration below messy
     if "stats" in scan_results:
         del scan_results["stats"]
 
     if "runtime" in scan_results:
         del scan_results["runtime"]
-
-    my_hostname = socket.gethostname()
-    try:
-        my_ipv4 = IPv4Address(socket.gethostbyname(my_hostname)).to_knowledge_node()
-        knowledge_nodes.append(my_ipv4)
-    except:
-        pass
-    try:
-        my_ipv6 = IPv6Address(
-            socket.getaddrinfo(my_hostname, None, socket.AF_INET6)[0][4][0]
-        ).to_knowledge_node()
-        knowledge_nodes.append(my_ipv6)
-    except:
-        pass
 
     for host, data in scan_results.items():
         if "task_results" in host:
@@ -1038,617 +581,413 @@ def nmap_scan_to_knowledge(
         ):
             continue
 
-        # Add scan target
-        target_host = Host(
-            host,
-            last_seen=scan_time.timestamp(),
-            values={
-                "state_reason": data["state"]["reason"],
-                "state_reason_ttl": data["state"]["reason_ttl"],
-            },
-        )
-        target_host_knowledge = target_host.to_knowledge_node()
-        knowledge_nodes.append(target_host_knowledge)
+        consists_of = []
+        if scan_results[host]["macaddress"]:
+            mac_addr = MACAddress(value=scan_results[host]["macaddress"])
+            consists_of.append(mac_addr)
+            knowledge_nodes.append(mac_addr)
 
-        # Add target IPv4 to host
-        if type(ipaddress.ip_address(host)) is ipaddress.IPv4Address:
-            ip_addr = IPv4Address(host).to_knowledge_node()
-            ip_addr_knowledge = ip_addr
-        elif type(ipaddress.ip_address(host)) is ipaddress.IPv6Address:
-            ip_addr = IPv6Address(host)
-            ip_addr_knowledge = ip_addr
+            try:
+                vendor_abstract = f"vendor: {scan_results[host]['vendor']}"
+                vendors = graph.get_note_ids_by_abstract(vendor_abstract)
+                if len(vendors) > 0:
+                    vendor_note = Note(
+                        id=list(vendors)[0],
+                        abstract=vendor_abstract,
+                        content=vendor_abstract,
+                        object_refs=[mac_addr],
+                    )
+                else:
+                    vendor_note = Note(
+                        abstract=vendor_abstract,
+                        content=vendor_abstract,
+                        object_refs=[mac_addr],
+                    )
+
+                knowledge_nodes.append(vendor_note)
+            except KeyError:
+                # Vendor not in data, not a big deal
+                logger.info(
+                    f"No vendor found in object for {scan_results[host]['macaddress']}"
+                )
+
+        mac_addr_list = [mac_addr] if mac_addr else []
+
+        ip_addr = ipaddress.ip_address(host)
+        # Update if new IP address or we found a MAC address, which could be new
+        if ip_addr.version == 4:
+            dest_addr_id = get_ipv4(str(ip_addr))
+            if not dest_addr_id or len(mac_addr_list) > 0:
+                dest_addr = IPv4Address(value=ip_addr, resolves_to_refs=mac_addr_list)
+                knowledge_nodes.append(dest_addr)
+            else:
+                dest_addr = IPv4Address(
+                    id=dest_addr_id, value=ip_addr, resolves_to_refs=mac_addr_list
+                )
+        elif ip_addr.version == 6:
+            dest_addr_id = get_ipv6(str(ip_addr))
+            if not dest_addr_id or len(mac_addr_list) > 0:
+                dest_addr = IPv6Address(value=ip_addr, resolves_to_refs=mac_addr_list)
+                knowledge_nodes.append(dest_addr)
+            else:
+                dest_addr = IPv6Address(
+                    id=dest_addr_id, value=ip_addr, resolves_to_refs=mac_addr_list
+                )
+
         else:
             raise ValueError(
                 f"Unsupported ip type {type(ipaddress.ip_address(host)) } for {host}"
             )
-        knowledge_nodes.append(ip_addr_knowledge)
-        knowledge_relations.append(
-            KnowledgeRelation(
-                label="HAS_ADDRESS",
-                source_node=target_host_knowledge,
-                target_node=ip_addr_knowledge,
-            )
-        )
 
-        if scan_results[host]["macaddress"]:
-            # Add MAC to NIC
-            mac_addr_knowledge = KnowledgeNode(
-                label="MACAddress",
-                name=scan_results[host]["macaddress"]["addr"],
-                values={
-                    "mac_address": scan_results[host]["macaddress"]["addr"],
-                },
-            )
-            knowledge_nodes.append(mac_addr_knowledge)
-            knowledge_relations.append(
-                KnowledgeRelation(
-                    label="HAS_ADDRESS",
-                    source_node=target_host_knowledge,
-                    target_node=mac_addr_knowledge,
-                )
-            )
-
-            if "vendor" in scan_results[host]["macaddress"]:
-                nic_manufacturer_knowledge = KnowledgeNode(
-                    label="Vendor",
-                    name=f"{scan_results[host]['macaddress']['vendor']}",
-                    values={
-                        "vendor": scan_results[host]["macaddress"]["vendor"],
-                    },
-                )
-                knowledge_nodes.append(nic_manufacturer_knowledge)
-                knowledge_relations.append(
-                    KnowledgeRelation(
-                        label="MANUFACTURES",
-                        source_node=nic_manufacturer_knowledge,
-                        target_node=mac_addr_knowledge,
-                    )
-                )
+        knowledge_nodes.append(dest_addr)
 
         for hostname in scan_results[host]["hostname"]:
-            domain_name = KnowledgeNode(
-                label="DNSRecord",
-                name=hostname["name"],
-                values={
-                    "dns_type": hostname["type"],
-                    "dns_record": hostname["name"],
-                },
+            domain_name = DomainName(
+                value=hostname["name"], resolves_to_refs=[dest_addr]
             )
             knowledge_nodes.append(domain_name)
 
         if len(scan_results[host]["osmatch"]) > 1:
             os_match = scan_results[host]["osmatch"][0]
-            operating_system_knowledge = KnowledgeNode(
-                label="Software",
-                name=os_match["cpe"] if os_match["cpe"] else os_match["name"],
-                values={
-                    "name": os_match["name"],
-                    "version": os_match["osclass"]["osgen"],
-                },
+            operating_system = Software(
+                name=os_match["name"],
+                cpe=os_match["cpe"] if os_match["cpe"] else "unknown",
+                version=os_match["osclass"]["osgen"],
+                vendor=os_match["osclass"]["vendor"],
             )
-            knowledge_nodes.append(operating_system_knowledge)
-            knowledge_relations.append(
-                KnowledgeRelation(
-                    label="RUNS_ON",
-                    source_node=operating_system_knowledge,
-                    target_node=target_host_knowledge,
+            consists_of.append(operating_system)
+            knowledge_nodes.append(operating_system)
+
+        target_host = Infrastructure(
+            name=str(host),
+            infrastructure_types=["unknown"],
+            last_seen=scan_time,
+        )
+        for consists_ref in consists_of:
+            knowledge_nodes.append(
+                Relationship(
+                    relationship_type="consists-of",
+                    source_ref=target_host,
+                    target_ref=consists_ref,
                 )
             )
 
-            if os_match["osclass"]["vendor"]:
-                os_vendor_knowledge = KnowledgeNode(
-                    label="Vendor",
-                    name=os_match["osclass"]["vendor"],
-                    values={
-                        "vendor": os_match["osclass"]["vendor"],
-                    },
-                )
-                knowledge_nodes.append(os_vendor_knowledge)
-                knowledge_relations.append(
-                    KnowledgeRelation(
-                        label="MANUFACTURES",
-                        source_node=os_vendor_knowledge,
-                        target_node=operating_system_knowledge,
-                    )
-                )
+        knowledge_nodes.append(target_host)
 
-        for port in scan_results[host]["ports"]:
-            if port["state"] == "open":
-                open_port = NetworkEndpoint(
-                    host,
-                    int(port["portid"]),
-                    port["protocol"],
-                    endpoint="dst",
-                    values={"service_name": port["service"]["name"]},
-                )
-                open_port_ref = open_port.to_network_port_ref()
-                open_port_knowledge = open_port.to_knowledge_node()
-                open_port_ref_knowledge = open_port_ref.to_knowledge_node()
-                knowledge_nodes.append(open_port_knowledge)
-                knowledge_nodes.append(open_port_ref_knowledge)
-                knowledge_relations.append(
-                    KnowledgeRelation(
-                        label="IS_TYPE",
-                        source_node=open_port_knowledge,
-                        target_node=open_port_ref_knowledge,
-                    )
-                )
-                knowledge_relations.append(
-                    KnowledgeRelation(
-                        label="HAS_PORT",
-                        source_node=ip_addr_knowledge,
-                        target_node=open_port_knowledge,
-                        values={"last_seen": scan_time.timestamp(), "status": "open"},
-                    )
-                )
-
-    return knowledge_nodes, knowledge_relations
+    return knowledge_nodes
 
 
-def suricata_alert_to_knowledge(
-    alert: Dict[str, Any]
-) -> Tuple[List[KnowledgeNode], List[KnowledgeRelation]]:
+def suricata_alert_to_knowledge(alert: Dict[str, Any]) -> List[_STIXBase]:
     """
     Converts a Suricata alert (as returned from aica_django.connectors.Suricata.poll_suricata_alerts)
     to knowledge objects.
 
     @param alert: A dictionary as returned by poll_suricata_alerts to be converted to knowledge objects
     @type alert: Dict[str, Any]
-    @return: Knowledge nodes and relations resulting form this conversion
-    @rtype: Tuple[list, list]
+    @return: Knowledge nodes resulting form this conversion
+    @rtype: list
     """
 
     knowledge_nodes = []
-    knowledge_relations = []
-
-    alert_dt: Optional[datetime.datetime] = dateparser.parse(alert["timestamp"])
-    assert alert_dt is not None
-
-    dissected_time_tripped = dissect_time(alert_dt.timestamp(), prefix="time_tripped")
-    value_dict: Dict[str, Any] = dissected_time_tripped
-    value_dict["time_tripped"] = alert_dt.timestamp()
-    value_dict["flow_id"] = alert["flow_id"]
-
-    alert_knowledge = KnowledgeNode(
-        label="Alert",
-        name=str(uuid.uuid4()),
-        values=value_dict,
-    )
-    knowledge_nodes.append(alert_knowledge)
-    alert_sig_knowledge = KnowledgeNode(
-        label="AttackSignature",
-        name=f"Suricata {alert['alert']['gid']}: {alert['alert']['signature_id']}",
-        values={
-            "gid": alert["alert"]["gid"],
-            "signature_id": alert["alert"]["signature_id"],
-            "rev": alert["alert"]["rev"],
-            "signature": alert["alert"]["signature"],
-            "severity": alert["alert"]["severity"],
-        },
-    )
-    knowledge_nodes.append(alert_sig_knowledge)
-
-    knowledge_relations.append(
-        KnowledgeRelation(
-            label="IS_TYPE",
-            source_node=alert_knowledge,
-            target_node=alert_sig_knowledge,
-        )
-    )
-
-    if alert["alert"]["category"] == "":
-        raise ValueError(f"Name must be non-empty|alert:" + str(alert))
-    alert_cat_knowledge = KnowledgeNode(
-        label="AttackSignatureCategory",
-        name=alert["alert"]["category"],
-        values={
-            "category": alert["alert"]["category"],
-        },
-    )
-    knowledge_nodes.append(alert_cat_knowledge)
-    knowledge_relations.append(
-        KnowledgeRelation(
-            label="MEMBER_OF",
-            source_node=alert_sig_knowledge,
-            target_node=alert_cat_knowledge,
-        )
-    )
-
-    dissected_time = dissect_time(alert_dt.timestamp())
-    source_host = Host(
-        alert["src_ip"],
-        last_seen=alert_dt.timestamp(),
-        values=dissected_time,
-    )
-    source_host_knowledge = source_host.to_knowledge_node()
-    knowledge_nodes.append(source_host_knowledge)
 
     if type(ipaddress.ip_address(alert["src_ip"])) is ipaddress.IPv4Address:
-        source_ip = IPv4Address(alert["src_ip"]).to_knowledge_node()
-    elif type(ipaddress.ip_address(alert["src_ip"])) is ipaddress.IPv6Address:
-        source_ip = IPv6Address(alert["src_ip"]).to_knowledge_node()
+        src_addr_id = get_ipv4(alert["src_ip"])
+        if src_addr_id:
+            src_addr = IPv4Address(id=src_addr_id, value=alert["src_ip"])
+        else:
+            src_addr = IPv4Address(value=alert["src_ip"])
+            knowledge_nodes.append(src_addr)
+
+        dst_addr_id = get_ipv4(alert["dest_ip"])
+        if dst_addr_id:
+            dst_addr = IPv4Address(id=dst_addr_id, value=alert["dest_ip"])
+        else:
+            dst_addr = IPv4Address(value=alert["dest_ip"])
+            knowledge_nodes.append(dst_addr)
     else:
-        raise ValueError(
-            f"Unsupported src_ip type {type(ipaddress.ip_address(alert['src_ip'])) } for {alert['src_ip']}"
-        )
+        src_addr_id = get_ipv6(alert["src_ip"])
+        if src_addr_id:
+            src_addr = IPv6Address(id=src_addr_id, value=alert["src_ip"])
+        else:
+            src_addr = IPv6Address(value=alert["src_ip"])
+            knowledge_nodes.append(src_addr)
 
-    source_ip_knowledge = source_ip
-    knowledge_nodes.append(source_ip_knowledge)
-    knowledge_relations.append(
-        KnowledgeRelation(
-            label="HAS_ADDRESS",
-            source_node=source_host_knowledge,
-            target_node=source_ip_knowledge,
-        )
+        dst_addr_id = get_ipv6(alert["dest_ip"])
+        if dst_addr_id:
+            dst_addr = IPv6Address(id=dst_addr_id, value=alert["dest_ip"])
+        else:
+            dst_addr = IPv6Address(value=alert["dest_ip"])
+            knowledge_nodes.append(dst_addr)
+
+    try:
+        protocol = ip_protos[alert["PROTO"]]
+    except KeyError:
+        protocol = "unknown"
+
+    # STIX 2.0 Mandated format
+    start_time = dateparser.parse(str(alert["timestamp"]))
+
+    params = {
+        "protocols": [protocol],
+        "src_ref": src_addr,
+        "src_port": alert["src_port"],
+        "dst_ref": dst_addr,
+        "dst_port": alert["dest_port"],
+        "start": start_time,
+    }
+
+    traffic = NetworkTraffic(
+        **params,
     )
 
-    dest_host = Host(
-        alert["dest_ip"],
-        last_seen=alert_dt.timestamp(),
-    )
-    dest_host_knowledge = dest_host.to_knowledge_node()
-    knowledge_nodes.append(dest_host_knowledge)
+    knowledge_nodes.append(traffic)
 
-    if type(ipaddress.ip_address(alert["dest_ip"])) is ipaddress.IPv4Address:
-        dest_ip = IPv4Address(alert["dest_ip"]).to_knowledge_node()
-    elif type(ipaddress.ip_address(alert["dest_ip"])) is ipaddress.IPv6Address:
-        dest_ip = IPv6Address(alert["dest_ip"]).to_knowledge_node()
+    dst_port_note_ids = graph.get_port_note_ids_by_abstract(
+        alert["dest_port"], alert["proto"]
+    )
+    if len(dst_port_note_ids) > 0:
+        dst_port_note = Note(
+            id=list(dst_port_note_ids)[0],
+            abstract=f"{alert['dest_port']}/{alert['proto']}",
+            content=f"{alert['dest_port']}/{alert['proto']}",
+            object_refs=[traffic],
+        )
     else:
-        raise ValueError(
-            f"Unsupported dest_ip type {type(ipaddress.ip_address(alert['dest_ip'])) } for {alert['dest_ip']}"
+        dst_port_note = Note(
+            abstract=f"{alert['dest_port']}/{alert['proto']}",
+            content=f"{alert['dest_port']}/{alert['proto']}",
+            object_refs=[traffic],
         )
 
-    dest_ip_knowledge = dest_ip
-    knowledge_nodes.append(dest_ip_knowledge)
+    knowledge_nodes.append(dst_port_note)
 
-    knowledge_relations.append(
-        KnowledgeRelation(
-            label="HAS_ADDRESS",
-            source_node=dest_host_knowledge,
-            target_node=dest_ip_knowledge,
+    alert_stix = ObservedData(
+        first_observed=dateparser.parse(alert["timestamp"]),
+        last_observed=dateparser.parse(alert["timestamp"]),
+        number_observed=1,
+        object_refs=[traffic],
+    )
+    knowledge_nodes.append(alert_stix)
+
+    alert_name = f"suricata:{alert['alert']['signature_id']}/{alert['alert']['rev']}"
+
+    # Check for existing indicator in DB. Create if it doesn't exist, reference if it does.
+    alert_sig_ids = graph.get_indicator_ids_by_name(alert_name)
+    if len(alert_sig_ids) == 0:
+        attack_pattern_ids = graph.get_attack_pattern_ids_by_name(
+            alert["alert"]["category"]
         )
-    )
+        if len(attack_pattern_ids) == 0:
+            attack_pattern = AttackPattern(
+                name=alert["alert"]["category"],
+            )
+            knowledge_nodes.append(attack_pattern)
+        else:
+            attack_pattern = AttackPattern(
+                id=attack_pattern_ids[0],
+                name=alert["alert"]["category"],
+            )
 
-    source_port = NetworkEndpoint(
-        alert["src_ip"], alert["src_port"], alert["proto"], endpoint="source"
-    )
-    source_port_ref = source_port.to_network_port_ref()
-    source_port_knowledge = source_port.to_knowledge_node()
-    source_port_ref_knowledge = source_port_ref.to_knowledge_node()
-    knowledge_nodes.append(source_port_knowledge)
-    knowledge_nodes.append(source_port_ref_knowledge)
-
-    knowledge_relations.append(
-        KnowledgeRelation(
-            label="HAS_PORT",
-            source_node=source_ip_knowledge,
-            target_node=source_port_knowledge,
+        indicator = Indicator(
+            name=alert_name,
+            description=alert["alert"]["signature"],
+            pattern="Not Provided",  # Required field, but we don't have this info
+            pattern_type="suricata",
+            pattern_version=alert["alert"]["rev"],
         )
-    )
-    knowledge_relations.append(
-        KnowledgeRelation(
-            label="IS_TYPE",
-            source_node=source_port_knowledge,
-            target_node=source_port_ref_knowledge,
+        knowledge_nodes.append(indicator)
+        indicates_rel = Relationship(
+            relationship_type="indicates",
+            source_ref=indicator,
+            target_ref=attack_pattern,
         )
-    )
+        knowledge_nodes.append(indicates_rel)
+    else:
+        indicator = Indicator(id=list(alert_sig_ids)[0])
 
-    dest_port = NetworkEndpoint(
-        alert["dest_ip"], alert["dest_port"], alert["proto"], endpoint="dest"
+    sighting = Sighting(
+        description="suricata_alert",
+        last_seen=dateparser.parse(alert["timestamp"]),
+        count=1,
+        observed_data_refs=[alert_stix],
+        sighting_of_ref=indicator,
     )
-    dest_port_ref = dest_port.to_network_port_ref()
-    dest_port_knowledge = dest_port.to_knowledge_node()
-    dest_port_ref_knowledge = dest_port_ref.to_knowledge_node()
-    knowledge_nodes.append(dest_port_knowledge)
-    knowledge_nodes.append(dest_port_ref_knowledge)
-    knowledge_relations.append(
-        KnowledgeRelation(
-            label="HAS_PORT",
-            source_node=dest_ip_knowledge,
-            target_node=dest_port_knowledge,
-        )
-    )
+    knowledge_nodes.append(sighting)
 
-    knowledge_relations.append(
-        KnowledgeRelation(
-            label="IS_TYPE",
-            source_node=dest_port_knowledge,
-            target_node=dest_port_ref_knowledge,
-        )
-    )
-
-    flow_start_dt: Optional[datetime.datetime] = dateparser.parse(
-        alert["flow"]["start"]
-    )
-    assert flow_start_dt is not None
-
-    dissected_start: Dict[str, Any] = dissect_time(
-        flow_start_dt.timestamp(), prefix="start"
-    )
-    value_dict = dissected_start
-    value_dict["source"] = "suricata"
-
-    network_flow = NetworkTraffic(
-        int(alert["flow"]["pkts_toserver"]),
-        int(alert["flow"]["bytes_toserver"]),
-        flow_start_dt.timestamp(),
-        values=value_dict,
-    )
-    network_flow_knowledge = network_flow.to_knowledge_node()
-    knowledge_nodes.append(network_flow_knowledge)
-
-    knowledge_relations.append(
-        KnowledgeRelation(
-            label="HAS_PORT",
-            source_node=source_ip_knowledge,
-            target_node=source_port_knowledge,
-        )
-    )
-    knowledge_relations.append(
-        KnowledgeRelation(
-            label="HAS_PORT",
-            source_node=dest_ip_knowledge,
-            target_node=dest_port_knowledge,
-        )
-    )
-    knowledge_relations.append(
-        KnowledgeRelation(
-            label="COMMUNICATES_TO",
-            source_node=source_port_knowledge,
-            target_node=network_flow_knowledge,
-        )
-    )
-    knowledge_relations.append(
-        KnowledgeRelation(
-            label="COMMUNICATES_TO",
-            source_node=network_flow_knowledge,
-            target_node=dest_port_knowledge,
-        )
-    )
-    knowledge_relations.append(
-        KnowledgeRelation(
-            label="TRIGGERED_BY",
-            source_node=alert_knowledge,
-            target_node=network_flow_knowledge,
-        )
-    )
-
-    return knowledge_nodes, knowledge_relations
+    return knowledge_nodes
 
 
-def antivirus_alert_to_knowledge(
-    alert: Dict[str, Any]
-) -> Tuple[List[KnowledgeNode], List[KnowledgeRelation]]:
+def clamav_alert_to_knowledge(alert: Dict[str, Any]) -> List[_STIXBase]:
     """
     Converts an antivirus alert (as returned from aica_django.connectors.Antivirus.poll_antivirus_alerts)
     to knowledge objects.
 
     @param alert: A dictionary as returned by poll_antivirus_alerts to be converted to knowledge objects
     @type alert: Dict[str, Any]
-    @return: Knowledge nodes and relations resulting form this conversion
-    @rtype: Tuple[list, list]
+    @return: Knowledge nodes resulting form this conversion
+    @rtype: list
     """
 
-    nodes = []
-    relations = []
+    knowledge_nodes = []
+    timestamp = dateparser.parse(alert["date"])
+    alert_name = f"clamav:{alert['signature']}/{alert['revision']}"
 
-    # The if statement is here for error handling the case where the VirusTotal
-    # data isn't properly stored in the alert object and we get the "Not Available"
-    # as specified in the antivirus.py file. Otherwise, we'd have a bunch of errors
-    # showing up anytime an API key was invalid or the VT servers are unavailable
-    alert_knowledge = KnowledgeNode(
-        label="Alert",
-        name=str(uuid.uuid4()),
-        values={
-            "date": alert["date"],
-        },
-    )
-    nodes.append(alert_knowledge)
+    directory_path = "/".join(alert["path"].split("/")[:-1])
+    file_name = alert["path"].split("/")[-1]
 
-    alert_signature_knowledge = KnowledgeNode(
-        label="AttackSignature",
-        name=f"{alert['signature']}:{alert['revision']}",
+    directory = Directory(path=directory_path)
+    knowledge_nodes.append(directory)
+
+    file = File(name=file_name, parent_directory_ref=directory)
+    knowledge_nodes.append(file)
+
+    alert_indicator = Indicator(
+        name=alert_name,
         values={
             "platform": alert["platform"],
             "name": alert["name"],
         },
     )
-    nodes.append(alert_signature_knowledge)
-    alert_signature_category_knowledge = KnowledgeNode(
-        label="AttackSignatureCategory",
-        name=f"{alert['category']}",
+    knowledge_nodes.append(alert_indicator)
+
+    platform = Software(name=alert["platform"])
+    knowledge_nodes.append(platform)
+
+    malware = Malware(
+        name=alert_name,
+        description=alert["name"],
+        is_family=False,
+        operating_system_refs=[platform],
+        sample_refs=[file],
     )
-    nodes.append(alert_signature_category_knowledge)
-    relations.append(
-        KnowledgeRelation(
-            "IS_TYPE",
-            source_node=alert_signature_knowledge,
-            target_node=alert_signature_category_knowledge,
-        )
+    knowledge_nodes.append(malware)
+
+    attack_pattern = AttackPattern(name=f"clamav:{alert['category']}")
+    knowledge_nodes.append(attack_pattern)
+
+    malware_pattern_rel = Relationship(
+        relationship_type="delivers",
+        source_ref=attack_pattern,
+        target_ref=malware,
     )
+    knowledge_nodes.append(malware_pattern_rel)
 
-    relations.append(
-        KnowledgeRelation(
-            label="IS_TYPE",
-            source_node=alert_knowledge,
-            target_node=alert_signature_knowledge,
-        )
+    host = Infrastructure(
+        name=alert["hostname"],
+        infrastructure_types=["workstation"],
+        last_seen=timestamp,
     )
+    knowledge_nodes.append(host)
 
-    path_knowledge = KnowledgeNode(
-        label="FilePath",
-        name=alert["path"],
+    sighting = Sighting(
+        description="clamav_alert",
+        last_seen=timestamp,
+        count=1,
+        observed_data_refs=[file],
+        sighting_of_ref=alert_indicator,
+        where_sighted_refs=[host],
     )
-    nodes.append(path_knowledge)
+    knowledge_nodes.append(sighting)
 
-    host = Host(alert["source_ip"], last_seen=datetime.datetime.now().timestamp())
-    host_knowledge = host.to_knowledge_node()
-    nodes.append(host_knowledge)
-
-    relations.append(
-        KnowledgeRelation(
-            label="TRIGGERED_BY",
-            source_node=alert_knowledge,
-            target_node=path_knowledge,
-        )
-    )
-
-    relations.append(
-        KnowledgeRelation(
-            label="STORED_ON",
-            source_node=path_knowledge,
-            target_node=host_knowledge,
-        )
-    )
-
-    return nodes, relations
+    return knowledge_nodes
 
 
-def waf_alert_to_knowledge(
-    alert: Dict[str, Any]
-) -> Tuple[List[KnowledgeNode], List[KnowledgeRelation]]:
+def waf_alert_to_knowledge(alert: Dict[str, Any]) -> List[_STIXBase]:
     """
     Converts an waf alert (as returned from aica_django.connectors.WAF.poll_waf_alerts)
     to knowledge objects.
 
-    **TODO**
-
     @param alert: A dictionary as returned by poll_waf_alerts to be converted to knowledge objects
     @type alert: Dict[str, Any]
-    @return: Knowledge nodes and relations resulting form this conversion
-    @rtype: Tuple[list, list]
+    @return: Knowledge nodes resulting from this conversion
+    @rtype: list
     """
 
     knowledge_nodes = []
-    knowledge_relations = []
 
-    # alert_dt: Optional[datetime.datetime] = dateparser.parse(alert["timestamp"])
-    alert_dt = float(alert["ts"])
-    assert alert_dt is not None
+    alert_dt = datetime.datetime.fromtimestamp(alert["ts"])
 
-    dissected_time_tripped = dissect_time(alert_dt, prefix="time_tripped")
-    value_dict: Dict[str, Any] = dissected_time_tripped
-    value_dict["time_tripped"] = alert_dt
-    value_dict["unique_id"] = alert["unique_id"]
+    try:
+        alert_name = f"owasp_crs:{alert['id']}/{alert['rev']}"
+    except:
+        logger.warning(f"Skipping alert with no ID: {alert}")
+        return []
 
-    alert_knowledge = KnowledgeNode(
-        label="Alert",
-        name=str(uuid.uuid4()),
-        values=value_dict,
+    alert_indicator = Indicator(
+        name=alert_name,
+        description=alert["data"],
+        pattern="Not specified",
+        pattern_type="owasp_crs",
+        valid_from=alert_dt,
     )
-    knowledge_nodes.append(alert_knowledge)
-    alert_sig_knowledge = KnowledgeNode(
-        label="AttackSignature",
-        name=f"OWASP CRS {alert['id']}",
-        values={
-            "rule_id": alert["alert"]["id"],
-            "rev": alert["rev"],
-            "data": alert["data"],
-            "severity": alert["severity"],
-        },
-    )
-    knowledge_nodes.append(alert_sig_knowledge)
-
-    knowledge_relations.append(
-        KnowledgeRelation(
-            label="IS_TYPE",
-            source_node=alert_knowledge,
-            target_node=alert_sig_knowledge,
-        )
-    )
+    knowledge_nodes.append(alert_indicator)
 
     for tag in alert["tags"]:
-        alert_cat_knowledge = KnowledgeNode(
-            label="AttackSignatureCategory",
-            name=tag,
-            values={
-                "tag": tag,
-            },
-        )
-        knowledge_nodes.append(alert_cat_knowledge)
-        knowledge_relations.append(
-            KnowledgeRelation(
-                label="MEMBER_OF",
-                source_node=alert_sig_knowledge,
-                target_node=alert_cat_knowledge,
-            )
-        )
+        ap_id = get_attack_pattern(tag)
+        ap_rel = Relationship(alert_indicator, "indicates", ap_id)
+        knowledge_nodes.append(ap_rel)
 
     # Make Cypher query and return node that contains the correct unique ID
-    graph = AicaNeo4j()
-    req_id = alert["unique_id"]  # leaving this here because format strings
-    nodes = list(
-        graph.graph.run(
-            f'MATCH (n:HttpRequest) WHERE n.unique_id = "{req_id}" RETURN n'
-        )
+    http_req_nodes = graph.graph.run(
+        f"MATCH (n:HttpRequest) WHERE n.caddy_id = \"{alert['unique_id']}\" RETURN n"
     )
+    http_req = HTTPRequestExt(id=list(http_req_nodes)[0].id)
 
-    if len(nodes) > 0:
-        source_http_req = nodes[0]
-        # DO NOT APPEND THIS TO THE NODES LIST
-        source_http_knowledge = KnowledgeNode(
-            label="HttpRequest", name=source_http_req["id"]
-        )
-        knowledge_relations.append(
-            KnowledgeRelation(
-                label="TRIGGERED_BY",
-                source_node=source_http_knowledge,
-                target_node=alert_knowledge,
-            )
-        )
+    sighting = Sighting(
+        description="waf_alert",
+        last_seen=alert_dt,
+        count=1,
+        observed_data_refs=[http_req] if len(http_req_nodes) > 0 else [],
+        sighting_of_ref=alert_indicator,
+    )
+    knowledge_nodes.append(sighting)
 
-    else:
-        source_host = Host(alert["client"], last_seen=alert_dt)
-        knowledge_nodes.append(source_host.to_knowledge_node())
-        knowledge_relations.append(
-            KnowledgeRelation(
-                label="TRIGGERED_BY",
-                source_node=source_host,
-                target_node=alert_knowledge,
-            )
-        )
-
-    return knowledge_nodes, knowledge_relations
+    return knowledge_nodes
 
 
 def knowledge_to_neo(
-    nodes: List[KnowledgeNode], relations: List[KnowledgeRelation]
+    nodes: List[_STIXBase],
 ) -> bool:
     """
-    Stores KnowledgeNode and KnowledgeRelation objects in the knowledge graph database.
+    Stores STIX objects in the knowledge graph database. This assumes all references
+    refer to nodes that will exist after provided nodes have all been created.
 
-    @param nodes: KnowledgeNodes to store
+    @param nodes: STIX Objects to store
     @type nodes: list
-    @param relations: KnowledgeRelations to store (must consist entirely of existing or to-be-added nodes)
-    @type relations: list
     @return: Whether the insert was successful
     @rtype: bool
     """
 
-    neo_host = str(os.getenv("N4J_HOST"))
-    neo_user = str(os.getenv("N4J_USER"))
-    neo_password = str(os.getenv("N4J_PASSWORD"))
-
-    graph = AicaNeo4j()
-
-    # Intentionally only handling lists to encourage batching
-    res1 = False
-    res2 = False
+    rels_to_add = []
     for node in nodes:
-        res1 = graph.add_node(
-            node.name,
-            node.label,
-            node.values,
+        graph.add_node(
+            node.id,
+            node.type,
+            {
+                **{
+                    x: node[x]
+                    for x in node.properties_populated()
+                    if x not in ["id", "type"]
+                    and not x.endswith("_ref")
+                    and not x.endswith("_refs")
+                },
+                **{"identifier": node["id"]},
+            },
         )
+        for x in node.properties_populated():
+            if x.endswith("_ref"):
+                rels_to_add.append((node.id, node[x], x))
+            elif x.endswith("_refs"):
+                rels_to_add.extend([(node.id, y, x) for y in node[x]])
 
-    for relation in relations:
-        res2 = graph.add_relation(
-            relation.source_node,
-            relation.source_label,
-            relation.target_node,
-            relation.target_label,
-            relation.label,
-            relation.values,
-        )
+    for rel in rels_to_add:
+        try:
+            graph.add_relation(
+                node_a_id=rel[0], node_b_id=rel[1], relation_label=rel[2]
+            )
+        except ValueError as e:
+            logger.warning(
+                f"Failed to add relation {rel[2]} between {rel[0]} and {rel[1]}: {e}"
+            )
 
-    return res1 and res2
+    return False
