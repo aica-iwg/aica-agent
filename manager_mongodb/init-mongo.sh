@@ -1,7 +1,5 @@
 set -e
 
-mongosh admin --eval "db.disableFreeMonitoring()"
-
 mongosh admin <<EOF
 db.createUser(
     {

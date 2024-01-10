@@ -125,9 +125,8 @@ def create_ports() -> bool:
 
     port_objects = []
 
-    # Not proud of this, but no other good way to add this info to the graph that I've found
-    port_parent = Software(name="Generic Port Usage Info")
-    port_objects.append(port_parent)
+    port_root = Software(name="Generic Port Usage Info")
+    port_objects.append(port_root)
 
     for index, row in nmap_df.iterrows():
         rank = nmap_df.index.get_loc(key=index)
@@ -146,7 +145,7 @@ def create_ports() -> bool:
                     "source": nmap_services_url,
                 }
             ),
-            object_refs=[port_parent.id],
+            object_refs=[port_root.id],
         )
         port_objects.append(port_object)
 

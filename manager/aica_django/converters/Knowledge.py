@@ -20,7 +20,6 @@ import ipaddress
 import json
 import pytz
 import re
-import socket
 
 from celery.utils.log import get_task_logger
 from stix2.base import _STIXBase
@@ -32,7 +31,6 @@ from stix2 import (
     HTTPRequestExt,
     Indicator,
     Infrastructure,
-    ICMPExt,
     IPv4Address,
     IPv6Address,
     Malware,
@@ -42,9 +40,7 @@ from stix2 import (
     ObservedData,
     Relationship,
     Sighting,
-    SocketExt,
     Software,
-    TCPExt,
 )
 from typing import Any, Dict, List, Optional, Union
 
@@ -55,35 +51,174 @@ logger = get_task_logger(__name__)
 
 graph = AicaNeo4j()
 
+ip_protos = {
+    0: "hopopt",
+    1: "icmp",
+    2: "igmp",
+    3: "ggp",
+    4: "ip-in-ip",
+    5: "st",
+    6: "tcp",
+    7: "cbt",
+    8: "egp",
+    9: "igp",
+    10: "bbn-rcc-mon",
+    11: "nvp-ii",
+    12: "pup",
+    13: "argus",
+    14: "emcon",
+    15: "xnet",
+    16: "chaos",
+    17: "udp",
+    18: "mux",
+    19: "dcn-meas",
+    20: "hmp",
+    21: "prm",
+    22: "xns-idp",
+    23: "trunk-1",
+    24: "trunk-2",
+    25: "leaf-1",
+    26: "leaf-2",
+    27: "rdp",
+    28: "irtp",
+    29: "iso-tp4",
+    30: "netblt",
+    31: "mfe-nsp",
+    32: "merit-inp",
+    33: "dccp",
+    34: "3pc",
+    35: "idpr",
+    36: "xtp",
+    37: "ddp",
+    38: "idpr-cmtp",
+    39: "tp++",
+    40: "il",
+    41: "ipv6",
+    42: "sdrp",
+    43: "ipv6-route",
+    44: "ipv6-frag",
+    45: "idrp",
+    46: "rsvp",
+    47: "gre",
+    48: "dsr",
+    49: "bna",
+    50: "esp",
+    51: "ah",
+    52: "i-nlsp",
+    53: "swipe",
+    54: "narp",
+    55: "mobile",
+    56: "tlsp",
+    57: "skip",
+    58: "ipv6-icmp",
+    59: "ipv6-nonxt",
+    60: "ipv6-opts",
+    62: "cftp",
+    64: "sat-expak",
+    65: "kryptolan",
+    66: "rvd",
+    67: "ippc",
+    69: "sat-mon",
+    70: "visa",
+    71: "ipcu",
+    72: "cpnx",
+    73: "cphb",
+    74: "wsn",
+    75: "pvp",
+    76: "br-sat-mon",
+    77: "sun-nd",
+    78: "wb-mon",
+    79: "wb-expak",
+    80: "iso-ip",
+    81: "vmtp",
+    82: "secure-vmtp",
+    83: "vines",
+    84: "ttp",
+    84: "iptm",
+    85: "nsfnet-igp",
+    86: "dgp",
+    87: "tcf",
+    88: "eigrp",
+    89: "ospf",
+    90: "sprite-rpc",
+    91: "larp",
+    92: "mtp",
+    93: "ax.25",
+    94: "os",
+    95: "micp",
+    96: "scc-sp",
+    97: "etherip",
+    98: "encap",
+    100: "gmtp",
+    101: "ifmp",
+    102: "pnni",
+    103: "pim",
+    104: "aris",
+    105: "scps",
+    106: "qnx",
+    107: "a/n",
+    108: "ipcomp",
+    109: "snp",
+    110: "compaq-peer",
+    111: "ipx-in-ip",
+    112: "vrrp",
+    113: "pgm",
+    115: "l2tp",
+    116: "ddx",
+    117: "iatp",
+    118: "stp",
+    119: "srp",
+    120: "uti",
+    121: "smp",
+    122: "sm",
+    123: "ptp",
+    124: "is-is over ipv4",
+    125: "fire",
+    126: "crtp",
+    127: "crudp",
+    128: "sscopmce",
+    129: "iplt",
+    130: "sps",
+    131: "pipe",
+    132: "sctp",
+    133: "fc",
+    134: "rsvp-e2e-ignore",
+    135: "mobility header",
+    136: "udplite",
+    137: "mpls-in-ip",
+    138: "manet",
+    139: "hip",
+    140: "shim6",
+    141: "wesp",
+    142: "rohc",
+    143: "ethernet",
+    144: "aggfrag",
+    145: "nsh",
+}
 
-def get_or_create_ipv4(ip_addr: str):
-    ip_addresses = graph.get_ipv4_by_addr(ip_addr)
+
+def get_ipv4(ip_addr: str):
+    ip_addresses = graph.get_ipv4_ids_by_addr(ip_addr)
     if len(ip_addresses) > 0:
-        ip_address = ip_addresses[0]
+        return list(ip_addresses)[0]
     else:
-        ip_address = IPv4Address(value=ip_addr)
-
-    return ip_address
+        return None
 
 
-def get_or_create_ipv6(ip_addr: str):
-    ip_addresses = graph.get_ipv6_by_addr(ip_addr)
+def get_ipv6(ip_addr: str):
+    ip_addresses = graph.get_ipv6_ids_by_addr(ip_addr)
     if len(ip_addresses) > 0:
-        ip_address = ip_addresses[0]
+        return list(ip_addresses)[0]
     else:
-        ip_address = IPv6Address(value=ip_addr)
-
-    return ip_address
+        return None
 
 
-def get_or_create_attack_pattern(attack_pattern: str):
-    attack_patterns = graph.get_attack_pattern_by_name(attack_pattern)
+def get_attack_pattern(attack_pattern: str):
+    attack_patterns = graph.get_attack_pattern_ids_by_name(attack_pattern)
     if len(attack_patterns) > 0:
-        ap = attack_patterns[0]
+        return list(attack_patterns)[0]
     else:
-        ap = AttackPattern(name=attack_pattern)
-
-    return ap
+        return None
 
 
 def dissect_time(timestamp: Union[int, float], prefix: str = "") -> Dict[str, Any]:
@@ -163,53 +298,79 @@ def netflow_to_knowledge(
     # Create source host and port nodes (and link to protocol node)
     if "IPV4_SRC_ADDR" in flow and flow["IPV4_SRC_ADDR"] is not None:
         ip_src_addr = str(ipaddress.ip_address(flow["IPV4_SRC_ADDR"]))
-        source_addr = get_or_create_ipv4(ip_src_addr)
+        source_addr_id = get_ipv4(ip_src_addr)
+        if source_addr_id:
+            source_addr = IPv4Address(id=source_addr_id, value=ip_src_addr)
+        else:
+            source_addr = IPv4Address(value=ip_src_addr)
+            knowledge_nodes.append(source_addr)
 
         ip_dst_addr = str(ipaddress.ip_address(flow["IPV4_DST_ADDR"]))
-        dest_addr = get_or_create_ipv4(ip_dst_addr)
+        dest_addr_id = get_ipv4(ip_dst_addr)
+        if dest_addr_id:
+            dest_addr = IPv4Address(id=dest_addr_id, value=ip_dst_addr)
+        else:
+            dest_addr = IPv4Address(value=ip_dst_addr)
+            knowledge_nodes.append(dest_addr)
 
     elif "IPV6_SRC_ADDR" in flow and flow["IPV6_SRC_ADDR"] is not None:
-        ip_src_addr = str(ipaddress.ip_address(flow["IPV4_SRC_ADDR"]))
-        source_addr = get_or_create_ipv6(ip_src_addr)
+        ip_src_addr = str(ipaddress.ip_address(flow["IPV6_SRC_ADDR"]))
+        source_addr_id = get_ipv6(ip_src_addr)
+        if source_addr_id:
+            source_addr = IPv6Address(id=source_addr_id, value=ip_src_addr)
+        else:
+            source_addr = IPv6Address(value=ip_src_addr)
+            knowledge_nodes.append(source_addr)
 
-        ip_dst_addr = str(ipaddress.ip_address(flow["IPV4_DST_ADDR"]))
-        dest_addr = get_or_create_ipv6(ip_dst_addr)
+        ip_dst_addr = str(ipaddress.ip_address(flow["IPV6_DST_ADDR"]))
+        dest_addr_id = get_ipv6(ip_dst_addr)
+        if dest_addr_id:
+            dest_addr = IPv6Address(id=dest_addr_id, value=dest_addr_id)
+        else:
+            dest_addr = IPv6Address(value=ip_dst_addr)
+            knowledge_nodes.append(dest_addr)
 
-    knowledge_nodes.append(source_addr)
-    knowledge_nodes.append(dest_addr)
+    # STIX 2.0 Mandated format
+    start_time = dateparser.parse(str(flow["FIRST_SWITCHED"]))
+    end_time = dateparser.parse(str(flow["LAST_SWITCHED"]))
+
+    try:
+        protocol = ip_protos[flow["PROTO"]]
+    except KeyError:
+        protocol = "unknown"
 
     params = {
-        "protocols": [flow["PROTO"]],
-        "src_ref": source_addr.id,
-        "src_port": flow["SRC_PORT"],
-        "src_packets": flow["IN_PACKETS"],
-        "src_byte_count": flow["IN_OCTETS"],
-        "dst_ref": dest_addr.id,
-        "dst_port": flow["DST_PORT"],
-        "start": float(flow["FIRST_SWITCHED"]),
-        "end": float(flow["LAST_SWITCHED"]),
+        "protocols": [protocol],
+        "src_ref": source_addr,
+        "src_port": int(flow["SRC_PORT"]),
+        "src_packets": int(flow["IN_PACKETS"]),
+        "src_byte_count": int(flow["IN_OCTETS"]),
+        "dst_ref": dest_addr,
+        "dst_port": int(flow["DST_PORT"]),
+        "start": start_time,
+        "end": end_time,
     }
 
-    if flow["PROTO"] == "icmp":
-        traffic = ICMPExt(
-            **params
-        )
-    elif flow["PROTO"] == "tcp":
-        traffic = TCPExt(
-            **params
-        )
-    else:
-        traffic = NetworkTraffic(
-            **params
-        )
+    # is_active must be false if end_time is set (per STIX)
+    traffic = NetworkTraffic(is_active=False, **params)
 
     knowledge_nodes.append(traffic)
 
-    dst_port_notes = graph.get_port_note(flow["DST_PORT"], flow["PROTO"])
-    if len(dst_port_notes) > 0:
-        dst_port_note = dst_port_notes[0]
-        dst_port_note["object_refs"].append(traffic.id)
-        knowledge_nodes.append(dst_port_note)
+    dst_port_note_ids = graph.get_port_note_ids_by_abstract(
+        flow["DST_PORT"], flow["PROTO"]
+    )
+    label = f"{flow['DST_PORT']}/{protocol}"
+    if len(dst_port_note_ids) > 0:
+        dst_port_note = Note(
+            id=list(dst_port_note_ids)[0],
+            object_refs=[traffic],
+            abstract=label,
+            content=label,
+        )
+    else:
+        dst_port_note = Note(object_refs=[traffic], abstract=label, content=label)
+
+    knowledge_nodes.append(dst_port_note)
 
     return knowledge_nodes
 
@@ -238,56 +399,75 @@ def nginx_accesslog_to_knowledge(
         raise ValueError(f"Couldn't parse timestamp {log_dict['dateandtime']}")
 
     # Create source host and port nodes (and link to protocol node)
-    ip_src_addr = str(ipaddress.ip_address(log_dict["src_ip"]))
+    ip_src_addr = ipaddress.ip_address(log_dict["src_ip"])
     if ip_src_addr.version == 4:
-        source_addr = get_or_create_ipv4(ip_src_addr)
-    elif ip_src_addr.version == 6:
-        source_addr = get_or_create_ipv6(ip_src_addr)
-    else:
-        raise ValueError(
-            f"Unsupported ip type {ip_src_addr.version} for {log_dict['src_ip']}"
-        )
-    knowledge_nodes.append(source_addr)
-
-    if log_dict["server_ip"] is not None:
-        ip_dst_addr = str(ipaddress.ip_address(log_dict["server_ip"]))
-        if ip_dst_addr.version == 4:
-            dest_addr = get_or_create_ipv4(ip_dst_addr)
-        elif ip_dst_addr.version == 6:
-            dest_addr = get_or_create_ipv6(ip_dst_addr)
+        source_addr_id = get_ipv4(ip_src_addr)
+        if source_addr_id:
+            source_addr = IPv4Address(id=source_addr_id, value=ip_src_addr)
         else:
-            raise ValueError(
-                f"Unsupported ip type {ip_dst_addr.version} for {log_dict['server_ip']}"
-            )
-        knowledge_nodes.append(dest_addr)
-    else:
-        dest_addr = None
+            source_addr = IPv4Address(value=ip_src_addr)
+            knowledge_nodes.append(source_addr)
 
-    traffic = HTTPRequestExt(
+        ip_dst_addr = str(ipaddress.ip_address(log_dict["server_ip"]))
+        dest_addr_id = get_ipv4(ip_dst_addr)
+        if dest_addr_id:
+            dest_addr = IPv4Address(id=dest_addr_id, value=ip_dst_addr)
+        else:
+            dest_addr = IPv4Address(value=ip_dst_addr)
+            knowledge_nodes.append(dest_addr)
+
+    elif ip_src_addr.version == 6:
+        ip_src_addr = str(ipaddress.ip_address(log_dict["src_ip"]))
+        source_addr_id = get_ipv6(ip_src_addr)
+        if source_addr_id:
+            source_addr = IPv6Address(id=source_addr_id, value=ip_src_addr)
+        else:
+            source_addr = IPv6Address(value=ip_src_addr)
+            knowledge_nodes.append(source_addr)
+
+        ip_dst_addr = str(ipaddress.ip_address(log_dict["server_ip"]))
+        dest_addr_id = get_ipv6(ip_dst_addr)
+        if dest_addr_id:
+            dest_addr = IPv6Address(id=dest_addr_id, value=ip_dst_addr)
+        else:
+            dest_addr = IPv6Address(value=ip_dst_addr)
+            knowledge_nodes.append(dest_addr)
+
+    extensions = [
+        HTTPRequestExt(
+            request_method=log_dict["method"],
+            request_value=log_dict["url"],
+            request_header={
+                "User-Agent": log_dict["useragent"],
+                "Referer": log_dict["referer"],
+            },
+        )
+    ]
+    traffic = NetworkTraffic(
         start=request_time,
-        src_ref=source_addr.id,
-        dst_ref=dest_addr.id if dest_addr else None,
-        request_method=log_dict["method"],
-        request_value=log_dict["url"],
+        src_ref=source_addr,
+        dst_ref=dest_addr,
         dst_byte_count=log_dict["bytes_sent"],
-        request_header={
-            "User-Agent": log_dict["useragent"],
-            "Referer": log_dict["referer"],
-        },
+        extensions=extensions,
     )
     knowledge_nodes.append(traffic)
 
     http_status_abstract = f"status: {log_dict['status']}"
 
-    http_statuses = graph.get_note_by_abstract(http_status_abstract)
-    if len(http_statuses) > 0:
-        http_status = http_statuses[0]
-        http_status["object_refs"].append(traffic.id)
+    http_status_ids = graph.get_note_ids_by_abstract(http_status_abstract)
+    label = f"status: {log_dict['status']}"
+    if len(http_status_ids) > 0:
+        http_status = Note(
+            id=list(http_status_ids)[0],
+            abstract=label,
+            content=label,
+            object_refs=[traffic],
+        )
     else:
         http_status = Note(
-            abstract=f"status: {log_dict['status']}",
-            content=json.dumps({"status": log_dict["status"]}),
-            object_refs=[traffic.id],
+            abstract=label,
+            content=label,
+            object_refs=[traffic],
         )
 
     knowledge_nodes.append(http_status)
@@ -315,37 +495,37 @@ def caddy_accesslog_to_knowledge(log_dict: Dict[str, Any]) -> List[_STIXBase]:
         raise ValueError(f"Couldn't parse timestamp {log_dict['ts']}")
 
     if type(ipaddress.ip_address(log_dict["src_ip"])) is ipaddress.IPv4Address:
-        src_ip = get_or_create_ipv4(log_dict["src_ip"])
-    elif type(ipaddress.ip_address(log_dict["src_ip"])) is ipaddress.IPv6Address:
-        src_ip = get_or_create_ipv6(log_dict["src_ip"])
-    else:
-        raise Exception(
-            f"Unhandled address type: {type(ipaddress.ip_address(log_dict['src_ip'])) }"
-        )
-
-    knowledge_nodes.append(src_ip)
-
-    try:
-        # TODO See if port is in the Caddy log once this is running
-        dst_ip = socket.getaddrinfo(log_dict["request"]["host"], port=None)[4]
-        if type(ipaddress.ip_address(log_dict["src_ip"])) is ipaddress.IPv4Address:
-            dst_ip = get_or_create_ipv4(log_dict["dst_ip"])
-        elif type(ipaddress.ip_address(log_dict["src_ip"])) is ipaddress.IPv6Address:
-            dst_ip = get_or_create_ipv6(log_dict["dst_ip"])
+        src_addr_id = get_ipv4(log_dict["src_ip"])
+        if src_addr_id:
+            src_addr = IPv4Address(id=src_addr_id, value=log_dict["src_ip"])
         else:
-            raise Exception(
-                f"Unhandled address type: {type(ipaddress.ip_address(log_dict['dst_ip'])) }"
-            )
-    except OSError as e:
-        logger.warning(e)
-        dst_ip = None
+            src_addr = IPv4Address(value=log_dict["src_ip"])
+            knowledge_nodes.append(src_addr)
 
-    knowledge_nodes.append(dst_ip)
+        dst_addr_id = get_ipv4(log_dict["dest_ip"])
+        if dst_addr_id:
+            dst_addr = IPv4Address(id=dst_addr_id, value=log_dict["dest_ip"])
+        else:
+            dst_addr = IPv4Address(value=log_dict["dest_ip"])
+            knowledge_nodes.append(dst_addr)
+    else:
+        src_addr_id = get_ipv6(log_dict["src_ip"])
+        if src_addr_id:
+            src_addr = IPv6Address(id=src_addr_id, value=log_dict["src_ip"])
+        else:
+            src_addr = IPv6Address(value=log_dict["src_ip"])
+            knowledge_nodes.append(src_addr)
+        dst_addr_id = get_ipv6(log_dict["dest_ip"])
+        if dst_addr_id:
+            dst_addr = IPv6Address(id=dst_addr_id, value=log_dict["dest_ip"])
+        else:
+            dst_addr = IPv6Address(value=log_dict["dest_ip"])
+            knowledge_nodes.append(dst_addr)
 
     traffic = HTTPRequestExt(
         start=request_time,
-        src_ref=src_ip.id,
-        dst_ref=dst_ip.id if dst_ip else None,
+        src_ref=src_addr,
+        dst_ref=dst_addr,
         request_method=log_dict["request"]["method"],
         request_value=log_dict["url"],
         dst_byte_count=log_dict["request"]["host"] + log_dict["uri"],
@@ -386,16 +566,6 @@ def nmap_scan_to_knowledge(scan_results: Dict[str, Any]) -> List[_STIXBase]:
     if "runtime" in scan_results:
         del scan_results["runtime"]
 
-    my_hostname = socket.gethostname()
-    try:
-        source_addr = get_or_create_ipv4(socket.gethostbyname(my_hostname))
-    except:
-        source_addr = get_or_create_ipv6(
-            socket.getaddrinfo(my_hostname, None, socket.AF_INET6)[0][4][0]
-        )
-
-    knowledge_nodes.append(source_addr)
-
     for host, data in scan_results.items():
         if "task_results" in host:
             continue
@@ -410,32 +580,55 @@ def nmap_scan_to_knowledge(scan_results: Dict[str, Any]) -> List[_STIXBase]:
         ):
             continue
 
-        mac_addr = None
+        consists_of = []
         if scan_results[host]["macaddress"]:
             mac_addr = MACAddress(value=scan_results[host]["macaddress"])
+            consists_of.append(mac_addr)
             knowledge_nodes.append(mac_addr)
 
-            vendor_abstract = f"vendor: {scan_results[host]['vendor']}"
-            vendors = graph.get_note_by_abstract(vendor_abstract)
-            if len(vendors) > 0:
-                vendor_note = vendors[0]
-                vendor_note["object_refs"].append(mac_addr.id)
-            else:
-                vendor_note = Note(
-                    abstract=vendor_abstract,
-                    content=json.dumps({"vendor": scan_results[host]["vendor"]}),
-                    object_refs=[mac_addr.id],
+            try:
+                vendor_abstract = f"vendor: {scan_results[host]['vendor']}"
+                vendors = graph.get_note_by_abstract(vendor_abstract)
+                if len(vendors) > 0:
+                    vendor_note = list(vendors)[0]
+                    vendor_note["object_refs"].append(mac_addr)
+                else:
+                    vendor_note = Note(
+                        abstract=vendor_abstract,
+                        content=vendor_abstract,
+                        object_refs=[mac_addr],
+                    )
+
+                knowledge_nodes.append(vendor_note)
+            except KeyError:
+                # Vendor not in data, not a big deal
+                logger.info(
+                    f"No vendor found in object for {scan_results[host]['macaddress']}"
                 )
 
-            knowledge_nodes.append(vendor_note)
+        mac_addr_list = [mac_addr] if mac_addr else []
 
         ip_addr = ipaddress.ip_address(host)
+        # Update if new IP address or we found a MAC address, which could be new
         if ip_addr.version == 4:
-            dest_addr = get_or_create_ipv4(str(ip_addr))
-            if mac_addr:
-                dest_addr["resolves_to_refs"] = [mac_addr.id]
+            dest_addr_id = get_ipv4(str(ip_addr))
+            if not dest_addr_id or len(mac_addr_list) > 0:
+                dest_addr = IPv4Address(value=ip_addr, resolves_to_refs=mac_addr_list)
+                knowledge_nodes.append(dest_addr)
+            else:
+                dest_addr = IPv4Address(
+                    id=dest_addr_id, value=ip_addr, resolves_to_refs=mac_addr_list
+                )
         elif ip_addr.version == 6:
-            dest_addr = get_or_create_ipv6(str(ip_addr))
+            dest_addr_id = get_ipv6(str(ip_addr))
+            if not dest_addr_id or len(mac_addr_list) > 0:
+                dest_addr = IPv6Address(value=ip_addr, resolves_to_refs=mac_addr_list)
+                knowledge_nodes.append(dest_addr)
+            else:
+                dest_addr = IPv6Address(
+                    id=dest_addr_id, value=ip_addr, resolves_to_refs=mac_addr_list
+                )
+
         else:
             raise ValueError(
                 f"Unsupported ip type {type(ipaddress.ip_address(host)) } for {host}"
@@ -444,7 +637,9 @@ def nmap_scan_to_knowledge(scan_results: Dict[str, Any]) -> List[_STIXBase]:
         knowledge_nodes.append(dest_addr)
 
         for hostname in scan_results[host]["hostname"]:
-            domain_name = DomainName(value=hostname["name"], resolves_to=dest_addr.id)
+            domain_name = DomainName(
+                value=hostname["name"], resolves_to_refs=[dest_addr]
+            )
             knowledge_nodes.append(domain_name)
 
         if len(scan_results[host]["osmatch"]) > 1:
@@ -455,31 +650,24 @@ def nmap_scan_to_knowledge(scan_results: Dict[str, Any]) -> List[_STIXBase]:
                 version=os_match["osclass"]["osgen"],
                 vendor=os_match["osclass"]["vendor"],
             )
+            consists_of.append(operating_system)
             knowledge_nodes.append(operating_system)
 
         target_host = Infrastructure(
             name=str(host),
-            consists_of=[mac_addr.id, operating_system.id],
-            infrastructure_type_ov="unknown",
+            infrastructure_types=["unknown"],
             last_seen=scan_time,
         )
-        knowledge_nodes.append(target_host)
-
-        for port in scan_results[host]["ports"]:
-            if port["state"] == "open":
-                open_port = SocketExt(
-                    is_listening=True,
-                    dst_port=port["portid"],
-                    dst_ref=target_host.id,
-                    protocols=[port["protocol"]],
+        for consists_ref in consists_of:
+            knowledge_nodes.append(
+                Relationship(
+                    relationship_type="consists-of",
+                    source_ref=target_host,
+                    target_ref=consists_ref,
                 )
-            knowledge_nodes.append(open_port)
+            )
 
-            dst_port_notes = graph.get_port_note(port["portid"], port["protocol"])
-            if len(dst_port_notes) > 0:
-                dst_port_note = dst_port_notes[0]
-                dst_port_note["object_refs"].append(open_port.id)
-                knowledge_nodes.append(dst_port_note)
+        knowledge_nodes.append(target_host)
 
     return knowledge_nodes
 
@@ -497,70 +685,105 @@ def suricata_alert_to_knowledge(alert: Dict[str, Any]) -> List[_STIXBase]:
 
     knowledge_nodes = []
 
-    alert_dt: Optional[datetime.datetime] = dateparser.parse(alert["timestamp"])
-    assert alert_dt is not None
-
     if type(ipaddress.ip_address(alert["src_ip"])) is ipaddress.IPv4Address:
-        source_ip = get_or_create_ipv4(str(alert["src_ip"]))
-        dest_ip = get_or_create_ipv4(str(alert["dest_ip"]))
-    elif type(ipaddress.ip_address(alert["src_ip"])) is ipaddress.IPv6Address:
-        source_ip = get_or_create_ipv6(str(alert["src_ip"]))
-        dest_ip = get_or_create_ipv6(str(alert["dest_ip"]))
+        src_addr_id = get_ipv4(alert["src_ip"])
+        if src_addr_id:
+            src_addr = IPv4Address(id=src_addr_id, value=alert["src_ip"])
+        else:
+            src_addr = IPv4Address(value=alert["src_ip"])
+            knowledge_nodes.append(src_addr)
 
-    knowledge_nodes.append(source_ip)
-    knowledge_nodes.append(dest_ip)
+        dst_addr_id = get_ipv4(alert["dest_ip"])
+        if dst_addr_id:
+            dst_addr = IPv4Address(id=dst_addr_id, value=alert["dest_ip"])
+        else:
+            dst_addr = IPv4Address(value=alert["dest_ip"])
+            knowledge_nodes.append(dst_addr)
+    else:
+        src_addr_id = get_ipv6(alert["src_ip"])
+        if src_addr_id:
+            src_addr = IPv6Address(id=src_addr_id, value=alert["src_ip"])
+        else:
+            src_addr = IPv6Address(value=alert["src_ip"])
+            knowledge_nodes.append(src_addr)
+
+        dst_addr_id = get_ipv6(alert["dest_ip"])
+        if dst_addr_id:
+            dst_addr = IPv6Address(id=dst_addr_id, value=alert["dest_ip"])
+        else:
+            dst_addr = IPv6Address(value=alert["dest_ip"])
+            knowledge_nodes.append(dst_addr)
+
+    try:
+        protocol = ip_protos[alert["PROTO"]]
+    except KeyError:
+        protocol = "unknown"
+
+    # STIX 2.0 Mandated format
+    start_time = dateparser.parse(str(alert["timestamp"]))
 
     params = {
-        "protocols": [alert["proto"]],
-        "src_ref": source_ip.id,
+        "protocols": [protocol],
+        "src_ref": src_addr,
         "src_port": alert["src_port"],
-        "dst_ref": dest_ip.id,
+        "dst_ref": dst_addr,
         "dst_port": alert["dest_port"],
-        "start": alert_dt.timestamp(),
-        "end": alert_dt.timestamp(),
+        "start": start_time,
     }
 
-    if alert["proto"] == "icmp":
-        traffic = ICMPExt(
-            kwargs=params,
-        )
-    elif alert["proto"] == "tcp":
-        traffic = TCPExt(
-            kwargs=params,
-        )
-    else:
-        traffic = NetworkTraffic(
-            kwargs=params,
-        )
+    traffic = NetworkTraffic(
+        **params,
+    )
+
     knowledge_nodes.append(traffic)
 
-    dst_port_notes = graph.get_port_note(alert["dest_port"], alert["proto"])
-    if len(dst_port_notes) > 0:
-        dst_port_note = dst_port_notes[0]
-        dst_port_note["object_refs"].append(traffic.id)
-        knowledge_nodes.append(dst_port_note)
-
-    alert = ObservedData(
-        first_observed=alert["timestamp"],
-        last_observed=alert["timestamp"],
-        number_observed=1,
-        object_refs=[traffic.id],
+    dst_port_note_ids = graph.get_port_note_ids_by_abstract(
+        alert["dest_port"], alert["proto"]
     )
-    knowledge_nodes.append(alert)
+    if len(dst_port_note_ids) > 0:
+        dst_port_note = Note(
+            id=list(dst_port_note_ids)[0],
+            abstract=f"{alert['dest_port']}/{alert['proto']}",
+            content=f"{alert['dest_port']}/{alert['proto']}",
+            object_refs=[traffic],
+        )
+    else:
+        dst_port_note = Note(
+            abstract=f"{alert['dest_port']}/{alert['proto']}",
+            content=f"{alert['dest_port']}/{alert['proto']}",
+            object_refs=[traffic],
+        )
 
-    alert_name = f"suricata:{alert['alert']['signature_id']}/{alert['alert']['rev']}"
+    knowledge_nodes.append(dst_port_note)
+
+    alert_stix = ObservedData(
+        first_observed=dateparser.parse(alert["timestamp"]),
+        last_observed=dateparser.parse(alert["timestamp"]),
+        number_observed=1,
+        object_refs=[traffic],
+    )
+    knowledge_nodes.append(alert_stix)
+
+    alert_name = (
+        f"suricata:{alert['alert']['signature_id']}/{alert['alert']['rev']}"
+    )
 
     # Check for existing indicator in DB. Create if it doesn't exist, reference if it does.
-    alert_sigs = graph.get_indicators_by_name(alert_name)
-    if len(alert_sigs) == 0:
-        attack_patterns = graph.get_attack_pattern_by_name(alert["alert"]["category"])
-        if len(attack_patterns) == 0:
+    alert_sig_ids = graph.get_indicator_ids_by_name(alert_name)
+    if len(alert_sig_ids) == 0:
+        attack_pattern_ids = graph.get_attack_pattern_ids_by_name(
+            alert["alert"]["category"]
+        )
+        if len(attack_pattern_ids) == 0:
             attack_pattern = AttackPattern(
                 name=alert["alert"]["category"],
             )
             knowledge_nodes.append(attack_pattern)
         else:
-            attack_pattern = attack_patterns[0]
+            attack_pattern = AttackPattern(
+                id=attack_pattern_ids[0],
+                name=alert["alert"]["category"],
+            )
 
         indicator = Indicator(
             name=alert_name,
@@ -568,18 +791,23 @@ def suricata_alert_to_knowledge(alert: Dict[str, Any]) -> List[_STIXBase]:
             pattern="Not Provided",  # Required field, but we don't have this info
             pattern_type="suricata",
             pattern_version=alert["alert"]["rev"],
-            indicates=attack_pattern.id,
         )
         knowledge_nodes.append(indicator)
+        indicates_rel = Relationship(
+            relationship_type="indicates",
+            source_ref=indicator,
+            target_ref=attack_pattern,
+        )
+        knowledge_nodes.append(indicates_rel)
     else:
-        indicator = alert_sigs[0]
+        indicator = Indicator(id=list(alert_sig_ids)[0])
 
     sighting = Sighting(
         description="suricata_alert",
-        last_seen=alert["timestamp"],
+        last_seen=dateparser.parse(alert["timestamp"]),
         count=1,
-        observed_data_refs=[alert.id],
-        sighting_of_ref=indicator.id,
+        observed_data_refs=[alert_stix],
+        sighting_of_ref=indicator,
     )
     knowledge_nodes.append(sighting)
 
@@ -607,7 +835,7 @@ def clamav_alert_to_knowledge(alert: Dict[str, Any]) -> List[_STIXBase]:
     directory = Directory(path=directory_path)
     knowledge_nodes.append(directory)
 
-    file = File(name=file_name, parent_directory_ref=directory.id)
+    file = File(name=file_name, parent_directory_ref=directory)
     knowledge_nodes.append(file)
 
     alert_indicator = Indicator(
@@ -626,8 +854,8 @@ def clamav_alert_to_knowledge(alert: Dict[str, Any]) -> List[_STIXBase]:
         name=alert_name,
         description=alert["name"],
         is_family=False,
-        operating_system_refs=[platform.id],
-        sample_refs=[file.id],
+        operating_system_refs=[platform],
+        sample_refs=[file],
     )
     knowledge_nodes.append(malware)
 
@@ -636,8 +864,8 @@ def clamav_alert_to_knowledge(alert: Dict[str, Any]) -> List[_STIXBase]:
 
     malware_pattern_rel = Relationship(
         relationship_type="delivers",
-        source_ref=attack_pattern.id,
-        target_ref=malware.id,
+        source_ref=attack_pattern,
+        target_ref=malware,
     )
     knowledge_nodes.append(malware_pattern_rel)
 
@@ -652,9 +880,9 @@ def clamav_alert_to_knowledge(alert: Dict[str, Any]) -> List[_STIXBase]:
         description="clamav_alert",
         last_seen=timestamp,
         count=1,
-        observed_data_refs=[file.id],
-        sighting_of_ref=alert_indicator.id,
-        where_sighted_refs=[host.id],
+        observed_data_refs=[file],
+        sighting_of_ref=alert_indicator,
+        where_sighted_refs=[host],
     )
     knowledge_nodes.append(sighting)
 
@@ -674,11 +902,14 @@ def waf_alert_to_knowledge(alert: Dict[str, Any]) -> List[_STIXBase]:
 
     knowledge_nodes = []
 
-    # alert_dt: Optional[datetime.datetime] = dateparser.parse(alert["timestamp"])
-    alert_dt = float(alert["ts"])
-    assert alert_dt is not None
+    alert_dt = datetime.datetime.fromtimestamp(alert["ts"])
 
-    alert_name = f"owasp_crs:{alert['id']}/{alert['rev']}"
+    try:
+        alert_name = f"owasp_crs:{alert['id']}/{alert['rev']}"
+    except:
+        logger.warning(f"Skipping alert with no ID: {alert}")
+        return []
+
     alert_indicator = Indicator(
         name=alert_name,
         description=alert["data"],
@@ -689,23 +920,22 @@ def waf_alert_to_knowledge(alert: Dict[str, Any]) -> List[_STIXBase]:
     knowledge_nodes.append(alert_indicator)
 
     for tag in alert["tags"]:
-        ap = get_or_create_attack_pattern(tag)
-        ap_rel = Relationship(alert_indicator.id, "indicates", ap.id)
+        ap_id = get_attack_pattern(tag)
+        ap_rel = Relationship(alert_indicator, "indicates", ap_id)
         knowledge_nodes.append(ap_rel)
 
     # Make Cypher query and return node that contains the correct unique ID
-    http_req_nodes = list(
-        graph.graph.run(
-            f"MATCH (n:HttpRequest) WHERE n.caddy_id = \"{alert['unique_id']}\" RETURN n"
-        )
+    http_req_nodes = graph.graph.run(
+        f"MATCH (n:HttpRequest) WHERE n.caddy_id = \"{alert['unique_id']}\" RETURN n"
     )
+    http_req = HTTPRequestExt(id=list(http_req_nodes)[0].id)
 
     sighting = Sighting(
         description="waf_alert",
         last_seen=alert_dt,
         count=1,
-        observed_data_refs=[http_req_nodes[0].id] if len(http_req_nodes) > 0 else [],
-        sighting_of_ref=alert_indicator.id,
+        observed_data_refs=[http_req] if len(http_req_nodes) > 0 else [],
+        sighting_of_ref=alert_indicator,
     )
     knowledge_nodes.append(sighting)
 
@@ -731,20 +961,30 @@ def knowledge_to_neo(
             node.id,
             node.type,
             {
-                x: node[x]
-                for x in node.properties_populated()
-                if x not in ["id", "type"]
-                and not x.endswith("_ref")
-                and not x.endswith("_refs")
+                **{
+                    x: node[x]
+                    for x in node.properties_populated()
+                    if x not in ["id", "type"]
+                    and not x.endswith("_ref")
+                    and not x.endswith("_refs")
+                },
+                **{"identifier": node["id"]},
             },
         )
         for x in node.properties_populated():
             if x.endswith("_ref"):
                 rels_to_add.append((node.id, node[x], x))
             elif x.endswith("_refs"):
-                rels_to_add.extend([(node.id, x, y) for y in node[x]])
+                rels_to_add.extend([(node.id, y, x) for y in node[x]])
 
     for rel in rels_to_add:
-        graph.add_relation(rel[0], rel[1], rel[2])
+        try:
+            graph.add_relation(
+                node_a_id=rel[0], node_b_id=rel[1], relation_label=rel[2]
+            )
+        except ValueError as e:
+            logger.warning(
+                f"Failed to add relation {rel[2]} between {rel[0]} and {rel[1]}: {e}"
+            )
 
     return False

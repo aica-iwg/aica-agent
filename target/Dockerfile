@@ -1,4 +1,4 @@
-FROM node:20-alpine3.18
+FROM node:21-alpine3.19
 
 ENV NODE_ENV=aica-config
 
@@ -9,8 +9,8 @@ RUN apk update && apk upgrade && \
 RUN ssh-keygen -A && mkdir -p /root/.ssh
 COPY manager_key.pub /root/.ssh/authorized_keys
 RUN chown -R root:root /root && \
-  chmod 750 /root/.ssh && \
-  chmod 600 /root/.ssh/authorized_keys
+    chmod 750 /root/.ssh && \
+    chmod 600 /root/.ssh/authorized_keys
 
 RUN wget https://secure.eicar.org/eicar.com.txt -O /tmp/eicar.com.txt
 

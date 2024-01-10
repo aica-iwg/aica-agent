@@ -68,7 +68,7 @@ def poll_caddy_accesslogs(frequency: int = 30) -> None:
                 # group requests into pairs
                 msg_pairs = [
                     response.json()["messages"][i : i + 2]
-                    for i in range(0, response.json()["messages"], 2)
+                    for i in range(0, len(response.json()["messages"]), 2)
                 ]
                 for message in msg_pairs:
                     # parse the graylog entry for both the access.log and audit.log events

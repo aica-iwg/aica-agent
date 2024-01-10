@@ -5,13 +5,15 @@ Classes:
     AicaNeo4j: The object to instantiate to create a persistent interface with Neo4j
 """
 
-import logging
 import os
 import py2neo.errors  # type: ignore
 
+from celery.utils.log import get_task_logger
 from py2neo import Graph, Node, Relationship
 from urllib.parse import quote_plus
 from typing import Any, Dict, List, Union
+
+logger = get_task_logger(__name__)
 
 
 class AicaNeo4j:
@@ -55,10 +57,15 @@ class AicaNeo4j:
 
         tx = self.graph.begin()
 
-        unique_id = f"""CREATE CONSTRAINT unique_abstract_note IF NOT EXISTS
+        unique_id = f"""CREATE CONSTRAINT unique_id IF NOT EXISTS
+                        FOR (n)
+                        REQUIRE n.id IS UNIQUE"""
+        tx.run(unique_id)
+
+        unique_note = f"""CREATE CONSTRAINT unique_abstract_note IF NOT EXISTS
                         FOR (n:note)
                         REQUIRE n.abstract IS UNIQUE"""
-        tx.run(unique_id)
+        tx.run(unique_note)
 
         unique_ipv4 = f"""CREATE CONSTRAINT unique_addr_ipv4 IF NOT EXISTS
                         FOR (n:`ipv4-addr`)
@@ -98,21 +105,40 @@ class AicaNeo4j:
         n.__primarylabel__ = node_label
         n.__primarykey__ = "id"
 
+        if (
+            "identifier" not in node_properties.keys()
+            and "id" in node_properties.keys()
+        ):
+            node_properties["identifier"] = node_properties["id"]
+
         try:
             if node_label.lower() == "note":
                 # We use notes as global information references, based on unique abstract values,
                 # so they need special handling
-                create_property_list = ", ".join(
-                    [f"n.{x} = '{node_properties[x]}'" for x in node_properties.keys()]
-                )
+                if len(list(node_properties.keys())) > 0:
+                    create_property_list = ", ".join(
+                        [
+                            f"n.{x} = '{node_properties[x]}'"
+                            for x in node_properties.keys()
+                        ]
+                    )
+                    create_property_list = f"ON CREATE SET {create_property_list}"
+                else:
+                    create_property_list = ""
+
+                if "object_refs" in node_properties.keys():
+                    match_property_list = f"ON MATCH SET n.object_refs = n.object_refs + {node_properties['object_refs']}"
+                else:
+                    match_property_list = ""
                 query = f"""MERGE (n:note {{abstract: '{node_properties['abstract']}'}})
-                            ON CREATE SET {create_property_list}
+                            {create_property_list}
+                            {match_property_list}
                             RETURN n"""
                 self.graph.run(query)
             else:
                 self.graph.merge(n)
         except py2neo.errors.ClientError as e:
-            logging.error(str(e))
+            logger.error(str(e))
             return False
 
         return True
@@ -142,19 +168,24 @@ class AicaNeo4j:
         if not relation_properties:
             relation_properties = dict()
 
-        node_a = self.graph.find_one(id=node_a_id)
-        node_b = self.graph.find_one(id=node_b_id)
+        node_a = self.graph.nodes.match(identifier=node_a_id).first()
+        node_b = self.graph.nodes.match(identifier=node_b_id).first()
+
+        if not (node_a and node_b):
+            raise ValueError(
+                f"Unable to find both ends of relationship: {node_a_id} ({node_a}), {node_b_id} ({node_b})"
+            )
 
         r = Relationship(node_a, relation_label, node_b, **relation_properties)
         try:
             self.graph.merge(r, label=relation_label)
         except py2neo.errors.ClientError as e:
-            logging.error(str(e))
+            logger.error(str(e))
             return False
 
         return True
 
-    def get_nodes_by_label(self, label: str) -> List[Node]:
+    def get_node_ids_by_label(self, label: str) -> List[Node]:
         """
         Get all nodes from graph with a given label.
 
@@ -164,11 +195,11 @@ class AicaNeo4j:
         @rtype:
         """
         query = f"MATCH (n:{label}) RETURN n"
-        results = list(self.graph.run(query))
+        results = {result["n"]["identifier"] for result in list(self.graph.run(query))}
 
         return results
 
-    def get_relations_by_label(self, label: str) -> List[Node]:
+    def get_relation_ids_by_label(self, label: str) -> List[Node]:
         """
         Get all relations from graph with a given label.
 
@@ -178,11 +209,11 @@ class AicaNeo4j:
         @rtype:
         """
         query = f"MATCH ()-[r:{label}]-() RETURN r"
-        results = list(self.graph.run(query))
+        results = {result["n"]["identifier"] for result in list(self.graph.run(query))}
 
         return results
 
-    def get_attack_pattern_by_name(self, name: str) -> List[Node]:
+    def get_attack_pattern_ids_by_name(self, name: str) -> List[Node]:
         """
         Get all relations from graph with a given label.
 
@@ -192,11 +223,11 @@ class AicaNeo4j:
         @rtype:
         """
         query = f"MATCH (n:AttackPattern WHERE n.name = '{name}') RETURN n"
-        results = list(self.graph.run(query))
+        results = {result["n"]["identifier"] for result in list(self.graph.run(query))}
 
         return results
 
-    def get_indicators_by_name(self, name: str) -> List[Node]:
+    def get_indicator_ids_by_name(self, name: str) -> List[Node]:
         """
         Get all relations from graph with a given label.
 
@@ -206,11 +237,11 @@ class AicaNeo4j:
         @rtype:
         """
         query = f"MATCH (n:Indicator WHERE n.name = '{name}') RETURN n"
-        results = list(self.graph.run(query))
+        results = {result["n"]["identifier"] for result in list(self.graph.run(query))}
 
         return results
 
-    def get_note_by_abstract(self, abstract: str) -> List[Node]:
+    def get_note_ids_by_abstract(self, abstract: str) -> List[Node]:
         """
         Get all port notes from graph with a given port/proto.
 
@@ -220,11 +251,11 @@ class AicaNeo4j:
         @rtype:
         """
         query = f"MATCH (n:note WHERE n.abstract = '{abstract}') RETURN n"
-        results = list(self.graph.run(query))
+        results = {result["n"]["identifier"] for result in list(self.graph.run(query))}
 
         return results
 
-    def get_port_note(self, port: int, proto: str) -> List[Node]:
+    def get_port_note_ids_by_abstract(self, port: int, proto: str) -> List[Node]:
         """
         Get all port notes from graph with a given port/proto.
 
@@ -233,16 +264,20 @@ class AicaNeo4j:
         @return:
         @rtype:
         """
-        return self.get_note_by_abstract(f"{port}/{proto}")
+        return self.get_note_ids_by_abstract(f"{port}/{proto}")
 
-    def get_ipv4_by_addr(self, addr: str) -> List[Node]:
+    def get_ipv4_ids_by_addr(self, addr: str) -> List[Node]:
         query = f"MATCH (n:`ipv4-addr` WHERE n.value = '{addr}') RETURN n"
-        results = list(self.graph.run(query))
+        query_results = list(self.graph.run(query))
+        if query_results:
+            return {result["n"]["identifier"] for result in query_results}
+        else:
+            return []
 
-        return results
-
-    def get_ipv6_by_addr(self, addr: str) -> List[Node]:
+    def get_ipv6_ids_by_addr(self, addr: str) -> List[Node]:
         query = f"MATCH (n:`ipv6-addr` WHERE n.value = '{addr}') RETURN n"
-        results = list(self.graph.run(query))
-
-        return results
+        query_results = list(self.graph.run(query))
+        if query_results:
+            return {result["n"]["identifier"] for result in query_results}
+        else:
+            return []

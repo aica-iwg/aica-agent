@@ -3,17 +3,16 @@ name: aica
 channels:
   - conda-forge
 dependencies:
-  - python=3.9
-  - black=23.1.*
-  - mypy=1.0.*
-  - pylint=2.16.*
-  - safety=2.*
-  - yamllint=1.29.*
-  - pip=23.*
+  - python=3.11
+  - black=23.12.*
+  - mypy=1.8.*
+  - safety=2.3.*
+  - yamllint=1.33.*
+  - pip=23.3.*
   - pip:
-      - bandit==1.7.4
+      - bandit==1.7.6
       - bashlint==0.1.1
-      - celery-types==0.14.0
-      - django-stubs==1.14.0
-      - types-dateparser==1.1.4.6
-      - types-paramiko==3.0.0.2
+      - celery-types==0.20.0
+      - django-stubs==4.2.7
+      - types-dateparser==1.1.4.10
+      - types-paramiko==3.4.0.20240103
