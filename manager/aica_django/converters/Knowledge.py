@@ -17,7 +17,6 @@ Functions:
 import dateparser
 import datetime
 import ipaddress
-import json
 import pytz
 import re
 
@@ -29,6 +28,7 @@ from stix2 import (  # type: ignore
     DomainName,
     File,
     HTTPRequestExt,
+    Incident,
     Indicator,
     Infrastructure,
     IPv4Address,
@@ -434,22 +434,19 @@ def nginx_accesslog_to_knowledge(
             dest_addr = IPv6Address(value=ip_dst_addr)
             knowledge_nodes.append(dest_addr)
 
-    extensions = [
-        HTTPRequestExt(
+    traffic = NetworkTraffic(
+        start=request_time,
+        src_ref=source_addr,
+        dst_ref=dest_addr,
+        dst_byte_count=log_dict["bytes_sent"],
+        extensions=HTTPRequestExt(
             request_method=log_dict["method"],
             request_value=log_dict["url"],
             request_header={
                 "User-Agent": log_dict["useragent"],
                 "Referer": log_dict["referer"],
             },
-        )
-    ]
-    traffic = NetworkTraffic(
-        start=request_time,
-        src_ref=source_addr,
-        dst_ref=dest_addr,
-        dst_byte_count=log_dict["bytes_sent"],
-        extensions=extensions,
+        ),
     )
     knowledge_nodes.append(traffic)
 
@@ -523,20 +520,22 @@ def caddy_accesslog_to_knowledge(log_dict: Dict[str, Any]) -> List[_STIXBase]:
             dst_addr = IPv6Address(value=log_dict["dest_ip"])
             knowledge_nodes.append(dst_addr)
 
-    traffic = HTTPRequestExt(
+    traffic = NetworkTraffic(
         start=request_time,
         src_ref=src_addr,
         dst_ref=dst_addr,
-        request_method=log_dict["request"]["method"],
-        request_value=log_dict["url"],
-        dst_byte_count=log_dict["request"]["host"] + log_dict["uri"],
-        request_header={
-            "User-Agent": log_dict["request"]["headers"]["User-Agent"],
-            "Referer": log_dict["request"]["headers"]["Referer"],
-        },
+        extensions=HTTPRequestExt(
+            request_method=log_dict["request"]["method"],
+            request_value=log_dict["url"],
+            dst_byte_count=log_dict["request"]["host"] + log_dict["uri"],
+            request_header={
+                "User-Agent": log_dict["request"]["headers"]["User-Agent"],
+                "Referer": log_dict["request"]["headers"]["Referer"],
+            },
+        ),
         custom_properties={
             "caddy_id": log_dict["id"],
-            "http_response_stats": log_dict["status"],
+            "http_response_status": log_dict["status"],
         },
     )
     knowledge_nodes.append(traffic)
@@ -607,7 +606,7 @@ def nmap_scan_to_knowledge(scan_results: Dict[str, Any]) -> List[_STIXBase]:
                 knowledge_nodes.append(vendor_note)
             except KeyError:
                 # Vendor not in data, not a big deal
-                logger.info(
+                logger.debug(
                     f"No vendor found in object for {scan_results[host]['macaddress']}"
                 )
 
@@ -666,7 +665,7 @@ def nmap_scan_to_knowledge(scan_results: Dict[str, Any]) -> List[_STIXBase]:
         for consists_ref in consists_of:
             knowledge_nodes.append(
                 Relationship(
-                    relationship_type="consists-of",
+                    relationship_type="consists_of",
                     source_ref=target_host,
                     target_ref=consists_ref,
                 )
@@ -724,7 +723,6 @@ def suricata_alert_to_knowledge(alert: Dict[str, Any]) -> List[_STIXBase]:
     except KeyError:
         protocol = "unknown"
 
-    # STIX 2.0 Mandated format
     start_time = dateparser.parse(str(alert["timestamp"]))
 
     params = {
@@ -761,14 +759,6 @@ def suricata_alert_to_knowledge(alert: Dict[str, Any]) -> List[_STIXBase]:
 
     knowledge_nodes.append(dst_port_note)
 
-    alert_stix = ObservedData(
-        first_observed=dateparser.parse(alert["timestamp"]),
-        last_observed=dateparser.parse(alert["timestamp"]),
-        number_observed=1,
-        object_refs=[traffic],
-    )
-    knowledge_nodes.append(alert_stix)
-
     alert_name = f"suricata:{alert['alert']['signature_id']}/{alert['alert']['rev']}"
 
     # Check for existing indicator in DB. Create if it doesn't exist, reference if it does.
@@ -794,6 +784,7 @@ def suricata_alert_to_knowledge(alert: Dict[str, Any]) -> List[_STIXBase]:
             pattern="Not Provided",  # Required field, but we don't have this info
             pattern_type="suricata",
             pattern_version=alert["alert"]["rev"],
+            valid_from=datetime.datetime.now(),
         )
         knowledge_nodes.append(indicator)
         indicates_rel = Relationship(
@@ -803,16 +794,31 @@ def suricata_alert_to_knowledge(alert: Dict[str, Any]) -> List[_STIXBase]:
         )
         knowledge_nodes.append(indicates_rel)
     else:
-        indicator = Indicator(id=list(alert_sig_ids)[0])
+        indicator = Indicator(
+            id=list(alert_sig_ids)[0],
+            pattern="<PLACEHOLDER>",
+            pattern_type="suricata",
+            valid_from=datetime.datetime.now(),
+        )
 
-    sighting = Sighting(
-        description="suricata_alert",
-        last_seen=dateparser.parse(alert["timestamp"]),
-        count=1,
-        observed_data_refs=[alert_stix],
-        sighting_of_ref=indicator,
-    )
-    knowledge_nodes.append(sighting)
+    try:
+        observation = ObservedData(
+            first_observed=start_time,
+            last_observed=start_time,
+            number_observed=1,
+            object_refs=[traffic],
+        )
+        knowledge_nodes.append(observation)
+        sighting = Sighting(
+            description="suricata_alert",
+            last_seen=dateparser.parse(alert["timestamp"]),
+            count=1,
+            observed_data_refs=[observation],
+            sighting_of_ref=indicator,
+        )
+        knowledge_nodes.append(sighting)
+    except Exception as e:
+        logger.error(f"Couldn't create sighting ({e})")
 
     return knowledge_nodes
 
@@ -841,12 +847,8 @@ def clamav_alert_to_knowledge(alert: Dict[str, Any]) -> List[_STIXBase]:
     file = File(name=file_name, parent_directory_ref=directory)
     knowledge_nodes.append(file)
 
-    alert_indicator = Indicator(
+    alert_indicator = Incident(
         name=alert_name,
-        values={
-            "platform": alert["platform"],
-            "name": alert["name"],
-        },
     )
     knowledge_nodes.append(alert_indicator)
 
@@ -879,15 +881,26 @@ def clamav_alert_to_knowledge(alert: Dict[str, Any]) -> List[_STIXBase]:
     )
     knowledge_nodes.append(host)
 
-    sighting = Sighting(
-        description="clamav_alert",
-        last_seen=timestamp,
-        count=1,
-        observed_data_refs=[file],
-        sighting_of_ref=alert_indicator,
-        where_sighted_refs=[host],
+    observation = ObservedData(
+        first_observed=timestamp,
+        last_observed=timestamp,
+        number_observed=1,
+        object_refs=[file],
     )
-    knowledge_nodes.append(sighting)
+    knowledge_nodes.append(malware_pattern_rel)
+
+    try:
+        sighting = Sighting(
+            description="clamav_alert",
+            last_seen=timestamp,
+            count=1,
+            observed_data_refs=[observation],
+            sighting_of_ref=alert_indicator,
+            where_sighted_refs=[host],
+        )
+        knowledge_nodes.append(sighting)
+    except Exception as e:
+        logger.error(e)
 
     return knowledge_nodes
 
@@ -929,15 +942,22 @@ def waf_alert_to_knowledge(alert: Dict[str, Any]) -> List[_STIXBase]:
 
     # Make Cypher query and return node that contains the correct unique ID
     http_req_nodes = graph.graph.run(
-        f"MATCH (n:HttpRequest) WHERE n.caddy_id = \"{alert['unique_id']}\" RETURN n"
+        f"MATCH (n:NetworkTraffic) WHERE n.caddy_id = \"{alert['unique_id']}\" RETURN n"
     )
-    http_req = HTTPRequestExt(id=list(http_req_nodes)[0].id)
+    http_req = NetworkTraffic(id=list(http_req_nodes)[0].id)
+
+    observation = ObservedData(
+        first_observed=alert_dt,
+        last_observed=alert_dt,
+        number_observed=1,
+        object_refs=[http_req] if len(http_req_nodes) > 0 else [],
+    )
 
     sighting = Sighting(
         description="waf_alert",
         last_seen=alert_dt,
         count=1,
-        observed_data_refs=[http_req] if len(http_req_nodes) > 0 else [],
+        observed_data_refs=[observation],
         sighting_of_ref=alert_indicator,
     )
     knowledge_nodes.append(sighting)
@@ -960,34 +980,83 @@ def knowledge_to_neo(
 
     rels_to_add = []
     for node in nodes:
-        graph.add_node(
-            node.id,
-            node.type,
-            {
-                **{
-                    x: node[x]
-                    for x in node.properties_populated()
-                    if x not in ["id", "type"]
-                    and not x.endswith("_ref")
-                    and not x.endswith("_refs")
+        # Sightings are relationships (SROs) - took me a while to figure that one out...
+        if isinstance(node, Relationship) or isinstance(node, Sighting):
+            rels_to_add.append(node)
+        else:
+            graph.add_node(
+                node.id,
+                f"{node.type}",
+                {
+                    **{
+                        x: node[x]
+                        for x in node.properties_populated()
+                        if x not in ["id", "type"]
+                        and not x.endswith("_ref")
+                        and not x.endswith("_refs")
+                    },
+                    **{"identifier": node["id"]},
                 },
-                **{"identifier": node["id"]},
-            },
-        )
-        for x in node.properties_populated():
-            if x.endswith("_ref"):
-                rels_to_add.append((node.id, node[x], x))
-            elif x.endswith("_refs"):
-                rels_to_add.extend([(node.id, y, x) for y in node[x]])
+            )
+            for x in node.properties_populated():
+                label = "_".join(x.split("_")[0:-1])
+                try:
+                    if x.endswith("_ref"):
+                        rels_to_add.append(
+                            Relationship(
+                                relationship_type=label,
+                                source_ref=node,
+                                target_ref=node[x],
+                            )
+                        )
+                    elif x.endswith("_refs"):
+                        rels_to_add.extend(
+                            [
+                                Relationship(
+                                    relationship_type=label,
+                                    source_ref=node,
+                                    target_ref=y,
+                                )
+                                for y in node[x]
+                            ]
+                        )
+                except Exception as e:
+                    logger.error(f"Couldn't add ({node})->[{label}]->({node[x]}) | {e}")
 
     for rel in rels_to_add:
+        if isinstance(rel, Sighting):
+            label = "sighting_of"
+            sources = rel["observed_data_refs"]
+            target = "sighting_of_ref"
+        else:
+            label = rel["relationship_type"]
+            sources = [rel["source_ref"]]
+            target = "target_ref"
+
         try:
-            graph.add_relation(
-                node_a_id=rel[0], node_b_id=rel[1], relation_label=rel[2]
-            )
+            for source in sources:
+                graph.add_relation(
+                    node_a_id=source,
+                    node_b_id=rel[target],
+                    relation_label=label,
+                    # Only include valid Relationship/Sighting properties
+                    # https://docs.oasis-open.org/cti/stix/v2.1/os/stix-v2.1-os.html#_e2e1szrqfoan
+                    relation_properties={
+                        x: rel[x]
+                        for x in rel.properties_populated()
+                        if x
+                        in [
+                            "description",
+                            "start_time",
+                            "stop_time",
+                            "first_seen",
+                            "last_seen",
+                            "count",
+                            "summary",
+                        ]
+                    },
+                )
         except ValueError as e:
-            logger.warning(
-                f"Failed to add relation {rel[2]} between {rel[0]} and {rel[1]}: {e}"
-            )
+            logger.error(f"Failed to add relation {rel} ({e})")
 
     return False
