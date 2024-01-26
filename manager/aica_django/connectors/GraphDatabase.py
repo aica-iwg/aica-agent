@@ -57,10 +57,10 @@ class AicaNeo4j:
 
         tx = self.graph.begin()
 
-        # unique_id = f"""CREATE CONSTRAINT unique_id IF NOT EXISTS
-        #                 FOR (n)
-        #                 REQUIRE n.id IS UNIQUE"""
-        # tx.run(unique_id)
+        unique_id = f"""CREATE CONSTRAINT unique_id IF NOT EXISTS
+                        FOR (n)
+                        REQUIRE n.id IS UNIQUE"""
+        tx.run(unique_id)
 
         unique_note = f"""CREATE CONSTRAINT unique_abstract_note IF NOT EXISTS
                         FOR (n:note)

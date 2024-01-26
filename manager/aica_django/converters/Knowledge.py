@@ -887,6 +887,7 @@ def clamav_alert_to_knowledge(alert: Dict[str, Any]) -> List[_STIXBase]:
         number_observed=1,
         object_refs=[file],
     )
+    knowledge_nodes.append(malware_pattern_rel)
 
     try:
         sighting = Sighting(
@@ -900,6 +901,8 @@ def clamav_alert_to_knowledge(alert: Dict[str, Any]) -> List[_STIXBase]:
         knowledge_nodes.append(sighting)
     except Exception as e:
         logger.error(e)
+
+    return knowledge_nodes
 
     return knowledge_nodes
 

@@ -220,7 +220,6 @@ def initialize(**kwargs: Dict[Any, Any]) -> bool:
     while True:
         try:
             graph = AicaNeo4j()
-            graph.create_constraints()
             break
         except ConnectionUnavailable:
             time.sleep(1)
