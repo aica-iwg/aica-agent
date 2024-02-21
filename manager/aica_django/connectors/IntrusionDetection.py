@@ -8,7 +8,7 @@ Functions:
 import datetime
 import json
 import logging
-import re2 as re
+import re2 as re  # type: ignore
 import requests
 import time
 

@@ -12,7 +12,7 @@ import logging
 import netifaces  # type: ignore
 import nmap3  # type: ignore
 import os
-import re2 as re
+import re2 as re  # type: ignore
 import time
 
 from hashlib import sha256
