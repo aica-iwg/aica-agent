@@ -10,7 +10,7 @@ import datetime
 import ipaddress
 import json
 import logging
-import re
+import re2 as re
 import requests
 import time
 

@@ -6,7 +6,6 @@ CONDA := conda run --no-capture-output -n aica
 check-env:
 ifndef MODE
 		$(error MODE is undefined)
-
 endif
 
 init: environment.yml
@@ -36,10 +35,13 @@ test: lint security
 				/opt/venv/bin/coverage run --omit='*test*' manage.py test --noinput && \
 				/opt/venv/bin/coverage report --fail-under=30"
 
-start: build
+start: check-env 
 		@docker compose -f docker-compose.yml -f docker-compose-${MODE}.yml up --wait -d
 
 stop: check-env
+		@docker compose -f docker-compose.yml -f docker-compose-${MODE}.yml down
+
+stop_purge: check-env
 		@docker compose -f docker-compose.yml -f docker-compose-${MODE}.yml down -v
 
 rebuild: build stop start

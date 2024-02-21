@@ -8,7 +8,7 @@ Functions:
 import ipaddress
 import os
 import socket
-from typing import Tuple, Union
+from typing import Tuple
 
 from paramiko import SSHClient, AutoAddPolicy
 from paramiko.ssh_exception import NoValidConnectionsError
