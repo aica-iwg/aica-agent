@@ -37,6 +37,7 @@ RUN --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
         g++ \
         musl-dev \
         tcpdump \
+        tshark \
         net-tools \
         vim
 

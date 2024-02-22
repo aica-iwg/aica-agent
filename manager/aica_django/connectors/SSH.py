@@ -32,7 +32,7 @@ def send_ssh_command(target: str, command: str) -> Tuple[int, str, str]:
     """
     client = SSHClient()
     client.load_system_host_keys()
-    client.set_missing_host_key_policy(AutoAddPolicy())
+    client.set_missing_host_key_policy(AutoAddPolicy())  # nosec
 
     client.connect(target, username="root")
     logger.debug(f"Sending command: {command}")

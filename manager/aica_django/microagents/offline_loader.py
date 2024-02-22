@@ -30,6 +30,7 @@ from celery.app import shared_task
 from celery.signals import worker_ready
 from celery.utils.log import get_task_logger
 from io import StringIO
+from numpy import ndarray
 from py2neo import ConnectionUnavailable  # type: ignore
 from stix2 import AttackPattern, Note, Software  # type: ignore
 from typing import Any, Dict
@@ -118,10 +119,12 @@ def create_ports() -> bool:
         comment="#",
         header=None,
         names=["service", "port", "frequency", "comment"],
+        index_col=False,
     )
     nmap_df[["port_number", "protocol"]] = nmap_df["port"].str.split("/", expand=True)
     nmap_df.drop(columns=["comment", "port"], axis=1, inplace=True)
     nmap_df.sort_values(by="frequency", inplace=True, ascending=False)
+    nmap_df = nmap_df.reset_index(drop=True)
 
     port_objects = []
 
@@ -130,6 +133,15 @@ def create_ports() -> bool:
 
     for index, row in nmap_df.iterrows():
         rank = nmap_df.index.get_loc(key=index)
+        if isinstance(rank, int):
+            rank = int(rank)
+        elif isinstance(rank, slice):
+            rank = int(rank.start)
+        elif isinstance(rank, ndarray):
+            rank = int(rank[0])
+        else:
+            raise ValueError
+
         port_object = Note(
             abstract=f"{row['port_number']}/{row['protocol']}",
             content=json.dumps(

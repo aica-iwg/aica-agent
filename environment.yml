@@ -4,18 +4,21 @@ channels:
   - conda-forge
 dependencies:
   - python=3.11
-  - black=23.12.*
   - mypy=1.8.*
-  - safety=2.3.*
-  - yamllint=1.33.*
-  - pip=23.3.*
+  - yamllint=1.35.*
+  - pip=24.*
+  # Some things are down here for better cross-platform compatibility
   - pip:
-      - bandit==1.7.6
+      - bandit==1.7.7
       - bashlint==0.1.1
-      - celery-types==0.20.0
+      - black==24.2.0
+      - celery-types==0.22.0
+      - charset-normalizer==3.3.2
       - django-stubs==4.2.7
       - pandas-stubs==2.2.0.240218
+      - safety==3.0.1
       - types-requests==2.31.0.20240218
-      - types-dateparser==1.1.4.10
+      - types-dateparser==1.1.4.20240106
       - types-openpyxl==3.1.0.20240220
       - types-paramiko==3.4.0.20240103
+      - urllib3==2.2.1
