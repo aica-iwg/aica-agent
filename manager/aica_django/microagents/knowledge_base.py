@@ -35,6 +35,7 @@ from aica_django.converters.Knowledge import (
     suricata_alert_to_knowledge,
     waf_alert_to_knowledge,
     clamav_alert_to_knowledge,
+    dnp3_to_knowledge,
     knowledge_to_neo,
 )
 
@@ -189,5 +190,21 @@ def record_caddy_accesslog(log_entry: Dict[str, str]) -> bool:
     """
     logger.info(f"Running {__name__}: record_nginx_accesslog")
     nodes = caddy_accesslog_to_knowledge(log_entry)
+
+    return knowledge_to_neo(nodes)
+
+
+@shared_task(name="ma-knowledge_base-record_dnp3")
+def record_dnp3(log_entry: Dict[str, str]) -> bool:
+    """
+    Convert a DNP3 message to Knowledge objects and store in the knowledge graph database.
+
+    @param log_entry: The log entry to be recorded.
+    @type log_entry: dict
+    @return: Return status of the attempt to add items to graph database.
+    @rtype: bool
+    """
+    logger.info(f"Running {__name__}: record_dnp3")
+    nodes = dnp3_to_knowledge(log_entry)
 
     return knowledge_to_neo(nodes)

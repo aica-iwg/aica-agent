@@ -18,7 +18,7 @@ import dateparser
 import datetime
 import ipaddress
 import pytz
-import re
+import re2 as re  # type: ignore
 
 from celery.utils.log import get_task_logger
 from stix2.base import _STIXBase  # type: ignore
@@ -274,7 +274,7 @@ def normalize_mac_addr(mac_addr: str) -> str:
     @raise: ValueError: MAC address does not parse to normalized form
     """
 
-    normed_mac = re.sub(r"[^A-Fa-f\d]", "", mac_addr).lower()
+    normed_mac = str(re.sub(r"[^A-Fa-f\d]", "", mac_addr).lower())
     if len(normed_mac) != 12:
         raise ValueError("Invalid MAC Address Provided")
 
@@ -961,6 +961,24 @@ def waf_alert_to_knowledge(alert: Dict[str, Any]) -> List[_STIXBase]:
         sighting_of_ref=alert_indicator,
     )
     knowledge_nodes.append(sighting)
+
+    return knowledge_nodes
+
+
+def dnp3_to_knowledge(log_dict: dict[str, str]) -> List[_STIXBase]:
+    """
+    Converts a DNP3 message (as returned from aica_django.connectors.DNP3.parse_dnp3_packet)
+    to knowledge objects.
+
+    @param alert: A dictionary as returned by parse_dnp3_packet to be converted to knowledge objects
+    @type alert: Dict[str, Any]
+    @return: Knowledge nodes resulting from this conversion
+    @rtype: list
+    """
+
+    knowledge_nodes: List[_STIXBase] = []
+
+    # TODO
 
     return knowledge_nodes
 
