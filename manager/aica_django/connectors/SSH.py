@@ -8,7 +8,7 @@ Functions:
 import ipaddress
 import os
 import socket
-from typing import Tuple, Union
+from typing import Tuple
 
 from paramiko import SSHClient, AutoAddPolicy
 from paramiko.ssh_exception import NoValidConnectionsError
@@ -32,7 +32,7 @@ def send_ssh_command(target: str, command: str) -> Tuple[int, str, str]:
     """
     client = SSHClient()
     client.load_system_host_keys()
-    client.set_missing_host_key_policy(AutoAddPolicy())
+    client.set_missing_host_key_policy(AutoAddPolicy())  # nosec
 
     client.connect(target, username="root")
     logger.debug(f"Sending command: {command}")

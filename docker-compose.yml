@@ -76,9 +76,8 @@ services:
     container_name: manager_graphdb
     restart: unless-stopped
     environment:
-      - NEO4J_PLUGINS=\[\"apoc\"\]
       # https://neo4j.com/docs/operations-manual/current/docker/ref-settings/
-      - NEO4J_dbms_security_procedures_unrestricted=apoc.*
+      - NEO4J_dbms_security_procedures_unrestricted=apoc.*,gds.*
       - apoc.export.file.enabled=true
       - apoc.import.file.enabled=true
       - apoc.import.file.use_neo4j_config=false
