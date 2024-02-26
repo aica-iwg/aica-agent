@@ -7,23 +7,23 @@ Classes:
 
 import inspect
 import os
-import re2 as re
-import stix2
+import re2 as re  # type: ignore
+import stix2  # type: ignore
 
 from celery.utils.log import get_task_logger
-from neo4j import GraphDatabase
+from neo4j import GraphDatabase  # type: ignore
 from urllib.parse import quote_plus
-from stix2.base import _STIXBase
+from stix2.base import _STIXBase  # type: ignore
 from typing import Any, Dict, List, Optional, Union
 
 logger = get_task_logger(__name__)
 
 
-def sanitize_cypher(text: str):
+def sanitize_cypher(text: str) -> str:
     if not isinstance(text, str):
         raise ValueError(f"text must be a string: {text}")
 
-    return re.sub("[-:]", "__", str(text)).replace('"', '\\"')
+    return str(re.sub("[-:]", "__", str(text)).replace('"', '\\"'))
 
 
 def dict_to_cypher(input_dict: dict[str, Any]) -> str:
@@ -52,43 +52,37 @@ class KnowledgeNode:
         self.set_labels(labels)
         self.set_props(props)
 
-    def set_id(self, id: str):
+    def set_id(self, id: str) -> None:
         self._id = sanitize_cypher(id)
 
-    def set_labels(self, labels: Union[str, list[str]]):
-        if not isinstance(labels, list):
-            labels = [labels]
-
+    def set_labels(self, labels: list[str]) -> None:
         self._labels = [sanitize_cypher(x) for x in labels]
 
-    def set_props(self, props: dict[str, Union[str, int, float, bool]]):
+    def set_props(self, props: dict[str, Union[str, int, float, bool]]) -> None:
         self._props = {
             sanitize_cypher(x): sanitize_cypher(str(props[x])) for x in props
         }
 
-    def get_create_statement(self, name="n"):
+    def get_create_statement(self, name: str = "n") -> str:
         if len(self._labels) == 0:
             raise ValueError(
                 "Cannot generate create statement for node of unknown type"
             )
-        labels_string = ":".join(
-            [sanitize_cypher(x) for x in self._labels]
-            if isinstance(self._labels, list)
-            else sanitize_cypher(self._labels)
-        )
+        labels_string = ":".join(self._labels)
+
         props_string = ",".join(
             [f'{k}: "{v}"' for k, v in {**self._props, "accolade_id": self._id}.items()]
         )
 
         return f"({name}:{labels_string} {{{props_string}}})"
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.get_create_statement()
 
-    def __unicode__(self):
+    def __unicode__(self) -> str:
         return self.__str__()
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return self.__str__()
 
 
@@ -99,30 +93,30 @@ class KnowledgeRelation:
         props: dict[str, Union[str, int, float, bool]],
         src_node_id: str,
         dst_node_id: str,
-    ):
+    ) -> None:
         self.set_type(rel_type)
         self.set_props(props)
         self.src_node_id = src_node_id
         self.dst_node_id = dst_node_id
 
-    def set_type(self, rel_type: str):
+    def set_type(self, rel_type: str) -> None:
         self._type = sanitize_cypher(rel_type)
 
-    def set_props(self, props: dict[str, Union[str, int, float, bool]]):
+    def set_props(self, props: dict[str, Union[str, int, float, bool]]) -> None:
         self._props = {
             sanitize_cypher(x): sanitize_cypher(str(props[x])) for x in props
         }
 
-    def get_create_statement(self, name="r"):
+    def get_create_statement(self, name: str = "r") -> str:
         return f"{name}:{self._type} {dict_to_cypher(self._props)}"
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"({self.src_node_id}) [{self._type} {dict_to_cypher(self._props)}] ({self.dst_node_id})"
 
-    def __unicode__(self):
+    def __unicode__(self) -> str:
         return self.__str__()
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return self.__str__()
 
 
@@ -209,7 +203,7 @@ class AicaNeo4j:
 
     def add_node(
         self, node_id: str, node_label: str, node_properties: Dict[str, Any]
-    ) -> bool:
+    ) -> None:
         """
         Adds a node with specified parameters to the graph database.
 
@@ -260,9 +254,9 @@ class AicaNeo4j:
         node_a_id: str,
         node_b_id: str,
         relation_label: str,
-        relation_properties: Optional[dict] = None,
+        relation_properties: Optional[dict[str, Any]] = None,
         directed: bool = True,
-    ) -> bool:
+    ) -> None:
         """
         Adds a relation with specified parameters to the graph database.
 
@@ -297,7 +291,7 @@ class AicaNeo4j:
                             RETURN type(r)"""
                 tx.run(query)
 
-                return tx.commit()
+                tx.commit()
 
     def get_node_ids_by_label(self, label: str) -> List[str]:
         """
