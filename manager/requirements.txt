@@ -12,7 +12,7 @@ google-re2==1.1
 gunicorn==21.2.0
 json2table==1.1.5
 kombu==5.3.5
-neo4j==5.15.0  # Older version required for neomodel compatibility
+neo4j==5.18.0  # Older version required for neomodel compatibility
 neomodel==5.2.1
 netaddr==1.2.1
 netflow==0.12.2
