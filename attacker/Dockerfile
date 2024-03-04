@@ -2,18 +2,19 @@ FROM kalilinux/kali-rolling:latest
 
 USER root
 
+# Use the Cloudflare Mirror (see http://http.kali.org/README?mirrorlist)
+ENV APT_MIRROR="kali.download/kali/"
+RUN sed --in-place --regexp-extended "s#http.kali.org/kali#${APT_MIRROR}#g" /etc/apt/sources.list
+
+# Recommend kali-linux-headless package, but very large so not installing here
 RUN apt-get update && \
     apt-get upgrade -y && \
     apt-get install -y --no-install-recommends \
         build-essential \
-        chromium \
-        chromium-driver \
-        kali-linux-headless \
-        libffi-dev \
+        nmap \
         openssh-server \
         python3-dev \
         python3-pip \
-        python3-selenium \
         python3-venv
 
 RUN ssh-keygen -A
