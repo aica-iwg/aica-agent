@@ -409,16 +409,11 @@ class AicaNeo4j:
                 )
                 self.graph.execute_query(id_unique)
 
-<<<<<<< HEAD
-        if poll_graph:
-            self.poll_graphml()
-=======
             # Periodic export of graph to graphML for analysis
             export_freq = str(int(os.getenv("AICA_GRAPHML_EXPORT_FREQ", default=900))) #1800 seconds is default
             export_query = 'CALL apoc.export.graphml.all("/graph_data/aica.graphml", {format:"gephi", useTypes:true})'
             schedule_query = f"CALL apoc.periodic.repeat('export-graphml', '{export_query}', {export_freq});"
             self.graph.execute_query(schedule_query)
->>>>>>> baab09b (Finished with process_graphml() function!)
 
     def add_node(
         self,
