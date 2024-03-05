@@ -8,3 +8,4 @@ __pycache__
 coverage.xml
 db.sqlite3
 venv
+/scratchwork
