@@ -63,6 +63,7 @@ RUN apt-get -y remove \
     apt-get -y clean
 
 COPY supervisor.conf /etc/supervisor/conf.d/
+
 COPY fprobe /etc/default/
 
 RUN mkdir -p /root/.ssh

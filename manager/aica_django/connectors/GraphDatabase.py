@@ -9,12 +9,14 @@ import inspect
 import os
 import re2 as re  # type: ignore
 import stix2  # type: ignore
+import time
 
+from celery import current_app
 from celery.utils.log import get_task_logger
 from neo4j import GraphDatabase  # type: ignore
-from urllib.parse import quote_plus
 from stix2.base import _STIXBase  # type: ignore
 from typing import Any, Dict, List, Optional, Union
+from urllib.parse import quote_plus
 
 logger = get_task_logger(__name__)
 
@@ -126,7 +128,7 @@ class AicaNeo4j:
     """
 
     def __init__(
-        self, host: str = "", port: int = 0, user: str = "", password: str = ""
+        self, host: str = "", port: int = 0, user: str = "", password: str = "", create_constraints: bool = True,
     ) -> None:
         """
         Initialize a new AiceNeo4j object.
@@ -151,58 +153,73 @@ class AicaNeo4j:
 
         self.graph = GraphDatabase.driver(uri, auth=(user, password))
 
-        with self.graph.session() as session:
-            with session.begin_transaction() as tx:
+        if create_constraints:
+            with self.graph.session() as session:
+                with session.begin_transaction() as tx:
 
-                for label in list(
-                    set(
-                        [
-                            getattr(stix2.v21.sdo, x)._type
-                            for x in dir(stix2.v21.sdo)
-                            if inspect.isclass(getattr(stix2.v21.sdo, x))
-                            and issubclass(getattr(stix2.v21.sdo, x), _STIXBase)
-                            and "_type" in dir(getattr(stix2.v21.sdo, x))
-                        ]
-                        + [
-                            getattr(stix2.v21.observables, x)._type
-                            for x in dir(stix2.v21.observables)
-                            if inspect.isclass(getattr(stix2.v21.observables, x))
-                            and issubclass(getattr(stix2.v21.observables, x), _STIXBase)
-                            and "_type" in dir(getattr(stix2.v21.observables, x))
-                        ]
+                    for label in list(
+                        set(
+                            [
+                                getattr(stix2.v21.sdo, x)._type
+                                for x in dir(stix2.v21.sdo)
+                                if inspect.isclass(getattr(stix2.v21.sdo, x))
+                                and issubclass(getattr(stix2.v21.sdo, x), _STIXBase)
+                                and "_type" in dir(getattr(stix2.v21.sdo, x))
+                            ]
+                            + [
+                                getattr(stix2.v21.observables, x)._type
+                                for x in dir(stix2.v21.observables)
+                                if inspect.isclass(getattr(stix2.v21.observables, x))
+                                and issubclass(getattr(stix2.v21.observables, x), _STIXBase)
+                                and "_type" in dir(getattr(stix2.v21.observables, x))
+                            ]
+                        )
+                    ):
+                        label_safe = re.sub("[^A-Za-z0-9_]", "_", label)
+                        unique_id = (
+                            f"CREATE CONSTRAINT {label_safe}_identifier IF NOT EXISTS "
+                            + f"FOR (n:`{label}`) REQUIRE n.identifier IS UNIQUE"
+                        )
+                        tx.run(unique_id)
+
+                    unique_note = (
+                        "CREATE CONSTRAINT note_abstract IF NOT EXISTS "
+                        + "FOR (n:note) REQUIRE n.abstract IS UNIQUE"
                     )
-                ):
-                    unique_id = f"""CREATE CONSTRAINT unique_id_{re.sub('[^A-za-z0-9]', '_', label)} IF NOT EXISTS
-                                    FOR (n:`{label}`)
-                                    REQUIRE n.identifier IS UNIQUE"""
-                    tx.run(unique_id)
+                    tx.run(unique_note)
 
-                unique_note = f"""CREATE CONSTRAINT unique_abstract_note IF NOT EXISTS
-                                FOR (n:note)
-                                REQUIRE n.abstract IS UNIQUE"""
-                tx.run(unique_note)
+                    unique_ap = (
+                        "CREATE CONSTRAINT attack_pattern_description IF NOT EXISTS "
+                        + "FOR (n:`attack-pattern`) REQUIRE n.description IS UNIQUE"
+                    )
+                    tx.run(unique_ap)
 
-                unique_ap = f"""CREATE CONSTRAINT unique_attack_pattern IF NOT EXISTS
-                                FOR (n:`attack-pattern`)
-                                REQUIRE n.description IS UNIQUE"""
-                tx.run(unique_ap)
+                    unique_value_labels = [
+                        "mac-addr",
+                        "ipv4-addr",
+                        "ipv6-addr",
+                        "domain-name",
+                    ]
+                    for label in unique_value_labels:
+                        label_safe = re.sub("[^A-Za-z0-9_]", "_", label)
+                        unique_constraint = (
+                            f"CREATE CONSTRAINT {label_safe}_value IF NOT EXISTS "
+                            + f"FOR (n:`{label}`) REQUIRE n.value IS UNIQUE"
+                        )
+                        tx.run(unique_constraint)
 
-                unique_value_labels = [
-                    "mac-addr",
-                    "ipv4-addr",
-                    "ipv6-addr",
-                    "domain-name",
-                ]
-                for label in unique_value_labels:
-                    unique_constraint = f"""CREATE CONSTRAINT unique_value_{re.sub('[^A-za-z0-9]', '_', label)} IF NOT EXISTS
-                                    FOR (n:`{label}`)
-                                    REQUIRE n.value IS UNIQUE"""
-                    tx.run(unique_constraint)
-
-                tx.commit()
+                    tx.commit()
 
     def add_node(
         self, node_id: str, node_label: str, node_properties: Dict[str, Any]
+    ) -> None:
+        self.add_nodes([node_id], [node_label], [node_properties])
+
+    def add_nodes(
+        self,
+        node_ids: List[str],
+        node_labels: List[str],
+        node_properties: List[Dict[str, Any]],
     ) -> None:
         """
         Adds a node with specified parameters to the graph database.
@@ -218,36 +235,49 @@ class AicaNeo4j:
         @raise: ValueError: if node_label is not a predefined type in defined_node_labels
         """
 
-        if not node_properties:
-            node_properties = dict()
+        queries = []
 
-        node_properties["identifier"] = node_id
+        for node_id, node_label, node_property in zip(
+            node_ids, node_labels, node_properties
+        ):
+            if not node_property:
+                node_property = dict()
 
-        if node_label.lower() == "note":
-            # We use notes as global information references, based on unique abstract values,
-            # so they need special handling
-            if len(list(node_properties.keys())) > 0:
-                create_property_list = ", ".join(
-                    [f"n.{x} = '{node_properties[x]}'" for x in node_properties.keys()]
+            if node_label.lower() == "note":
+                # We use notes as global information references, based on unique abstract values,
+                # so they need special handling
+                if len(list(node_property.keys())) > 0:
+                    node_property["identifier"] = node_id
+                    create_property_list = ", ".join(
+                        [f"n.{x} = '{node_property[x]}'" for x in node_property.keys()]
+                    )
+                    create_property_list = f"ON CREATE SET {create_property_list}"
+                else:
+                    create_property_list = ""
+
+                if "object_refs" in node_property.keys():
+                    match_property_list = f"ON MATCH SET n.object_refs = n.object_refs + {node_property['object_refs']}"
+                else:
+                    match_property_list = ""
+                queries.append(
+                    f"""MERGE (n:note {{abstract: '{node_property['abstract']}'}})
+                            {create_property_list}
+                            {match_property_list}
+                            RETURN n"""
                 )
-                create_property_list = f"ON CREATE SET {create_property_list}"
             else:
-                create_property_list = ""
+                queries.append(
+                    f"MERGE (n:`{node_label}` {dict_to_cypher(node_property)}) "
+                    + f"ON CREATE SET n.identifier = '{node_id}', n.created = timestamp() "
+                    + "RETURN n.identifier, n.created"
+                )
 
-            if "object_refs" in node_properties.keys():
-                match_property_list = f"ON MATCH SET n.object_refs = n.object_refs + {node_properties['object_refs']}"
-            else:
-                match_property_list = ""
-            query = f"""MERGE (n:note {{abstract: '{node_properties['abstract']}'}})
-                        {create_property_list}
-                        {match_property_list}
-                        RETURN n"""
-            self.graph.execute_query(query)
-        else:
-            query = (
-                f"MERGE (n:`{node_label}` {dict_to_cypher(node_properties)}) RETURN n"
-            )
-            self.graph.execute_query(query)
+        with self.graph.session() as session:
+            with session.begin_transaction() as tx:
+                for query in queries:
+                    tx.run(query)
+
+                tx.commit()
 
     def add_relation(
         self,
@@ -255,7 +285,23 @@ class AicaNeo4j:
         node_b_id: str,
         relation_label: str,
         relation_properties: Optional[dict[str, Any]] = None,
-        directed: bool = True,
+        directed_tag: bool = True,
+    ) -> None:
+        self.add_relations(
+            [node_a_id],
+            [node_b_id],
+            [relation_label],
+            [relation_properties],
+            [directed_tag],
+        )
+
+    def add_relations(
+        self,
+        node_a_ids: str,
+        node_b_ids: str,
+        relation_labels: str,
+        relation_properties: Optional[dict[str, Any]] = None,
+        directed_tags: bool = True,
     ) -> None:
         """
         Adds a relation with specified parameters to the graph database.
@@ -272,24 +318,39 @@ class AicaNeo4j:
         @rtype: bool
         """
 
-        if not relation_properties:
-            relation_properties = dict()
+        queries = []
 
-        relation = KnowledgeRelation(
-            relation_label, relation_properties, node_a_id, node_b_id
-        )
+        for (
+            node_a_id,
+            node_b_id,
+            relation_label,
+            relation_property,
+            directed_tag,
+        ) in zip(
+            node_a_ids, node_b_ids, relation_labels, relation_properties, directed_tags
+        ):
+            if not relation_property:
+                relation_property = dict()
+
+            relation = KnowledgeRelation(
+                relation_label, relation_property, node_a_id, node_b_id
+            )
+
+            query = f"""MATCH
+                            (n1), (n2)
+                        WHERE
+                            n1.identifier = '{node_a_id}' AND
+                            n2.identifier = '{node_b_id}' 
+                        MERGE 
+                            (n1)-[{relation.get_create_statement()}]-{'>' if directed_tag else ''}(n2)
+                        RETURN type(r)"""
+
+            queries.append(query)
 
         with self.graph.session() as session:
             with session.begin_transaction() as tx:
-                query = f"""MATCH
-                                (n1), (n2)
-                            WHERE
-                                n1.identifier = '{node_a_id}' AND
-                                n2.identifier = '{node_b_id}' 
-                            MERGE 
-                                (n1)-[{relation.get_create_statement()}]-{'>' if directed else ''}(n2)
-                            RETURN type(r)"""
-                tx.run(query)
+                for query in queries:
+                    tx.run(query)
 
                 tx.commit()
 
@@ -304,7 +365,11 @@ class AicaNeo4j:
         """
         query = f"MATCH (n:{label}) RETURN n.identifier as identifier"
         query_results, _, _ = self.graph.execute_query(query)
-        return [result["identifier"] for result in query_results]
+
+        try:
+            return [result.data()["identifier"] for result in query_results]
+        except:
+            raise ValueError("Identifier field missing for at least one result")
 
     def get_relation_ids_by_label(self, label: str) -> List[str]:
         """
@@ -317,7 +382,11 @@ class AicaNeo4j:
         """
         query = f"MATCH ()-[r:{label}]-() RETURN r.identifier as identifier"
         query_results, _, _ = self.graph.execute_query(query)
-        return [result["identifier"] for result in query_results]
+
+        try:
+            return [result.data()["identifier"] for result in query_results]
+        except:
+            raise ValueError("Identifier field missing for at least one result")
 
     def get_attack_pattern_ids_by_name(self, name: str) -> List[str]:
         """
@@ -330,7 +399,11 @@ class AicaNeo4j:
         """
         query = f"MATCH (n:AttackPattern WHERE n.name = '{name}') RETURN n.identifier as identifier"
         query_results, _, _ = self.graph.execute_query(query)
-        return [result["identifier"] for result in query_results]
+
+        try:
+            return [result.data()["identifier"] for result in query_results]
+        except:
+            raise ValueError("Identifier field missing for at least one result")
 
     def get_indicator_ids_by_name(self, name: str) -> List[str]:
         """
@@ -343,7 +416,11 @@ class AicaNeo4j:
         """
         query = f"MATCH (n:Indicator WHERE n.name = '{name}') RETURN n.identifier as identifier"
         query_results, _, _ = self.graph.execute_query(query)
-        return [result["identifier"] for result in query_results]
+
+        try:
+            return [result.data()["identifier"] for result in query_results]
+        except:
+            raise ValueError("Identifier field missing for at least one result")
 
     def get_attack_pattern_ids_by_category(self, category: str) -> List[str]:
         """
@@ -356,7 +433,11 @@ class AicaNeo4j:
         """
         query = f"MATCH (n:`attack-pattern`) WHERE (n.description = '{category}') RETURN n.identifier as identifier"
         query_results, _, _ = self.graph.execute_query(query)
-        return [result["identifier"] for result in query_results]
+
+        try:
+            return [result.data()["identifier"] for result in query_results]
+        except:
+            raise ValueError("Identifier field missing for at least one result")
 
     def get_note_ids_by_abstract(self, abstract: str) -> List[str]:
         """
@@ -369,7 +450,11 @@ class AicaNeo4j:
         """
         query = f"MATCH (n:note WHERE n.abstract = '{abstract}') RETURN n.identifier as identifier"
         query_results, _, _ = self.graph.execute_query(query)
-        return [result["identifier"] for result in query_results]
+
+        try:
+            return [result.data()["identifier"] for result in query_results]
+        except:
+            raise ValueError("Identifier field missing for at least one result")
 
     def get_port_note_ids_by_abstract(self, port: int, proto: str) -> List[str]:
         """
@@ -385,12 +470,43 @@ class AicaNeo4j:
     def get_ipv4_ids_by_addr(self, addr: str) -> List[str]:
         query = f"MATCH (n:`ipv4-addr` WHERE n.value = '{addr}') RETURN n.identifier as identifier"
         query_results, _, _ = self.graph.execute_query(query)
+
         try:
-            return [result["identifier"] for result in query_results]
+            return [result.data()["identifier"] for result in query_results]
         except:
-            raise ValueError([result for result in query_results])
+            raise ValueError("Identifier field missing for at least one result")
 
     def get_ipv6_ids_by_addr(self, addr: str) -> List[str]:
         query = f"MATCH (n:`ipv6-addr` WHERE n.value = '{addr}') RETURN n.identifier as identifier"
         query_results, _, _ = self.graph.execute_query(query)
-        return [result["identifier"] for result in query_results]
+
+        try:
+            return [result.data()["identifier"] for result in query_results]
+        except:
+            raise ValueError("Identifier field missing for at least one result")
+
+
+@current_app.task(name="prune-netflow-data")
+def prune_netflow_data(seconds: int = 600, pre_sleep: bool = True, post_sleep: bool = False) -> None:
+    # This function removes all network traffic items that were created at least
+    # _minutes_ ago and are not connected to any observations
+
+    graph = AicaNeo4j(create_constraints=False)
+
+    # Not using f-string here since it gets messy with braces in the query.
+    # This might get better with Python 3.12+.
+    query = (
+        "WITH datetime() - duration({minutes:"
+        + str(minutes)
+        + "}) AS cutoff "
+        + "CALL {MATCH (n:`network-traffic`) OPTIONAL MATCH (n)<-[r]-(o:`observed-data`) RETURN n,r,o} "
+        + "WITH *, datetime(replace(n.end, ' ', 'T')) AS end "
+        + "WHERE o IS NULL AND end < cutoff "
+        + "DETACH DELETE n"
+    )
+    while True:
+        if pre_sleep:
+            time.sleep(minutes)
+        graph.graph.execute_query(query)
+        if post_sleep:
+            time.sleep(minutes)

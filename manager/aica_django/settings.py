@@ -27,7 +27,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.getenv("DJANGO_SECRET")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = False 
 
 ALLOWED_HOSTS = [
     "*",
@@ -158,6 +158,7 @@ CELERY_BROKER_URL = (
     f"amqp://{os.getenv('CELERY_USER')}:{os.getenv('CELERY_PASSWORD')}@"
     f"{os.getenv('CELERY_HOST')}:{os.getenv('CELERY_PORT')}//"
 )
+CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
 
 CELERY_SERIALIZER = "json"
 

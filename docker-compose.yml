@@ -20,10 +20,15 @@ services:
         condition: service_healthy
       manager_graphdb:
         condition: service_healthy
+    volumes:
+      # For testing
+      - ./pcaps:/usr/src/app/pcaps
     networks:
-      - bridge
-      - control
-      - target
+      bridge:
+      control:
+        ipv4_address: 10.107.50.150
+      target:
+        ipv4_address: 10.107.100.150
 
   manager_db:
     image: postgres:13.8-bullseye
@@ -34,7 +39,8 @@ services:
     volumes:
       - pg_data:/var/lib/postgresql/data
     networks:
-      - control
+      control:
+        ipv4_address: 10.107.50.200
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 10s
@@ -48,7 +54,8 @@ services:
     volumes:
       - ./manager_mq/enabled_plugins:/etc/rabbitmq/enabled_plugins
     networks:
-      - control
+      control:
+        ipv4_address: 10.107.50.210
     healthcheck:
       test: ["CMD-SHELL", "rabbitmq-diagnostics -q ping"]
       interval: 10s
@@ -64,7 +71,8 @@ services:
     volumes:
       - mongo_data:/data/db
     networks:
-      - control
+      control:
+        ipv4_address: 10.107.50.220
     healthcheck:
       test: ["CMD-SHELL", "mongosh --quiet --eval 'db.runCommand({ping: 1})'"]
       interval: 10s
@@ -89,7 +97,9 @@ services:
       - "7474:7474"  # Neo4j web GUI
       - "7687:7687"  # Neo4j API port (needed for web GUI)
     networks:
-      - control
+      bridge:
+      control:
+        ipv4_address: 10.107.50.230
     healthcheck:
       test: [ "CMD-SHELL", "wget http://localhost:7474/" ]
       interval: 10s
@@ -104,4 +114,18 @@ volumes:
 networks:
   bridge:
   control:
+    internal: true
+    ipam:
+      driver: default
+      config:
+        - subnet: 10.107.50.0/24 
+          ip_range: 10.107.50.128/25
+          gateway: 10.107.50.1 
   target:
+    internal: true
+    ipam:
+      driver: default
+      config:
+        - subnet: 10.107.100.0/24 
+          ip_range: 10.107.100.128/25
+          gateway: 10.107.100.1

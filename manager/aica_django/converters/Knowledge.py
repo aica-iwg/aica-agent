@@ -49,7 +49,7 @@ from aica_django.connectors.GraphDatabase import AicaNeo4j
 
 logger = get_task_logger(__name__)
 
-graph = AicaNeo4j()
+graph = AicaNeo4j(create_constraints=False)
 
 ip_protos = {
     0: "hopopt",
@@ -487,9 +487,7 @@ def caddy_accesslog_to_knowledge(log_dict: Dict[str, Any]) -> List[_STIXBase]:
     knowledge_nodes = []
 
     # dateparser can't seem to handle this format
-    request_time = datetime.datetime.strptime(
-        str(log_dict["ts"]), "%d/%b/%Y:%H:%M:%S %z"
-    )
+    request_time = datetime.datetime.fromtimestamp(log_dict["ts"])
 
     if not request_time:
         raise ValueError(f"Couldn't parse timestamp {log_dict['ts']}")
@@ -585,7 +583,6 @@ def nmap_scan_to_knowledge(scan_results: Dict[str, Any]) -> List[_STIXBase]:
         consists_of = []
         if scan_results[host]["macaddress"]:
             mac_addr = MACAddress(value=scan_results[host]["macaddress"])
-            consists_of.append(mac_addr)
             knowledge_nodes.append(mac_addr)
 
             try:
@@ -659,21 +656,14 @@ def nmap_scan_to_knowledge(scan_results: Dict[str, Any]) -> List[_STIXBase]:
             consists_of.append(operating_system)
             knowledge_nodes.append(operating_system)
 
-        target_host = Infrastructure(
-            name=str(host),
-            infrastructure_types=["unknown"],
-            last_seen=scan_time,
-        )
         for consists_ref in consists_of:
             knowledge_nodes.append(
                 Relationship(
                     relationship_type="consists_of",
-                    source_ref=target_host,
+                    source_ref=mac_addr,
                     target_ref=consists_ref,
                 )
             )
-
-        knowledge_nodes.append(target_host)
 
     return knowledge_nodes
 
@@ -873,26 +863,13 @@ def clamav_alert_to_knowledge(alert: Dict[str, Any]) -> List[_STIXBase]:
     )
     knowledge_nodes.append(malware_pattern_rel)
 
-    host = Infrastructure(
-        name=alert["hostname"],
-        infrastructure_types=["workstation"],
-        last_seen=timestamp,
-    )
-    knowledge_nodes.append(host)
-
     observation = ObservedData(
         first_observed=timestamp,
         last_observed=timestamp,
         number_observed=1,
         object_refs=[file],
     )
-    knowledge_nodes.append(malware_pattern_rel)
-
-    try:
-        sighting = Relationship(host, "hosts", malware)
-        knowledge_nodes.append(sighting)
-    except Exception as e:
-        logger.error(e)
+    knowledge_nodes.append(observation)
 
     return knowledge_nodes
 
@@ -971,13 +948,14 @@ def dnp3_to_knowledge(log_dict: dict[str, str]) -> List[_STIXBase]:
     knowledge_nodes: List[_STIXBase] = []
 
     # TODO
+    print(knowledge_nodes)
 
     return knowledge_nodes
 
 
 def knowledge_to_neo(
     nodes: List[_STIXBase],
-) -> bool:
+) -> None:
     """
     Stores STIX objects in the knowledge graph database. This assumes all references
     refer to nodes that will exist after provided nodes have all been created.
@@ -988,13 +966,14 @@ def knowledge_to_neo(
     @rtype: bool
     """
 
-    rels_to_add = []
+    nodes_to_add = []
+    rels = []
     for node in nodes:
         # Sightings are relationships (SROs) - took me a while to figure that one out...
         if isinstance(node, Relationship) or isinstance(node, Sighting):
-            rels_to_add.append(node)
+            rels.append(node)
         else:
-            graph.add_node(
+            node_tuple = (
                 node.id,
                 f"{node.type}",
                 {
@@ -1005,11 +984,12 @@ def knowledge_to_neo(
                     and not x.endswith("_refs")
                 },
             )
+            nodes_to_add.append(node_tuple)
             for x in node.properties_populated():
                 label = "_".join(x.split("_")[0:-1])
                 try:
                     if x.endswith("_ref"):
-                        rels_to_add.append(
+                        rels.append(
                             Relationship(
                                 relationship_type=label,
                                 source_ref=node,
@@ -1017,7 +997,7 @@ def knowledge_to_neo(
                             )
                         )
                     elif x.endswith("_refs"):
-                        rels_to_add.extend(
+                        rels.extend(
                             [
                                 Relationship(
                                     relationship_type=label,
@@ -1030,7 +1010,8 @@ def knowledge_to_neo(
                 except Exception as e:
                     logger.error(f"Couldn't add ({node})->[{label}]->({node[x]}) | {e}")
 
-    for rel in rels_to_add:
+    rels_to_add = []
+    for rel in rels:
         if isinstance(rel, Sighting):
             label = "sighting_of"
             sources = rel["observed_data_refs"]
@@ -1042,13 +1023,13 @@ def knowledge_to_neo(
 
         try:
             for source in sources:
-                graph.add_relation(
-                    node_a_id=source,
-                    node_b_id=rel[target],
-                    relation_label=label,
+                rel_tuple = (
+                    source,
+                    rel[target],
+                    label,
                     # Only include valid Relationship/Sighting properties
                     # https://docs.oasis-open.org/cti/stix/v2.1/os/stix-v2.1-os.html#_e2e1szrqfoan
-                    relation_properties={
+                    {
                         x: rel[x]
                         for x in rel.properties_populated()
                         if x
@@ -1062,8 +1043,14 @@ def knowledge_to_neo(
                             "summary",
                         ]
                     },
+                    True,
                 )
+                rels_to_add.append(rel_tuple)
         except ValueError as e:
             logger.error(f"Failed to add relation {rel} ({e})")
 
-    return False
+    # This Python fanciness means break the list of tuples out into the corresponding positional arguments for each function
+    if len(nodes_to_add) > 0:
+        graph.add_nodes(*list(zip(*nodes_to_add)))
+    if len(rels_to_add) > 0:
+        graph.add_relations(*list(zip(*rels_to_add)))

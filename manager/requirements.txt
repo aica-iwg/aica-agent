@@ -10,6 +10,7 @@ fasteners==0.19
 flower==2.0.1
 google-re2==1.1
 gunicorn==21.2.0
+joblib==1.3.2
 json2table==1.1.5
 kombu==5.3.5
 neo4j==5.15.0  # Older version required for neomodel compatibility
