@@ -77,7 +77,7 @@ def query_action(alert: Dict[str, Any]) -> List[Dict[str, Any]]:
 
 
 @shared_task(name="ma-knowledge_base-record_netflow")
-def record_netflow(flow: Dict[str, Any]) -> bool:
+def record_netflow(flow: Dict[str, Any]) -> None:
     """
     Convert a flow dictionary to Knowledge objects and store in the knowledge graph database.
 
@@ -90,11 +90,11 @@ def record_netflow(flow: Dict[str, Any]) -> bool:
     logger.info(f"Running {__name__}: record_netflow")
     nodes = netflow_to_knowledge(flow)
 
-    return knowledge_to_neo(nodes)
+    knowledge_to_neo(nodes)
 
 
 @shared_task(name="ma-knowledge_base-record_nmap_scan")
-def record_nmap_scan(scan_result: Dict[str, Any]) -> bool:
+def record_nmap_scan(scan_result: Dict[str, Any]) -> None:
     """
     Convert an nmap scan result to Knowledge objects and store in the knowledge graph database.
 
@@ -110,11 +110,11 @@ def record_nmap_scan(scan_result: Dict[str, Any]) -> bool:
         f"record_nmap_scan knowledge_to_neo: number of nodes: {str(len(nodes))}"
     )
 
-    return knowledge_to_neo(nodes)
+    knowledge_to_neo(nodes)
 
 
 @shared_task(name="ma-knowledge_base-record_suricata_alert")
-def record_suricata_alert(alert: Dict[str, Any]) -> bool:
+def record_suricata_alert(alert: Dict[str, Any]) -> None:
     """
     Convert a Suricata alert to Knowledge objects and store in the knowledge graph database.
 
@@ -127,11 +127,11 @@ def record_suricata_alert(alert: Dict[str, Any]) -> bool:
     logger.info(f"Running {__name__}: record_alert")
     nodes = suricata_alert_to_knowledge(alert)
 
-    return knowledge_to_neo(nodes)
+    knowledge_to_neo(nodes)
 
 
 @shared_task(name="ma-knowledge_base-record_antivirus_alert")
-def record_antivirus_alert(alert: Dict[str, str]) -> bool:
+def record_antivirus_alert(alert: Dict[str, str]) -> None:
     """
     Convert an Antivirus alert to Knowledge objects and store in the knowledge graph database.
 
@@ -143,11 +143,12 @@ def record_antivirus_alert(alert: Dict[str, str]) -> bool:
 
     logger.info(f"Running{__name__}: record_alert")
     nodes = clamav_alert_to_knowledge(alert)
-    return knowledge_to_neo(nodes)
+
+    knowledge_to_neo(nodes)
 
 
 @shared_task(name="ma-knowledge_base-record_waf_alert")
-def record_waf_alert(alert: Dict[str, str]) -> bool:
+def record_waf_alert(alert: Dict[str, str]) -> None:
     """
     Convert an WAF alert to Knowledge objects and store in the knowledge graph database.
 
@@ -159,11 +160,11 @@ def record_waf_alert(alert: Dict[str, str]) -> bool:
 
     logger.info(f"Running{__name__}: record_alert")
     nodes = waf_alert_to_knowledge(alert)
-    return knowledge_to_neo(nodes)
+    knowledge_to_neo(nodes)
 
 
 @shared_task(name="ma-knowledge_base-record_nginx_accesslog")
-def record_nginx_accesslog(log_entry: Dict[str, str]) -> bool:
+def record_nginx_accesslog(log_entry: Dict[str, str]) -> None:
     """
     Convert an HTTP access log entry to Knowledge objects and store in the knowledge graph database.
 
@@ -175,11 +176,11 @@ def record_nginx_accesslog(log_entry: Dict[str, str]) -> bool:
     logger.info(f"Running {__name__}: record_nginx_accesslog")
     nodes = nginx_accesslog_to_knowledge(log_entry)
 
-    return knowledge_to_neo(nodes)
+    knowledge_to_neo(nodes)
 
 
 @shared_task(name="ma-knowledge_base-record_caddy_accesslog")
-def record_caddy_accesslog(log_entry: Dict[str, str]) -> bool:
+def record_caddy_accesslog(log_entry: Dict[str, str]) -> None:
     """
     Convert an HTTP access log entry to Knowledge objects and store in the knowledge graph database.
 
@@ -191,11 +192,11 @@ def record_caddy_accesslog(log_entry: Dict[str, str]) -> bool:
     logger.info(f"Running {__name__}: record_nginx_accesslog")
     nodes = caddy_accesslog_to_knowledge(log_entry)
 
-    return knowledge_to_neo(nodes)
+    knowledge_to_neo(nodes)
 
 
 @shared_task(name="ma-knowledge_base-record_dnp3")
-def record_dnp3(log_entry: Dict[str, str]) -> bool:
+def record_dnp3(log_entry: Dict[str, str]) -> None:
     """
     Convert a DNP3 message to Knowledge objects and store in the knowledge graph database.
 
@@ -207,4 +208,4 @@ def record_dnp3(log_entry: Dict[str, str]) -> bool:
     logger.info(f"Running {__name__}: record_dnp3")
     nodes = dnp3_to_knowledge(log_entry)
 
-    return knowledge_to_neo(nodes)
+    knowledge_to_neo(nodes)

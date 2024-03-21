@@ -1049,8 +1049,17 @@ def knowledge_to_neo(
         except ValueError as e:
             logger.error(f"Failed to add relation {rel} ({e})")
 
-    # This Python fanciness means break the list of tuples out into the corresponding positional arguments for each function
     if len(nodes_to_add) > 0:
-        graph.add_nodes(*list(zip(*nodes_to_add)))
+        node_ids: List[str] = [x[0] for x in nodes_to_add]
+        node_labels: List[str] = [x[1] for x in nodes_to_add]
+        node_properties: List[dict[str, Any]] = [x[2] for x in nodes_to_add]
+        graph.add_nodes(node_ids, node_labels, node_properties)
     if len(rels_to_add) > 0:
-        graph.add_relations(*list(zip(*rels_to_add)))
+        node_a_ids: List[str] = [x[0] for x in rels_to_add]
+        node_b_ids: List[str] = [x[1] for x in rels_to_add]
+        rel_labels: List[str] = [x[2] for x in rels_to_add]
+        rel_properties: List[dict[str, Any]] = [x[3] for x in rels_to_add]
+        rel_directionality: List[bool] = [x[4] for x in rels_to_add]
+        graph.add_relations(
+            node_a_ids, node_b_ids, rel_labels, rel_properties, rel_directionality
+        )

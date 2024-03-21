@@ -20,6 +20,8 @@ Functions:
 
 import json
 import logging
+import numpy as np
+import numpy.typing as npt
 import os
 import pandas as pd
 import requests
@@ -29,12 +31,13 @@ import yaml
 from celery.signals import worker_ready
 from celery.utils.log import get_task_logger
 from io import StringIO
-from joblib import Parallel, delayed
+from joblib import Parallel, delayed  # type: ignore
 from multiprocessing import cpu_count
 from numpy import ndarray
+from pandas.core.series import Series
 from py2neo import ConnectionUnavailable  # type: ignore
 from stix2 import AttackPattern, Note, Software  # type: ignore
-from typing import Any, Dict
+from typing import Any, Dict, Union
 
 from aica_django.connectors.DNP3 import replay_pcap, capture_dnp3
 
@@ -101,7 +104,11 @@ def create_malware_categories() -> None:
     logger.info("Created malware categories from ClamAV data.")
 
 
-def port_to_note(rank, row, port_root_id):
+def port_to_note(
+    rank: Union[int, slice, npt.NDArray[np.int64]],
+    row: Series[type[object]],
+    port_root_id: int,
+) -> Note:
     if isinstance(rank, int):
         rank = int(rank)
     elif isinstance(rank, slice):
@@ -241,7 +248,7 @@ def initialize(**kwargs: Dict[Any, Any]) -> None:
         mongo_db["alert_response_actions"].insert_many(alert_actions)
 
     if os.environ.get("SKIP_TASKS"):
-        return True
+        return
 
     # Wait for graph to be available
     while True:

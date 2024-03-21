@@ -128,7 +128,12 @@ class AicaNeo4j:
     """
 
     def __init__(
-        self, host: str = "", port: int = 0, user: str = "", password: str = "", create_constraints: bool = True,
+        self,
+        host: str = "",
+        port: int = 0,
+        user: str = "",
+        password: str = "",
+        create_constraints: bool = True,
     ) -> None:
         """
         Initialize a new AiceNeo4j object.
@@ -170,7 +175,9 @@ class AicaNeo4j:
                                 getattr(stix2.v21.observables, x)._type
                                 for x in dir(stix2.v21.observables)
                                 if inspect.isclass(getattr(stix2.v21.observables, x))
-                                and issubclass(getattr(stix2.v21.observables, x), _STIXBase)
+                                and issubclass(
+                                    getattr(stix2.v21.observables, x), _STIXBase
+                                )
                                 and "_type" in dir(getattr(stix2.v21.observables, x))
                             ]
                         )
@@ -211,8 +218,11 @@ class AicaNeo4j:
                     tx.commit()
 
     def add_node(
-        self, node_id: str, node_label: str, node_properties: Dict[str, Any]
+        self, node_id: str, node_label: str, node_properties: Optional[Dict[str, Any]]
     ) -> None:
+        if not node_properties:
+            node_properties = dict()
+
         self.add_nodes([node_id], [node_label], [node_properties])
 
     def add_nodes(
@@ -287,6 +297,9 @@ class AicaNeo4j:
         relation_properties: Optional[dict[str, Any]] = None,
         directed_tag: bool = True,
     ) -> None:
+        if not relation_properties:
+            relation_properties = dict()
+
         self.add_relations(
             [node_a_id],
             [node_b_id],
@@ -297,11 +310,11 @@ class AicaNeo4j:
 
     def add_relations(
         self,
-        node_a_ids: str,
-        node_b_ids: str,
-        relation_labels: str,
-        relation_properties: Optional[dict[str, Any]] = None,
-        directed_tags: bool = True,
+        node_a_ids: List[str],
+        node_b_ids: List[str],
+        relation_labels: List[str],
+        relation_properties: List[dict[str, Any]],
+        directed_tags: List[bool],
     ) -> None:
         """
         Adds a relation with specified parameters to the graph database.
@@ -487,7 +500,9 @@ class AicaNeo4j:
 
 
 @current_app.task(name="prune-netflow-data")
-def prune_netflow_data(seconds: int = 600, pre_sleep: bool = True, post_sleep: bool = False) -> None:
+def prune_netflow_data(
+    seconds: int = 600, pre_sleep: bool = True, post_sleep: bool = False
+) -> None:
     # This function removes all network traffic items that were created at least
     # _minutes_ ago and are not connected to any observations
 
@@ -496,8 +511,8 @@ def prune_netflow_data(seconds: int = 600, pre_sleep: bool = True, post_sleep: b
     # Not using f-string here since it gets messy with braces in the query.
     # This might get better with Python 3.12+.
     query = (
-        "WITH datetime() - duration({minutes:"
-        + str(minutes)
+        "WITH datetime() - duration({seconds:"
+        + str(seconds)
         + "}) AS cutoff "
         + "CALL {MATCH (n:`network-traffic`) OPTIONAL MATCH (n)<-[r]-(o:`observed-data`) RETURN n,r,o} "
         + "WITH *, datetime(replace(n.end, ' ', 'T')) AS end "
@@ -506,7 +521,7 @@ def prune_netflow_data(seconds: int = 600, pre_sleep: bool = True, post_sleep: b
     )
     while True:
         if pre_sleep:
-            time.sleep(minutes)
+            time.sleep(seconds)
         graph.graph.execute_query(query)
         if post_sleep:
-            time.sleep(minutes)
+            time.sleep(seconds)
