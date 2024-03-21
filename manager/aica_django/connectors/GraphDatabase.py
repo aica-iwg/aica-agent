@@ -234,15 +234,12 @@ class AicaNeo4j:
         """
         Adds a node with specified parameters to the graph database.
 
-        @param node_name: Unique name to use for this node
-        @type node_name: str
+        @param node_id: Unique name to use for this node
+        @type node_id: str 
         @param node_label: Label to use for this node, must be defined in defined_node_labels
         @type node_label: str
         @param node_properties: Any other metadata to store with this node
         @type node_properties: dict
-        @return: True if addition was successful, false otherwise.
-        @rtype: bool
-        @raise: ValueError: if node_label is not a predefined type in defined_node_labels
         """
 
         queries = []
@@ -327,8 +324,6 @@ class AicaNeo4j:
         @type relation_label: str
         @param relation_properties: Any other metadata to store with this relation
         @type relation_properties: dict
-        @return: True if addition was successful, false otherwise.
-        @rtype: bool
         """
 
         queries = []
@@ -373,8 +368,8 @@ class AicaNeo4j:
 
         @param label: Type (label) of nodes to retrieve.
         @type label: str
-        @return:
-        @rtype:
+        @return: List of ids
+        @rtype: List[str]
         """
         query = f"MATCH (n:{label}) RETURN n.identifier as identifier"
         query_results, _, _ = self.graph.execute_query(query)
@@ -390,8 +385,8 @@ class AicaNeo4j:
 
         @param label: Type (label) of nodes to retrieve.
         @type label: str
-        @return:
-        @rtype:
+        @return: List of ids
+        @rtype: List[str]
         """
         query = f"MATCH ()-[r:{label}]-() RETURN r.identifier as identifier"
         query_results, _, _ = self.graph.execute_query(query)
@@ -402,14 +397,6 @@ class AicaNeo4j:
             raise ValueError("Identifier field missing for at least one result")
 
     def get_attack_pattern_ids_by_name(self, name: str) -> List[str]:
-        """
-        Get all relations from graph with a given label.
-
-        @param label: Type (label) of nodes to retrieve.
-        @type label: str
-        @return:
-        @rtype:
-        """
         query = f"MATCH (n:AttackPattern WHERE n.name = '{name}') RETURN n.identifier as identifier"
         query_results, _, _ = self.graph.execute_query(query)
 
@@ -419,14 +406,6 @@ class AicaNeo4j:
             raise ValueError("Identifier field missing for at least one result")
 
     def get_indicator_ids_by_name(self, name: str) -> List[str]:
-        """
-        Get all relations from graph with a given label.
-
-        @param label: Type (label) of nodes to retrieve.
-        @type label: str
-        @return:
-        @rtype:
-        """
         query = f"MATCH (n:Indicator WHERE n.name = '{name}') RETURN n.identifier as identifier"
         query_results, _, _ = self.graph.execute_query(query)
 
@@ -436,14 +415,6 @@ class AicaNeo4j:
             raise ValueError("Identifier field missing for at least one result")
 
     def get_attack_pattern_ids_by_category(self, category: str) -> List[str]:
-        """
-        Get all relations from graph with a given label.
-
-        @param label: Type (label) of nodes to retrieve.
-        @type label: str
-        @return:
-        @rtype:
-        """
         query = f"MATCH (n:`attack-pattern`) WHERE (n.description = '{category}') RETURN n.identifier as identifier"
         query_results, _, _ = self.graph.execute_query(query)
 
@@ -458,8 +429,8 @@ class AicaNeo4j:
 
         @param label: Type (label) of nodes to retrieve.
         @type label: str
-        @return:
-        @rtype:
+        @return: List of ids
+        @rtype: List[str]
         """
         query = f"MATCH (n:note WHERE n.abstract = '{abstract}') RETURN n.identifier as identifier"
         query_results, _, _ = self.graph.execute_query(query)
@@ -475,8 +446,8 @@ class AicaNeo4j:
 
         @param label: Type (label) of nodes to retrieve.
         @type label: str
-        @return:
-        @rtype:
+        @return: List of ids
+        @rtype: List[str]
         """
         return self.get_note_ids_by_abstract(f"{port}/{proto}")
 
