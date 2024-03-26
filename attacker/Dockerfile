@@ -11,6 +11,8 @@ RUN apt-get update && \
     apt-get upgrade -y && \
     apt-get install -y --no-install-recommends \
         build-essential \
+        hydra \
+        nikto \
         nmap \
         openssh-server \
         python3-dev \

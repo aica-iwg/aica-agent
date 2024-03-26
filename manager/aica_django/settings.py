@@ -49,7 +49,6 @@ INSTALLED_APPS = [
     "aica_django.microagents.knowledge_base",
     "aica_django.microagents.offline_loader",
     "aica_django.microagents.online_learning",
-    "bootstrap5",
 ]
 
 MIDDLEWARE = [

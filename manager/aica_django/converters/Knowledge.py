@@ -21,18 +21,21 @@ import pytz
 import re2 as re  # type: ignore
 
 from celery.utils.log import get_task_logger
+from ipwhois import IPWhois  # type: ignore
 from stix2.base import _STIXBase  # type: ignore
 from stix2 import (  # type: ignore
     AttackPattern,
+    AutonomousSystem,
     Directory,
     DomainName,
     File,
     HTTPRequestExt,
+    Identity,
     Incident,
     Indicator,
-    Infrastructure,
     IPv4Address,
     IPv6Address,
+    Location,
     Malware,
     MACAddress,
     NetworkTraffic,
@@ -41,6 +44,7 @@ from stix2 import (  # type: ignore
     Relationship,
     Sighting,
     Software,
+    Tool,
 )
 from typing import Any, Dict, List, Optional, Union
 
@@ -51,166 +55,311 @@ logger = get_task_logger(__name__)
 
 graph = AicaNeo4j(create_constraints=False)
 
+# https://www.iana.org/assignments/protocol-numbers/protocol-numbers.xhtml
 ip_protos = {
-    0: "hopopt",
-    1: "icmp",
-    2: "igmp",
-    3: "ggp",
-    4: "ip-in-ip",
-    5: "st",
-    6: "tcp",
-    7: "cbt",
-    8: "egp",
-    9: "igp",
-    10: "bbn-rcc-mon",
-    11: "nvp-ii",
-    12: "pup",
-    13: "argus",
-    14: "emcon",
-    15: "xnet",
-    16: "chaos",
-    17: "udp",
-    18: "mux",
-    19: "dcn-meas",
-    20: "hmp",
-    21: "prm",
-    22: "xns-idp",
-    23: "trunk-1",
-    24: "trunk-2",
-    25: "leaf-1",
-    26: "leaf-2",
-    27: "rdp",
-    28: "irtp",
-    29: "iso-tp4",
-    30: "netblt",
-    31: "mfe-nsp",
-    32: "merit-inp",
-    33: "dccp",
-    34: "3pc",
-    35: "idpr",
-    36: "xtp",
-    37: "ddp",
-    38: "idpr-cmtp",
-    39: "tp++",
-    40: "il",
-    41: "ipv6",
-    42: "sdrp",
-    43: "ipv6-route",
-    44: "ipv6-frag",
-    45: "idrp",
-    46: "rsvp",
-    47: "gre",
-    48: "dsr",
-    49: "bna",
-    50: "esp",
-    51: "ah",
-    52: "i-nlsp",
-    53: "swipe",
-    54: "narp",
-    55: "mobile",
-    56: "tlsp",
-    57: "skip",
-    58: "ipv6-icmp",
-    59: "ipv6-nonxt",
-    60: "ipv6-opts",
-    62: "cftp",
-    64: "sat-expak",
-    65: "kryptolan",
-    66: "rvd",
-    67: "ippc",
-    69: "sat-mon",
-    70: "visa",
-    71: "ipcu",
-    72: "cpnx",
-    73: "cphb",
-    74: "wsn",
-    75: "pvp",
-    76: "br-sat-mon",
-    77: "sun-nd",
-    78: "wb-mon",
-    79: "wb-expak",
-    80: "iso-ip",
-    81: "vmtp",
-    82: "secure-vmtp",
-    83: "vines",
-    84: "ttp",
-    84: "iptm",
-    85: "nsfnet-igp",
-    86: "dgp",
-    87: "tcf",
-    88: "eigrp",
-    89: "ospf",
-    90: "sprite-rpc",
-    91: "larp",
-    92: "mtp",
-    93: "ax.25",
-    94: "os",
-    95: "micp",
-    96: "scc-sp",
-    97: "etherip",
-    98: "encap",
-    100: "gmtp",
-    101: "ifmp",
-    102: "pnni",
-    103: "pim",
-    104: "aris",
-    105: "scps",
-    106: "qnx",
-    107: "a/n",
-    108: "ipcomp",
-    109: "snp",
-    110: "compaq-peer",
-    111: "ipx-in-ip",
-    112: "vrrp",
-    113: "pgm",
-    115: "l2tp",
-    116: "ddx",
-    117: "iatp",
-    118: "stp",
-    119: "srp",
-    120: "uti",
-    121: "smp",
-    122: "sm",
-    123: "ptp",
-    124: "is-is over ipv4",
-    125: "fire",
-    126: "crtp",
-    127: "crudp",
-    128: "sscopmce",
-    129: "iplt",
-    130: "sps",
-    131: "pipe",
-    132: "sctp",
-    133: "fc",
-    134: "rsvp-e2e-ignore",
-    135: "mobility header",
-    136: "udplite",
-    137: "mpls-in-ip",
+    0: "HOPOPT",
+    1: "ICMP",
+    2: "IGMP",
+    3: "GGP",
+    4: "IPv4",
+    5: "ST",
+    6: "TCP",
+    7: "CBT",
+    8: "EGP",
+    9: "IGP",
+    10: "BBN-RCC-MON",
+    11: "NVP-II",
+    12: "PUP",
+    13: "ARGUS",
+    14: "EMCON",
+    15: "XNET",
+    16: "CHAOS",
+    17: "UDP",
+    18: "MUX",
+    19: "DCN-MEAS",
+    20: "HMP",
+    21: "PRM",
+    22: "XNS-IDP",
+    23: "TRUNK-1",
+    24: "TRUNK-2",
+    25: "LEAF-1",
+    26: "LEAF-2",
+    27: "RDP",
+    28: "IRTP",
+    29: "ISO-TP4",
+    30: "NETBLT",
+    31: "MFE-NSP",
+    32: "MERIT-INP",
+    33: "DCCP",
+    34: "3PC",
+    35: "IDPR",
+    36: "XTP",
+    37: "DDP",
+    38: "IDPR-CMTP",
+    39: "TP++",
+    40: "IL",
+    41: "IPv6",
+    42: "SDRP",
+    43: "IPv6-Route",
+    44: "IPv6-Frag",
+    45: "IDRP",
+    46: "RSVP",
+    47: "GRE",
+    48: "DSR",
+    49: "BNA",
+    50: "ESP",
+    51: "AH",
+    52: "I-NLSP",
+    53: "SWIPE",
+    54: "NARP",
+    55: "Min-IPv4",
+    56: "TLSP",
+    57: "SKIP",
+    58: "IPv6-ICMP",
+    59: "IPv6-NoNxt",
+    60: "IPv6-Opts",
+    62: "CFTP",
+    64: "SAT-EXPAK",
+    65: "KRYPTOLAN",
+    66: "RVD",
+    67: "IPPC",
+    69: "SAT-MON",
+    70: "VISA",
+    71: "IPCV",
+    72: "CPNX",
+    73: "CPHB",
+    74: "WSN",
+    75: "PVP",
+    76: "BR-SAT-MON",
+    77: "SUN-ND",
+    78: "WB-MON",
+    79: "WB-EXPAK",
+    80: "ISO-IP",
+    81: "VMTP",
+    82: "SECURE-VMTP",
+    83: "VINES",
+    84: "IPTM",
+    85: "NSFNET-IGP",
+    86: "DGP",
+    87: "TCF",
+    88: "EIGRP",
+    89: "OSPFIGP",
+    90: "Sprite-RPC",
+    91: "LARP",
+    92: "MTP",
+    93: "AX.25",
+    94: "IPIP",
+    95: "MICP",
+    96: "SCC-SP",
+    97: "ETHERIP",
+    98: "ENCAP",
+    100: "GMTP",
+    101: "IFMP",
+    102: "PNNI",
+    103: "PIM",
+    104: "ARIS",
+    105: "SCPS",
+    106: "QNX",
+    107: "A/N",
+    108: "IPComp",
+    109: "SNP",
+    110: "Compaq-Peer",
+    111: "IPX-in-IP",
+    112: "VRRP",
+    113: "PGM",
+    115: "L2TP",
+    116: "DDX",
+    117: "IATP",
+    118: "STP",
+    119: "SRP",
+    120: "UTI",
+    121: "SMP",
+    122: "SM",
+    123: "PTP",
+    124: "ISIS over IPv4",
+    125: "FIRE",
+    126: "CRTP",
+    127: "CRUDP",
+    128: "SSCOPMCE",
+    129: "IPLT",
+    130: "SPS",
+    131: "PIPE",
+    132: "SCTP",
+    133: "FC",
+    134: "RSVP-E2E-IGNORE",
+    135: "Mobility Header",
+    136: "UDPLite",
+    137: "MPLS-in-IP",
     138: "manet",
-    139: "hip",
-    140: "shim6",
-    141: "wesp",
-    142: "rohc",
-    143: "ethernet",
-    144: "aggfrag",
-    145: "nsh",
+    139: "HIP",
+    140: "Shim6",
+    141: "WESP",
+    142: "ROHC",
+    143: "Ethernet",
+    144: "AGGFRAG",
+    145: "NSH",
 }
+# Nmap data protocols are lowercase
+ip_protos = {k: v.lower() for k, v in ip_protos.items()}
+
+# We need this because Notes are required to have a reference, but the ID is based on them
+# so we create this as an artificial reference point for Notes created before we know what
+# their references are. It is stripped out in the knowledge_to_neo function.
+# We use "Tool" because it has a single deterministic required property.
+fake_note_root = Tool(
+    id="tool--a6ed2b50-ea7d-40d0-8c3e-46ed99e67ea2", name="fake_note_root"
+)
+
+# To match the root used when port notes are created, as the ID is based on the name
+port_root = Software(
+    id="software--e3aaca11-5e6a-4ee7-bc59-e8d4d64b9e62", name="Generic Port Usage Info"
+)
+
+ip_version_4_note = Note(
+    id="note--05d8ecaa-f461-4785-a9a1-9c06d6e7b848",
+    abstract=f"ip_version_4",
+    content=f"ip_version_4",
+    object_refs=[fake_note_root],
+)
+
+ip_version_6_note = Note(
+    id="note--166fffdb-9220-4a34-b244-8ea978d26231",
+    abstract=f"ip_version_6",
+    content=f"ip_version_6",
+    object_refs=[fake_note_root],
+)
+
+is_private_note = Note(
+    id="note--30f7a5e9-98dc-4ba7-a181-d5e6bd326a8f",
+    abstract="ip_is_private",
+    content="ip_is_private",
+    object_refs=[fake_note_root],
+)
+
+is_multicast_note = Note(
+    id="note--f8455d6d-e05a-4abb-96cf-ecdfaaa33ff3",
+    abstract="ip_is_multicast",
+    content="ip_is_multicast",
+    object_refs=[fake_note_root],
+)
+
+is_reserved_note = Note(
+    id="note--37c5420b-2f00-453d-9330-1e6571b84a8f",
+    abstract="ip_is_reserved",
+    content="ip_is_reserved",
+    object_refs=[fake_note_root],
+)
+
+is_loopback_note = Note(
+    id="note--ac691c59-96d5-4b00-99d2-2149ef3645fe",
+    abstract="ip_is_loopback",
+    content="ip_is_loopback",
+    object_refs=[fake_note_root],
+)
+
+is_link_local_note = Note(
+    id="note--c47336a0-2c08-4101-9abd-2744b63e8e06",
+    abstract="ip_is_link_local",
+    content="ip_is_link_local",
+    object_refs=[fake_note_root],
+)
 
 
-def get_ipv4(ip_addr: str) -> Union[str, None]:
-    ip_addresses = graph.get_ipv4_ids_by_addr(ip_addr)
-    if len(ip_addresses) > 0:
-        return list(ip_addresses)[0]
+def get_ip_context(ip_addr: Union[IPv4Address, IPv6Address]) -> List[_STIXBase]:
+    note_refs = []
+    return_nodes = []
+    new_ip_addr_kwargs = {k: ip_addr[k] for k in ip_addr.properties_populated()}
+
+    ip_string = ip_addr.value
+    ip_obj = ipaddress.ip_address(ip_string)
+
+    version: int = ip_obj.version
+    if version == 4:
+        note_refs.append(ip_version_4_note)
+        return_nodes.append(ip_version_4_note)
     else:
-        return None
+        note_refs.append(ip_version_6_note)
+        return_nodes.append(ip_version_6_note)
 
+    is_private: bool = ip_obj.is_private
+    if is_private:
+        note_refs.append(is_private_note)
+        return_nodes.append(is_private_note)
 
-def get_ipv6(ip_addr: str) -> Union[str, None]:
-    ip_addresses = graph.get_ipv6_ids_by_addr(ip_addr)
-    if len(ip_addresses) > 0:
-        return list(ip_addresses)[0]
+    is_multicast: bool = ip_obj.is_multicast
+    if is_multicast:
+        note_refs.append(is_multicast_note)
+        return_nodes.append(is_multicast_note)
+
+    is_reserved: bool = ip_obj.is_reserved
+    if is_reserved:
+        note_refs.append(is_reserved_note)
+        return_nodes.append(is_reserved_note)
+
+    is_loopback: bool = ip_obj.is_loopback
+    if is_loopback:
+        note_refs.append(is_loopback_note)
+        return_nodes.append(is_loopback_note)
+
+    is_link_local: bool = ip_obj.version == 6 and ip_obj.is_link_local
+    if is_link_local:
+        note_refs.append(is_link_local_note)
+        return_nodes.append(is_link_local_note)
+
+    if not any([is_private, is_multicast, is_reserved, is_loopback, is_link_local]):
+        whois_obj = IPWhois(ip_string)
+        whois_data = whois_obj.lookup_rdap(depth=1)
+        cidr_kwargs: Dict[str, Dict[str, Any]] = {"custom_properties": dict()}
+
+        if whois_data["asn"]:
+            asn = AutonomousSystem(
+                number=whois_data["asn"], rir=whois_data["asn_registry"]
+            )
+            new_ip_addr_kwargs["belongs_to"] = asn
+            cidr_kwargs["belongs_to"] = asn
+            return_nodes.append(asn)
+
+        if whois_data["asn_country_code"]:
+            location = Location(country=whois_data["asn_country_code"])
+            return_nodes.append(location)
+        else:
+            location = None
+
+        if whois_data["entities"]:
+            new_ip_addr_kwargs["custom_properties"].update({"has_owner_refs": []})
+            cidr_kwargs["custom_properties"].update({"has_owner_refs": []})
+            for entity in whois_data["entities"]:
+                entity_kwargs = {"name": entity}
+                if location:
+                    entity_kwargs["located_at"] = location
+                entity = Identity(**entity_kwargs)
+                new_ip_addr_kwargs["custom_properties"]["has_owner_refs"].append(entity)
+                cidr_kwargs["custom_properties"]["has_owner_refs"].append(entity)
+                return_nodes.append(entity)
+
+        if whois_data["asn_cidr"]:
+            cidr_kwargs.update({"value": whois_data["asn_cidr"]})
+            cidr_kwargs["custom_properties"].update({"has_member_refs": [ip_addr]})
+            if version == 4:
+                asn_cidr = IPv4Address(**cidr_kwargs)
+            else:
+                asn_cidr = IPv6Address(**cidr_kwargs)
+            return_nodes.append(asn_cidr)
+
+    if isinstance(ip_addr, IPv4Address):
+        ip_stix = IPv4Address(**new_ip_addr_kwargs)
+        return_nodes.append(IPv4Address(**new_ip_addr_kwargs))
     else:
-        return None
+        ip_stix = IPv4Address(**new_ip_addr_kwargs)
+        return_nodes.append(IPv6Address(**new_ip_addr_kwargs))
+
+    for note_ref in note_refs:
+        note_rel = Relationship(
+            source_ref=note_ref, relationship_type="object", target_ref=ip_stix
+        )
+        return_nodes.append(note_rel)
+
+    return return_nodes
 
 
 def get_attack_pattern(attack_pattern: str) -> Union[str, None]:
@@ -295,42 +444,25 @@ def netflow_to_knowledge(
 
     knowledge_nodes = []
 
-    # Create source host and port nodes (and link to protocol node)
+    # Create source host nodes (and link to protocol node)
     if "IPV4_SRC_ADDR" in flow and flow["IPV4_SRC_ADDR"] is not None:
         ip_src_addr = str(ipaddress.ip_address(flow["IPV4_SRC_ADDR"]))
-        source_addr_id = get_ipv4(ip_src_addr)
-        if source_addr_id:
-            source_addr = IPv4Address(id=source_addr_id, value=ip_src_addr)
-        else:
-            source_addr = IPv4Address(value=ip_src_addr)
-            knowledge_nodes.append(source_addr)
+        source_addr = IPv4Address(value=ip_src_addr)
+        knowledge_nodes.extend(get_ip_context(source_addr))
 
-        ip_dst_addr = str(ipaddress.ip_address(flow["IPV4_DST_ADDR"]))
-        dest_addr_id = get_ipv4(ip_dst_addr)
-        if dest_addr_id:
-            dest_addr = IPv4Address(id=dest_addr_id, value=ip_dst_addr)
-        else:
-            dest_addr = IPv4Address(value=ip_dst_addr)
-            knowledge_nodes.append(dest_addr)
+        ip_dest_addr = str(ipaddress.ip_address(flow["IPV4_DST_ADDR"]))
+        dest_addr = IPv4Address(value=ip_dest_addr)
+        knowledge_nodes.extend(get_ip_context(dest_addr))
 
     elif "IPV6_SRC_ADDR" in flow and flow["IPV6_SRC_ADDR"] is not None:
         ip_src_addr = str(ipaddress.ip_address(flow["IPV6_SRC_ADDR"]))
-        source_addr_id = get_ipv6(ip_src_addr)
-        if source_addr_id:
-            source_addr = IPv6Address(id=source_addr_id, value=ip_src_addr)
-        else:
-            source_addr = IPv6Address(value=ip_src_addr)
-            knowledge_nodes.append(source_addr)
+        source_addr = IPv6Address(value=ip_src_addr)
+        knowledge_nodes.extend(get_ip_context(source_addr))
 
-        ip_dst_addr = str(ipaddress.ip_address(flow["IPV6_DST_ADDR"]))
-        dest_addr_id = get_ipv6(ip_dst_addr)
-        if dest_addr_id:
-            dest_addr = IPv6Address(id=dest_addr_id, value=dest_addr_id)
-        else:
-            dest_addr = IPv6Address(value=ip_dst_addr)
-            knowledge_nodes.append(dest_addr)
+        ip_dest_addr = str(ipaddress.ip_address(flow["IPV6_DST_ADDR"]))
+        dest_addr = IPv6Address(value=ip_dest_addr)
+        knowledge_nodes.extend(get_ip_context(dest_addr))
 
-    # STIX 2.0 Mandated format
     start_time = dateparser.parse(str(flow["FIRST_SWITCHED"]))
     end_time = dateparser.parse(str(flow["LAST_SWITCHED"]))
 
@@ -356,21 +488,14 @@ def netflow_to_knowledge(
 
     knowledge_nodes.append(traffic)
 
-    dst_port_note_ids = graph.get_port_note_ids_by_abstract(
-        int(flow["DST_PORT"]), protocol
-    )
     label = f"{flow['DST_PORT']}/{protocol}"
-    if len(dst_port_note_ids) > 0:
-        dst_port_note = Note(
-            id=list(dst_port_note_ids)[0],
-            object_refs=[traffic],
-            abstract=label,
-            content=label,
-        )
-    else:
-        dst_port_note = Note(object_refs=[traffic], abstract=label, content=label)
+    dest_port_note = Note(
+        abstract=label,
+        content=label,
+        object_refs=[port_root],
+    )
 
-    knowledge_nodes.append(dst_port_note)
+    knowledge_nodes.append(Relationship(dest_port_note, "object", traffic))
 
     return knowledge_nodes
 
@@ -398,55 +523,41 @@ def nginx_accesslog_to_knowledge(
     if not request_time:
         raise ValueError(f"Couldn't parse timestamp {log_dict['dateandtime']}")
 
-    # Create source host and port nodes (and link to protocol node)
+    # Create source host nodes (and link to protocol node)
     ip_version = ipaddress.ip_address(log_dict["src_ip"]).version
     ip_src_addr = log_dict["src_ip"]
     if ip_version == 4:
-        source_addr_id = get_ipv4(ip_src_addr)
-        if source_addr_id:
-            source_addr = IPv4Address(id=source_addr_id, value=ip_src_addr)
-        else:
-            source_addr = IPv4Address(value=ip_src_addr)
-            knowledge_nodes.append(source_addr)
+        source_addr = IPv4Address(value=ip_src_addr)
+        knowledge_nodes.extend(get_ip_context(source_addr))
 
-        ip_dst_addr = str(ipaddress.ip_address(log_dict["server_ip"]))
-        dest_addr_id = get_ipv4(ip_dst_addr)
-        if dest_addr_id:
-            dest_addr = IPv4Address(id=dest_addr_id, value=ip_dst_addr)
-        else:
-            dest_addr = IPv4Address(value=ip_dst_addr)
-            knowledge_nodes.append(dest_addr)
+        ip_dest_addr = str(ipaddress.ip_address(log_dict["server_ip"]))
+        dest_addr = IPv4Address(value=ip_dest_addr)
+        knowledge_nodes.extend(get_ip_context(dest_addr))
 
     elif ip_version == 6:
         ip_src_addr = str(ipaddress.ip_address(log_dict["src_ip"]))
-        source_addr_id = get_ipv6(ip_src_addr)
-        if source_addr_id:
-            source_addr = IPv6Address(id=source_addr_id, value=ip_src_addr)
-        else:
-            source_addr = IPv6Address(value=ip_src_addr)
-            knowledge_nodes.append(source_addr)
+        source_addr = IPv6Address(value=ip_src_addr)
+        knowledge_nodes.extend(get_ip_context(source_addr))
 
-        ip_dst_addr = str(ipaddress.ip_address(log_dict["server_ip"]))
-        dest_addr_id = get_ipv6(ip_dst_addr)
-        if dest_addr_id:
-            dest_addr = IPv6Address(id=dest_addr_id, value=ip_dst_addr)
-        else:
-            dest_addr = IPv6Address(value=ip_dst_addr)
-            knowledge_nodes.append(dest_addr)
+        ip_dest_addr = str(ipaddress.ip_address(log_dict["server_ip"]))
+        dest_addr = IPv6Address(value=ip_dest_addr)
+        knowledge_nodes.extend(get_ip_context(dest_addr))
 
     traffic = NetworkTraffic(
         start=request_time,
         src_ref=source_addr,
-        dst_ref=dest_addr,
-        dst_byte_count=log_dict["bytes_sent"],
-        extensions=HTTPRequestExt(
-            request_method=log_dict["method"],
-            request_value=log_dict["url"],
-            request_header={
-                "User-Agent": log_dict["useragent"],
-                "Referer": log_dict["referer"],
-            },
-        ),
+        dest_ref=dest_addr,
+        dest_byte_count=log_dict["bytes_sent"],
+        extensions=[
+            HTTPRequestExt(
+                request_method=log_dict["method"],
+                request_value=log_dict["url"],
+                request_header={
+                    "User-Agent": log_dict["useragent"],
+                    "Referer": log_dict["referer"],
+                },
+            )
+        ],
     )
     knowledge_nodes.append(traffic)
 
@@ -493,46 +604,33 @@ def caddy_accesslog_to_knowledge(log_dict: Dict[str, Any]) -> List[_STIXBase]:
         raise ValueError(f"Couldn't parse timestamp {log_dict['ts']}")
 
     if type(ipaddress.ip_address(log_dict["src_ip"])) is ipaddress.IPv4Address:
-        src_addr_id = get_ipv4(log_dict["src_ip"])
-        if src_addr_id:
-            src_addr = IPv4Address(id=src_addr_id, value=log_dict["src_ip"])
-        else:
-            src_addr = IPv4Address(value=log_dict["src_ip"])
-            knowledge_nodes.append(src_addr)
+        src_addr = IPv4Address(value=log_dict["src_ip"])
+        knowledge_nodes.extend(get_ip_context(src_addr))
 
-        dst_addr_id = get_ipv4(log_dict["dest_ip"])
-        if dst_addr_id:
-            dst_addr = IPv4Address(id=dst_addr_id, value=log_dict["dest_ip"])
-        else:
-            dst_addr = IPv4Address(value=log_dict["dest_ip"])
-            knowledge_nodes.append(dst_addr)
+        dest_addr = IPv4Address(value=log_dict["dst_ip"])
+        knowledge_nodes.extend(get_ip_context(dest_addr))
     else:
-        src_addr_id = get_ipv6(log_dict["src_ip"])
-        if src_addr_id:
-            src_addr = IPv6Address(id=src_addr_id, value=log_dict["src_ip"])
-        else:
-            src_addr = IPv6Address(value=log_dict["src_ip"])
-            knowledge_nodes.append(src_addr)
-        dst_addr_id = get_ipv6(log_dict["dest_ip"])
-        if dst_addr_id:
-            dst_addr = IPv6Address(id=dst_addr_id, value=log_dict["dest_ip"])
-        else:
-            dst_addr = IPv6Address(value=log_dict["dest_ip"])
-            knowledge_nodes.append(dst_addr)
+        src_addr = IPv6Address(value=log_dict["src_ip"])
+        knowledge_nodes.extend(get_ip_context(src_addr))
+
+        dest_addr = IPv6Address(value=log_dict["dst_ip"])
+        knowledge_nodes.extend(get_ip_context(dest_addr))
 
     traffic = NetworkTraffic(
         start=request_time,
         src_ref=src_addr,
-        dst_ref=dst_addr,
-        extensions=HTTPRequestExt(
-            request_method=log_dict["request"]["method"],
-            request_value=log_dict["url"],
-            dst_byte_count=log_dict["request"]["host"] + log_dict["uri"],
-            request_header={
-                "User-Agent": log_dict["request"]["headers"]["User-Agent"],
-                "Referer": log_dict["request"]["headers"]["Referer"],
-            },
-        ),
+        dst_ref=dest_addr,
+        extensions=[
+            HTTPRequestExt(
+                request_method=log_dict["request"]["method"],
+                request_value=log_dict["url"],
+                dst_byte_count=log_dict["request"]["host"] + log_dict["uri"],
+                request_header={
+                    "User-Agent": log_dict["request"]["headers"]["User-Agent"],
+                    "Referer": log_dict["request"]["headers"]["Referer"],
+                },
+            )
+        ],
         custom_properties={
             "caddy_id": log_dict["id"],
             "http_response_status": log_dict["status"],
@@ -614,23 +712,11 @@ def nmap_scan_to_knowledge(scan_results: Dict[str, Any]) -> List[_STIXBase]:
         ip_addr = ipaddress.ip_address(host)
         # Update if new IP address or we found a MAC address, which could be new
         if ip_addr.version == 4:
-            dest_addr_id = get_ipv4(str(ip_addr))
-            if not dest_addr_id or len(mac_addr_list) > 0:
-                dest_addr = IPv4Address(value=ip_addr, resolves_to_refs=mac_addr_list)
-                knowledge_nodes.append(dest_addr)
-            else:
-                dest_addr = IPv4Address(
-                    id=dest_addr_id, value=ip_addr, resolves_to_refs=mac_addr_list
-                )
+            dest_addr = IPv4Address(value=ip_addr, resolves_to_refs=mac_addr_list)
+            knowledge_nodes.extend(get_ip_context(dest_addr))
         elif ip_addr.version == 6:
-            dest_addr_id = get_ipv6(str(ip_addr))
-            if not dest_addr_id or len(mac_addr_list) > 0:
-                dest_addr = IPv6Address(value=ip_addr, resolves_to_refs=mac_addr_list)
-                knowledge_nodes.append(dest_addr)
-            else:
-                dest_addr = IPv6Address(
-                    id=dest_addr_id, value=ip_addr, resolves_to_refs=mac_addr_list
-                )
+            dest_addr = IPv6Address(value=ip_addr, resolves_to_refs=mac_addr_list)
+            knowledge_nodes.extend(get_ip_context(dest_addr))
 
         else:
             raise ValueError(
@@ -682,33 +768,17 @@ def suricata_alert_to_knowledge(alert: Dict[str, Any]) -> List[_STIXBase]:
     knowledge_nodes = []
 
     if type(ipaddress.ip_address(alert["src_ip"])) is ipaddress.IPv4Address:
-        src_addr_id = get_ipv4(alert["src_ip"])
-        if src_addr_id:
-            src_addr = IPv4Address(id=src_addr_id, value=alert["src_ip"])
-        else:
-            src_addr = IPv4Address(value=alert["src_ip"])
-            knowledge_nodes.append(src_addr)
+        src_addr = IPv4Address(value=alert["src_ip"])
+        knowledge_nodes.extend(get_ip_context(src_addr))
 
-        dst_addr_id = get_ipv4(alert["dest_ip"])
-        if dst_addr_id:
-            dst_addr = IPv4Address(id=dst_addr_id, value=alert["dest_ip"])
-        else:
-            dst_addr = IPv4Address(value=alert["dest_ip"])
-            knowledge_nodes.append(dst_addr)
+        dest_addr = IPv4Address(value=alert["dest_ip"])
+        knowledge_nodes.extend(get_ip_context(dest_addr))
     else:
-        src_addr_id = get_ipv6(alert["src_ip"])
-        if src_addr_id:
-            src_addr = IPv6Address(id=src_addr_id, value=alert["src_ip"])
-        else:
-            src_addr = IPv6Address(value=alert["src_ip"])
-            knowledge_nodes.append(src_addr)
+        src_addr = IPv6Address(value=alert["src_ip"])
+        knowledge_nodes.extend(get_ip_context(src_addr))
 
-        dst_addr_id = get_ipv6(alert["dest_ip"])
-        if dst_addr_id:
-            dst_addr = IPv6Address(id=dst_addr_id, value=alert["dest_ip"])
-        else:
-            dst_addr = IPv6Address(value=alert["dest_ip"])
-            knowledge_nodes.append(dst_addr)
+        dest_addr = IPv6Address(value=alert["dest_ip"])
+        knowledge_nodes.append(dest_addr)
 
     try:
         protocol = ip_protos[alert["PROTO"]]
@@ -721,7 +791,7 @@ def suricata_alert_to_knowledge(alert: Dict[str, Any]) -> List[_STIXBase]:
         "protocols": [protocol],
         "src_ref": src_addr,
         "src_port": alert["src_port"],
-        "dst_ref": dst_addr,
+        "dst_ref": dest_addr,
         "dst_port": alert["dest_port"],
         "start": start_time,
     }
@@ -732,63 +802,36 @@ def suricata_alert_to_knowledge(alert: Dict[str, Any]) -> List[_STIXBase]:
 
     knowledge_nodes.append(traffic)
 
-    dst_port_note_ids = graph.get_port_note_ids_by_abstract(
-        alert["dest_port"], alert["proto"]
+    label = f"{alert['dest_port']}/{alert['proto']}"
+    dest_port_note = Note(
+        abstract=label,
+        content=label,
+        object_refs=[port_root],
     )
-    if len(dst_port_note_ids) > 0:
-        dst_port_note = Note(
-            id=list(dst_port_note_ids)[0],
-            abstract=f"{alert['dest_port']}/{alert['proto']}",
-            content=f"{alert['dest_port']}/{alert['proto']}",
-            object_refs=[traffic],
-        )
-    else:
-        dst_port_note = Note(
-            abstract=f"{alert['dest_port']}/{alert['proto']}",
-            content=f"{alert['dest_port']}/{alert['proto']}",
-            object_refs=[traffic],
-        )
 
-    knowledge_nodes.append(dst_port_note)
+    knowledge_nodes.append(Relationship(dest_port_note, "object", traffic))
 
     alert_name = f"suricata:{alert['alert']['signature_id']}/{alert['alert']['rev']}"
 
-    # Check for existing indicator in DB. Create if it doesn't exist, reference if it does.
-    alert_sig_ids = graph.get_indicator_ids_by_name(alert_name)
-    if len(alert_sig_ids) == 0:
-        attack_pattern_ids = graph.get_attack_pattern_ids_by_category(
-            alert["alert"]["category"]
-        )
-        if len(attack_pattern_ids) == 0:
-            raise ValueError(f"Unknown Suricata attack pattern: {alert['alert']}")
-        else:
-            attack_pattern = AttackPattern(
-                id=attack_pattern_ids[0],
-                name=alert["alert"]["category"],
-            )
+    attack_pattern = AttackPattern(
+        name=alert["alert"]["category"],
+    )
 
-        indicator = Indicator(
-            name=alert_name,
-            description=alert["alert"]["signature"],
-            pattern="Not Provided",  # Required field, but we don't have this info
-            pattern_type="suricata",
-            pattern_version=alert["alert"]["rev"],
-            valid_from=datetime.datetime.now(),
-        )
-        knowledge_nodes.append(indicator)
-        indicates_rel = Relationship(
-            relationship_type="indicates",
-            source_ref=indicator,
-            target_ref=attack_pattern,
-        )
-        knowledge_nodes.append(indicates_rel)
-    else:
-        indicator = Indicator(
-            id=list(alert_sig_ids)[0],
-            pattern="<PLACEHOLDER>",
-            pattern_type="suricata",
-            valid_from=datetime.datetime.now(),
-        )
+    indicator = Indicator(
+        name=alert_name,
+        description=alert["alert"]["signature"],
+        pattern="Not Provided",  # Required field, but we don't have this info
+        pattern_type="suricata",
+        pattern_version=alert["alert"]["rev"],
+        valid_from=datetime.datetime.now(),
+    )
+    knowledge_nodes.append(indicator)
+    indicates_rel = Relationship(
+        relationship_type="indicates",
+        source_ref=indicator,
+        target_ref=attack_pattern,
+    )
+    knowledge_nodes.append(indicates_rel)
 
     try:
         observation = ObservedData(
@@ -1049,11 +1092,16 @@ def knowledge_to_neo(
         except ValueError as e:
             logger.error(f"Failed to add relation {rel} ({e})")
 
+    # Strip out any relationships from the placeholder fake note root
+    # (Note is always source)
+    rels_to_add = [x for x in rels_to_add if x[1] != fake_note_root.id]
+
     if len(nodes_to_add) > 0:
         node_ids: List[str] = [x[0] for x in nodes_to_add]
         node_labels: List[str] = [x[1] for x in nodes_to_add]
         node_properties: List[dict[str, Any]] = [x[2] for x in nodes_to_add]
         graph.add_nodes(node_ids, node_labels, node_properties)
+
     if len(rels_to_add) > 0:
         node_a_ids: List[str] = [x[0] for x in rels_to_add]
         node_b_ids: List[str] = [x[1] for x in rels_to_add]

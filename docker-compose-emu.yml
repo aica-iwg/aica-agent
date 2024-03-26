@@ -40,6 +40,7 @@ services:
       - NET_ADMIN  # For iptables/ipset
       - SYS_ADMIN  # For ClamAV on-access scanning (fanotify)
     networks:
+      bridge:
       target:
         ipv4_address: 10.107.100.170
     healthcheck:
