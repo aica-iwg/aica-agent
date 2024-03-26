@@ -24,31 +24,33 @@ from celery.utils.log import get_task_logger
 from ipwhois import IPWhois  # type: ignore
 from stix2.base import _STIXBase  # type: ignore
 from stix2 import (  # type: ignore
-    AttackPattern,
     AutonomousSystem,
     Directory,
     DomainName,
     File,
     HTTPRequestExt,
-    Identity,
-    Incident,
-    Indicator,
     IPv4Address,
     IPv6Address,
     Location,
-    Malware,
+    Malware,  # TODO: Create AICA Version
     MACAddress,
     NetworkTraffic,
-    Note,
-    ObservedData,
+    ObservedData,  # TODO: Create AICA Version
     Relationship,
     Sighting,
     Software,
-    Tool,
+    Tool,  # TODO: Create AICA Version
 )
 from typing import Any, Dict, List, Optional, Union
 
 from aica_django.connectors.GraphDatabase import AicaNeo4j
+from aica_django.converters.AICAStix import (
+    AICAAttackPattern,
+    AICAIncident,
+    AICAIdentity,
+    AICAIndicator,
+    AICANote,
+)
 
 
 logger = get_task_logger(__name__)
@@ -215,50 +217,43 @@ port_root = Software(
     id="software--e3aaca11-5e6a-4ee7-bc59-e8d4d64b9e62", name="Generic Port Usage Info"
 )
 
-ip_version_4_note = Note(
-    id="note--05d8ecaa-f461-4785-a9a1-9c06d6e7b848",
+ip_version_4_note = AICANote(
     abstract=f"ip_version_4",
     content=f"ip_version_4",
     object_refs=[fake_note_root],
 )
 
-ip_version_6_note = Note(
-    id="note--166fffdb-9220-4a34-b244-8ea978d26231",
+ip_version_6_note = AICANote(
     abstract=f"ip_version_6",
     content=f"ip_version_6",
     object_refs=[fake_note_root],
 )
 
-is_private_note = Note(
-    id="note--30f7a5e9-98dc-4ba7-a181-d5e6bd326a8f",
+is_private_note = AICANote(
     abstract="ip_is_private",
     content="ip_is_private",
     object_refs=[fake_note_root],
 )
 
-is_multicast_note = Note(
-    id="note--f8455d6d-e05a-4abb-96cf-ecdfaaa33ff3",
+is_multicast_note = AICANote(
     abstract="ip_is_multicast",
     content="ip_is_multicast",
     object_refs=[fake_note_root],
 )
 
-is_reserved_note = Note(
-    id="note--37c5420b-2f00-453d-9330-1e6571b84a8f",
+is_reserved_note = AICANote(
     abstract="ip_is_reserved",
     content="ip_is_reserved",
     object_refs=[fake_note_root],
 )
 
-is_loopback_note = Note(
-    id="note--ac691c59-96d5-4b00-99d2-2149ef3645fe",
+is_loopback_note = AICANote(
     abstract="ip_is_loopback",
     content="ip_is_loopback",
     object_refs=[fake_note_root],
 )
 
-is_link_local_note = Note(
-    id="note--c47336a0-2c08-4101-9abd-2744b63e8e06",
+is_link_local_note = AICANote(
     abstract="ip_is_link_local",
     content="ip_is_link_local",
     object_refs=[fake_note_root],
@@ -332,7 +327,7 @@ def get_ip_context(ip_addr: Union[IPv4Address, IPv6Address]) -> List[_STIXBase]:
                 entity_kwargs = {"name": entity}
                 if location:
                     entity_kwargs["located_at"] = location
-                entity = Identity(**entity_kwargs)
+                entity = AICAIdentity(**entity_kwargs)
                 new_ip_addr_kwargs["custom_properties"]["has_owner_refs"].append(entity)
                 cidr_kwargs["custom_properties"]["has_owner_refs"].append(entity)
                 return_nodes.append(entity)
@@ -383,7 +378,7 @@ def dissect_time(timestamp: Union[int, float], prefix: str = "") -> Dict[str, An
     @rtype: dict
     """
 
-    dt_utc = datetime.datetime.utcfromtimestamp(timestamp)
+    dt_utc = datetime.datetime.fromtimestamp(timestamp)
     dt_americas = dt_utc.astimezone(pytz.timezone("America/Chicago"))
     dt_europeafrica = dt_utc.astimezone(pytz.timezone("Europe/Berlin"))
     dt_asiaoceana = dt_utc.astimezone(pytz.timezone("Asia/Shanghai"))
@@ -489,7 +484,7 @@ def netflow_to_knowledge(
     knowledge_nodes.append(traffic)
 
     label = f"{flow['DST_PORT']}/{protocol}"
-    dest_port_note = Note(
+    dest_port_note = AICANote(
         abstract=label,
         content=label,
         object_refs=[port_root],
@@ -543,41 +538,31 @@ def nginx_accesslog_to_knowledge(
         dest_addr = IPv6Address(value=ip_dest_addr)
         knowledge_nodes.extend(get_ip_context(dest_addr))
 
+    http_req_ext = HTTPRequestExt(
+        request_method=log_dict["method"],
+        request_value=log_dict["url"],
+        request_header={
+            "User-Agent": log_dict["useragent"],
+            "Referer": log_dict["referer"],
+        },
+    )
+
     traffic = NetworkTraffic(
+        protocols="http",
         start=request_time,
         src_ref=source_addr,
-        dest_ref=dest_addr,
-        dest_byte_count=log_dict["bytes_sent"],
-        extensions=[
-            HTTPRequestExt(
-                request_method=log_dict["method"],
-                request_value=log_dict["url"],
-                request_header={
-                    "User-Agent": log_dict["useragent"],
-                    "Referer": log_dict["referer"],
-                },
-            )
-        ],
+        dst_ref=dest_addr,
+        dst_byte_count=log_dict["bytes_sent"],
+        extensions={"http-request-ext": http_req_ext},
     )
     knowledge_nodes.append(traffic)
 
-    http_status_abstract = f"status: {log_dict['status']}"
-
-    http_status_ids = graph.get_note_ids_by_abstract(http_status_abstract)
     label = f"status: {log_dict['status']}"
-    if len(http_status_ids) > 0:
-        http_status = Note(
-            id=list(http_status_ids)[0],
-            abstract=label,
-            content=label,
-            object_refs=[traffic],
-        )
-    else:
-        http_status = Note(
-            abstract=label,
-            content=label,
-            object_refs=[traffic],
-        )
+    http_status = AICANote(
+        abstract=label,
+        content=label,
+        object_refs=[traffic],
+    )
 
     knowledge_nodes.append(http_status)
 
@@ -616,21 +601,21 @@ def caddy_accesslog_to_knowledge(log_dict: Dict[str, Any]) -> List[_STIXBase]:
         dest_addr = IPv6Address(value=log_dict["dst_ip"])
         knowledge_nodes.extend(get_ip_context(dest_addr))
 
+    http_req_ext = HTTPRequestExt(
+        request_method=log_dict["request"]["method"],
+        request_value=log_dict["url"],
+        request_header={
+            "User-Agent": log_dict["request"]["headers"]["User-Agent"],
+            "Referer": log_dict["request"]["headers"]["Referer"],
+        },
+    )
     traffic = NetworkTraffic(
+        protocols="http",
         start=request_time,
         src_ref=src_addr,
         dst_ref=dest_addr,
-        extensions=[
-            HTTPRequestExt(
-                request_method=log_dict["request"]["method"],
-                request_value=log_dict["url"],
-                dst_byte_count=log_dict["request"]["host"] + log_dict["uri"],
-                request_header={
-                    "User-Agent": log_dict["request"]["headers"]["User-Agent"],
-                    "Referer": log_dict["request"]["headers"]["Referer"],
-                },
-            )
-        ],
+        dst_byte_count=log_dict["request"]["host"] + log_dict["uri"],
+        extensions={"http-request-ext": http_req_ext},
         custom_properties={
             "caddy_id": log_dict["id"],
             "http_response_status": log_dict["status"],
@@ -685,20 +670,11 @@ def nmap_scan_to_knowledge(scan_results: Dict[str, Any]) -> List[_STIXBase]:
 
             try:
                 vendor_abstract = f"vendor: {scan_results[host]['vendor']}"
-                vendors = graph.get_note_ids_by_abstract(vendor_abstract)
-                if len(vendors) > 0:
-                    vendor_note = Note(
-                        id=list(vendors)[0],
-                        abstract=vendor_abstract,
-                        content=vendor_abstract,
-                        object_refs=[mac_addr],
-                    )
-                else:
-                    vendor_note = Note(
-                        abstract=vendor_abstract,
-                        content=vendor_abstract,
-                        object_refs=[mac_addr],
-                    )
+                vendor_note = AICANote(
+                    abstract=vendor_abstract,
+                    content=vendor_abstract,
+                    object_refs=[mac_addr],
+                )
 
                 knowledge_nodes.append(vendor_note)
             except KeyError:
@@ -803,7 +779,7 @@ def suricata_alert_to_knowledge(alert: Dict[str, Any]) -> List[_STIXBase]:
     knowledge_nodes.append(traffic)
 
     label = f"{alert['dest_port']}/{alert['proto']}"
-    dest_port_note = Note(
+    dest_port_note = AICANote(
         abstract=label,
         content=label,
         object_refs=[port_root],
@@ -811,19 +787,19 @@ def suricata_alert_to_knowledge(alert: Dict[str, Any]) -> List[_STIXBase]:
 
     knowledge_nodes.append(Relationship(dest_port_note, "object", traffic))
 
-    alert_name = f"suricata:{alert['alert']['signature_id']}/{alert['alert']['rev']}"
-
-    attack_pattern = AttackPattern(
-        name=alert["alert"]["category"],
+    attack_pattern_name = alert["alert"]["category"]
+    attack_pattern = AICAAttackPattern(
+        name=attack_pattern_name,
     )
 
-    indicator = Indicator(
+    alert_name = f"suricata:{alert['alert']['signature_id']}/{alert['alert']['rev']}"
+    indicator = AICAIndicator(
         name=alert_name,
         description=alert["alert"]["signature"],
         pattern="Not Provided",  # Required field, but we don't have this info
         pattern_type="suricata",
         pattern_version=alert["alert"]["rev"],
-        valid_from=datetime.datetime.now(),
+        valid_from=datetime.datetime.fromtimestamp(0),  # Required by STIX but we don't care
     )
     knowledge_nodes.append(indicator)
     indicates_rel = Relationship(
@@ -879,7 +855,7 @@ def clamav_alert_to_knowledge(alert: Dict[str, Any]) -> List[_STIXBase]:
     file = File(name=file_name, parent_directory_ref=directory)
     knowledge_nodes.append(file)
 
-    alert_indicator = Incident(
+    alert_indicator = AICAIncident(
         name=alert_name,
     )
     knowledge_nodes.append(alert_indicator)
@@ -896,7 +872,8 @@ def clamav_alert_to_knowledge(alert: Dict[str, Any]) -> List[_STIXBase]:
     )
     knowledge_nodes.append(malware)
 
-    attack_pattern = AttackPattern(name=f"clamav:{alert['category']}")
+    attack_pattern_name = f"clamav:{alert['category']}"
+    attack_pattern = AICAAttackPattern(name=attack_pattern_name)
     knowledge_nodes.append(attack_pattern)
 
     malware_pattern_rel = Relationship(
@@ -938,7 +915,7 @@ def waf_alert_to_knowledge(alert: Dict[str, Any]) -> List[_STIXBase]:
         logger.warning(f"Skipping alert with no ID: {alert}")
         return []
 
-    alert_indicator = Indicator(
+    alert_indicator = AICAIndicator(
         name=alert_name,
         description=alert["data"],
         pattern="Not specified",

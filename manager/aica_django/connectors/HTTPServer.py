@@ -24,7 +24,7 @@ nginx_regex = (
     r"(?P<src_ip>\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}) - - "
     r"\[(?P<dateandtime>\d{2}\/[A-Za-z]{3}\/\d{4}:\d{2}:\d{2}:\d{2} "
     r"(\+|\-)\d{4})\] ((\"(?P<method>(GET|POST)) )(?P<url>.+)"
-    r"(HTTP\/1\.1\")) (?P<statuscode>\d{3}) (?P<bytes_sent>\d+) "
+    r"(HTTP\/1\.1\")) (?P<status>\d{3}) (?P<bytes_sent>\d+) "
     r"(\"(?P<referer>(\-)|(.+))\") (\"(?P<useragent>[^\"]+)\")"
 )
 

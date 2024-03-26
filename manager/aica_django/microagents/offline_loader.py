@@ -29,11 +29,12 @@ from celery.signals import worker_ready
 from celery.utils.log import get_task_logger
 from collections import defaultdict
 from io import StringIO
-from stix2 import AttackPattern, Note, Relationship, Software  # type: ignore
+from stix2 import Note, Relationship, Software  # type: ignore
 from typing import Any, Dict
 
 from aica_django.connectors.DNP3 import replay_pcap, capture_dnp3
 
+from aica_django.converters.AICAStix import AICAAttackPattern
 from aica_django.connectors.DocumentDatabase import AicaMongo
 from aica_django.connectors.GraphDatabase import AicaNeo4j, prune_netflow_data
 from aica_django.connectors.Netflow import network_flow_capture
@@ -89,7 +90,8 @@ def create_malware_categories() -> None:
 
     malware_categories = []
     for category in clamav_categories:
-        malware_signature = AttackPattern(name=f"clamav:{category}")
+        attack_pattern_name = f"clamav:{category}"
+        malware_signature = AICAAttackPattern(name=attack_pattern_name)
         malware_categories.append(malware_signature)
 
     knowledge_to_neo(malware_categories)
@@ -239,12 +241,11 @@ def create_suricata_categories() -> None:
 
     attack_patterns = []
     for _, row in suricata_df.iterrows():
-        attack_pattern = AttackPattern(
-            type="attack-pattern",
-            name=row["name"],
-            description=row["description"],
-            custom_properties={"severity": row["priority"]},
+        attack_pattern_name = row["name"]
+        attack_pattern = AICAAttackPattern(
+            name=attack_pattern_name,
         )
+
         attack_patterns.append(attack_pattern)
 
     knowledge_to_neo(attack_patterns)
