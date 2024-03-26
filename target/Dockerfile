@@ -3,7 +3,7 @@ FROM node:21-alpine3.19
 ENV NODE_ENV=aica-config
 
 RUN apk update && apk upgrade && \
-    apk --no-cache add openssh iptables ipset nginx bind-tools bash syslog-ng clamav supervisor git go
+    apk --no-cache add openssh iptables ipset nginx bind-tools bash syslog-ng clamav supervisor git go fprobe
 
 # Allow manager to access via SSH commands
 RUN ssh-keygen -A && mkdir -p /root/.ssh

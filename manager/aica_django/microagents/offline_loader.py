@@ -20,24 +20,17 @@ Functions:
 
 import json
 import logging
-import numpy as np
-import numpy.typing as npt
 import os
 import pandas as pd
 import requests
-import time
 import yaml
 
 from celery.signals import worker_ready
 from celery.utils.log import get_task_logger
+from collections import defaultdict
 from io import StringIO
-from joblib import Parallel, delayed  # type: ignore
-from multiprocessing import cpu_count
-from numpy import ndarray
-from pandas.core.series import Series
-from py2neo import ConnectionUnavailable  # type: ignore
-from stix2 import AttackPattern, Note, Software  # type: ignore
-from typing import Any, Dict, Union
+from stix2 import AttackPattern, Note, Relationship, Software  # type: ignore
+from typing import Any, Dict
 
 from aica_django.connectors.DNP3 import replay_pcap, capture_dnp3
 
@@ -50,7 +43,7 @@ from aica_django.connectors.NetworkScan import periodic_network_scan
 from aica_django.connectors.IntrusionDetection import poll_suricata_alerts
 from aica_django.connectors.Antivirus import poll_clamav_alerts
 from aica_django.connectors.WAF import poll_waf_alerts
-from aica_django.converters.Knowledge import knowledge_to_neo
+from aica_django.converters.Knowledge import knowledge_to_neo, fake_note_root
 
 logger = get_task_logger(__name__)
 
@@ -104,41 +97,31 @@ def create_malware_categories() -> None:
     logger.info("Created malware categories from ClamAV data.")
 
 
-def port_to_note(
-    rank: Union[int, slice, npt.NDArray[np.int64]],
-    row: Series[type[object]],
-    port_root_id: int,
-) -> Note:
-    if isinstance(rank, int):
-        rank = int(rank)
-    elif isinstance(rank, slice):
-        rank = int(rank.start)
-    elif isinstance(rank, ndarray):
-        rank = int(rank[0])
-    else:
-        raise ValueError
+port_root = Software(
+    id="software--e136328d-3962-4af7-b9e5-6306fcc8d555", name="Generic Port Usage Info"
+)
 
-    port_object = Note(
-        abstract=f"{row['port_number']}/{row['protocol']}",
-        content=json.dumps(
-            {
-                "port": row["port_number"],
-                "protocol": row["protocol"],
-                "service": row["service"],
-                "frequency": row["frequency"],
-                "rank": rank,
-                "top10": rank < 10,
-                "top100": rank < 100,
-                "top1000": rank < 1000,
-            }
-        ),
-        object_refs=[port_root_id],
-    )
-
-    return port_object
+top_10_port_note = Note(
+    id="note--f3cd780d-9f32-4211-b26c-42118dbbe207",
+    abstract="top_10_port",
+    content="top_10_port",
+    object_refs=[fake_note_root],
+)
+top_100_port_note = Note(
+    id="note--2adf3880-1a5f-4b1c-8c88-c9722238dcf0",
+    abstract="top_100_port",
+    content="top_100_port",
+    object_refs=[fake_note_root],
+)
+top_1000_port_note = Note(
+    id="note--40d34e90-9a9b-4350-97c6-01d64824a081",
+    abstract="top_1000_port",
+    content="top_1000_port",
+    object_refs=[fake_note_root],
+)
 
 
-def create_port_info(num_ports: int = 10000) -> None:
+def create_port_info() -> None:
     """
     Load Nmap's list (from web) of port/service info into the graph.
 
@@ -165,21 +148,64 @@ def create_port_info(num_ports: int = 10000) -> None:
         names=["service", "port", "frequency", "comment"],
         index_col=False,
     )
+    nmap_df = nmap_df[nmap_df["service"] != "unknown"]
+
+    # We want all parts of service, except the last part in the case of hyphenated
+    nmap_df["software"] = nmap_df["service"].apply(
+        lambda x: "-".join(
+            x.split("-")[
+                : len(x.split("-")) - 1 if len(x.split("-")) > 1 else len(x.split("-"))
+            ]
+        )
+    )
+
     nmap_df[["port_number", "protocol"]] = nmap_df["port"].str.split("/", expand=True)
     nmap_df.drop(columns=["comment", "port"], axis=1, inplace=True)
-    nmap_df.sort_values(by="frequency", inplace=True, ascending=False)
-    nmap_df = nmap_df.head(num_ports)
-    nmap_df = nmap_df.reset_index(drop=True)
 
-    port_objects = []
+    # For performance reasons (startup is slow creating these)
+    nmap_df = nmap_df[nmap_df["frequency"] > 0]
 
-    port_root = Software(name="Generic Port Usage Info")
-    port_objects.append(port_root)
+    nmap_df["rank"] = nmap_df["frequency"].rank(ascending=False)
 
-    port_objects = Parallel(n_jobs=cpu_count() - 1 or 1)(
-        delayed(port_to_note)(nmap_df.index.get_loc(key=index), row, port_root.id)
-        for index, row in nmap_df.iterrows()
-    )
+    port_objects = [port_root, top_10_port_note, top_100_port_note, top_1000_port_note]
+
+    port_software_map = defaultdict(list)
+
+    for _, row in nmap_df.iterrows():
+        port_object = Note(
+            abstract=f"{row['port_number']}/{row['protocol']}",
+            content=json.dumps(
+                {
+                    "port": row["port_number"],
+                    "protocol": row["protocol"],
+                    "service": row["service"],
+                    "frequency": row["frequency"],
+                    "rank": row["rank"],
+                }
+            ),
+            object_refs=[port_root.id],
+        )
+        port_objects.append(port_object)
+
+        if row["rank"] <= 10:
+            port_objects.append(Relationship(top_10_port_note, "object", port_object))
+        if row["rank"] <= 100:
+            port_objects.append(Relationship(top_100_port_note, "object", port_object))
+        if row["rank"] <= 1000:
+            port_objects.append(Relationship(top_1000_port_note, "object", port_object))
+
+        port_software_map[row["software"]].append(port_object)
+
+    for software, port_notes in port_software_map.items():
+        software_obj = Software(name=software)
+        port_objects.append(software_obj)
+        for port_note in port_notes:
+            port_rel = Relationship(
+                relationship_type="object",
+                source_ref=port_note,
+                target_ref=software_obj,
+            )
+            port_objects.append(port_rel)
 
     knowledge_to_neo(port_objects)
 
@@ -250,13 +276,7 @@ def initialize(**kwargs: Dict[Any, Any]) -> None:
     if os.environ.get("SKIP_TASKS"):
         return
 
-    # Wait for graph to be available
-    while True:
-        try:
-            graph = AicaNeo4j()
-            break
-        except ConnectionUnavailable:
-            time.sleep(1)
+    graph = AicaNeo4j()
 
     ### Preload Contextual Data ###
 

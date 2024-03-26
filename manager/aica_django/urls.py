@@ -20,6 +20,5 @@ from django.contrib import admin
 admin.autodiscover()
 
 urlpatterns = [
-    re_path("", include("apps.aica_manager.urls")),
     re_path("admin/", admin.site.urls),
 ]

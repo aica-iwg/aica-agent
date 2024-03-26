@@ -159,132 +159,89 @@ class AicaNeo4j:
         self.graph = GraphDatabase.driver(uri, auth=(user, password))
 
         if create_constraints:
-            with self.graph.session() as session:
-                with session.begin_transaction() as tx:
-
-                    for label in list(
-                        set(
-                            [
-                                getattr(stix2.v21.sdo, x)._type
-                                for x in dir(stix2.v21.sdo)
-                                if inspect.isclass(getattr(stix2.v21.sdo, x))
-                                and issubclass(getattr(stix2.v21.sdo, x), _STIXBase)
-                                and "_type" in dir(getattr(stix2.v21.sdo, x))
-                            ]
-                            + [
-                                getattr(stix2.v21.observables, x)._type
-                                for x in dir(stix2.v21.observables)
-                                if inspect.isclass(getattr(stix2.v21.observables, x))
-                                and issubclass(
-                                    getattr(stix2.v21.observables, x), _STIXBase
-                                )
-                                and "_type" in dir(getattr(stix2.v21.observables, x))
-                            ]
-                        )
-                    ):
-                        label_safe = re.sub("[^A-Za-z0-9_]", "_", label)
-                        unique_id = (
-                            f"CREATE CONSTRAINT {label_safe}_identifier IF NOT EXISTS "
-                            + f"FOR (n:`{label}`) REQUIRE n.identifier IS UNIQUE"
-                        )
-                        tx.run(unique_id)
-
-                    unique_note = (
-                        "CREATE CONSTRAINT note_abstract IF NOT EXISTS "
-                        + "FOR (n:note) REQUIRE n.abstract IS UNIQUE"
-                    )
-                    tx.run(unique_note)
-
-                    unique_ap = (
-                        "CREATE CONSTRAINT attack_pattern_description IF NOT EXISTS "
-                        + "FOR (n:`attack-pattern`) REQUIRE n.description IS UNIQUE"
-                    )
-                    tx.run(unique_ap)
-
-                    unique_value_labels = [
-                        "mac-addr",
-                        "ipv4-addr",
-                        "ipv6-addr",
-                        "domain-name",
+            for label in list(
+                set(
+                    [
+                        getattr(stix2.v21.sdo, x)._type
+                        for x in dir(stix2.v21.sdo)
+                        if inspect.isclass(getattr(stix2.v21.sdo, x))
+                        and issubclass(getattr(stix2.v21.sdo, x), _STIXBase)
+                        and "_type" in dir(getattr(stix2.v21.sdo, x))
                     ]
-                    for label in unique_value_labels:
-                        label_safe = re.sub("[^A-Za-z0-9_]", "_", label)
-                        unique_constraint = (
-                            f"CREATE CONSTRAINT {label_safe}_value IF NOT EXISTS "
-                            + f"FOR (n:`{label}`) REQUIRE n.value IS UNIQUE"
-                        )
-                        tx.run(unique_constraint)
+                    + [
+                        getattr(stix2.v21.observables, x)._type
+                        for x in dir(stix2.v21.observables)
+                        if inspect.isclass(getattr(stix2.v21.observables, x))
+                        and issubclass(getattr(stix2.v21.observables, x), _STIXBase)
+                        and "_type" in dir(getattr(stix2.v21.observables, x))
+                    ]
+                )
+            ):
+                # Identifier is determined in STIX2 by the "ID Contributing Properties", so if the Identifier is unique, that
+                # automatically enforces uniqueness of constituent properties by way of their creation with the STIX2 library
+                label_safe = re.sub("[^A-Za-z0-9_]", "_", label)
 
-                    tx.commit()
+                id_index = (
+                    f"CREATE TEXT INDEX {label_safe}_identifier_index IF NOT EXISTS "
+                    + f"FOR (n:`{label}`) on (n.identifier)"
+                )
+                self.graph.execute_query(id_index)
+
+                id_unique = (
+                    f"CREATE CONSTRAINT {label_safe}_identifier_unique IF NOT EXISTS "
+                    + f"FOR (n:`{label}`) REQUIRE n.identifier IS UNIQUE"
+                )
+                self.graph.execute_query(id_unique)
 
     def add_node(
-        self, node_id: str, node_label: str, node_properties: Optional[Dict[str, Any]]
+        self,
+        node_id: str,
+        node_label: str,
+        node_property_lists: Optional[Dict[str, Any]],
     ) -> None:
-        if not node_properties:
-            node_properties = dict()
+        if not node_property_lists:
+            node_property_lists = dict()
 
-        self.add_nodes([node_id], [node_label], [node_properties])
+        self.add_nodes([node_id], [node_label], [node_property_lists])
 
     def add_nodes(
         self,
         node_ids: List[str],
         node_labels: List[str],
-        node_properties: List[Dict[str, Any]],
+        node_property_lists: List[Dict[str, Any]],
     ) -> None:
         """
         Adds a node with specified parameters to the graph database.
 
         @param node_id: Unique name to use for this node
-        @type node_id: str 
+        @type node_id: str
         @param node_label: Label to use for this node, must be defined in defined_node_labels
         @type node_label: str
         @param node_properties: Any other metadata to store with this node
         @type node_properties: dict
         """
 
+        # These are STIX properties that we don't need, and will mess up our MERGE statements
+        merge_exclude_properties = ["revoked", "spec_version", "created", "modified"]
+
         queries = []
 
-        for node_id, node_label, node_property in zip(
-            node_ids, node_labels, node_properties
+        for node_id, node_label, node_property_list in zip(
+            node_ids, node_labels, node_property_lists
         ):
-            if not node_property:
-                node_property = dict()
+            node_property_list["identifier"] = node_id
+            queries.append(
+                f"MERGE (n:`{node_label}` "
+                + f"{dict_to_cypher({k: v for k, v in node_property_list.items() if k not in merge_exclude_properties})}) "
+                + "RETURN n.identifier"
+            )
 
-            if node_label.lower() == "note":
-                # We use notes as global information references, based on unique abstract values,
-                # so they need special handling
-                if len(list(node_property.keys())) > 0:
-                    node_property["identifier"] = node_id
-                    create_property_list = ", ".join(
-                        [f"n.{x} = '{node_property[x]}'" for x in node_property.keys()]
-                    )
-                    create_property_list = f"ON CREATE SET {create_property_list}"
-                else:
-                    create_property_list = ""
-
-                if "object_refs" in node_property.keys():
-                    match_property_list = f"ON MATCH SET n.object_refs = n.object_refs + {node_property['object_refs']}"
-                else:
-                    match_property_list = ""
-                queries.append(
-                    f"""MERGE (n:note {{abstract: '{node_property['abstract']}'}})
-                            {create_property_list}
-                            {match_property_list}
-                            RETURN n"""
-                )
-            else:
-                queries.append(
-                    f"MERGE (n:`{node_label}` {dict_to_cypher(node_property)}) "
-                    + f"ON CREATE SET n.identifier = '{node_id}', n.created = timestamp() "
-                    + "RETURN n.identifier, n.created"
-                )
-
-        with self.graph.session() as session:
-            with session.begin_transaction() as tx:
-                for query in queries:
-                    tx.run(query)
-
-                tx.commit()
+        # We should figure out how to batch this for efficiency - APOC seems to have options
+        # but I haven't figured it out yet.
+        for query in queries:
+            # logger.info(query)
+            result = self.graph.execute_query(query)
+            # logger.info(result)
 
     def add_relation(
         self,
@@ -355,12 +312,10 @@ class AicaNeo4j:
 
             queries.append(query)
 
-        with self.graph.session() as session:
-            with session.begin_transaction() as tx:
-                for query in queries:
-                    tx.run(query)
-
-                tx.commit()
+        # We should figure out how to batch this for efficiency - APOC seems to have options
+        # but I haven't figured it out yet.
+        for query in queries:
+            result = self.graph.execute_query(query)
 
     def get_node_ids_by_label(self, label: str) -> List[str]:
         """

@@ -33,9 +33,6 @@ if [ "$DJANGO_SUPERUSER_USERNAME" ]; then
     /opt/venv/bin/python3 manage.py createsuperuser --noinput
 fi
 
-# Start netflow exporter (configured in /etc/default/fprobe, copied to container)
-service fprobe start
-
 echo "Manager started in mode: ${MODE}"
 
 tail -f /dev/null

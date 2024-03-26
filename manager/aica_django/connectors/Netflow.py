@@ -24,7 +24,7 @@ def network_flow_capture() -> None:
     logger.info(f"Running {__name__}: network_flow_capture")
     # Create listener for Netflow exports on port 2055
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    sock.bind(("127.0.0.1", 2055))
+    sock.bind(("0.0.0.0", 2055))
     while True:
         payload = sock.recv(4096)
         p = netflow.parse_packet(payload)
