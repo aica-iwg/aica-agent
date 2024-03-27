@@ -5,6 +5,7 @@
 .pytest_cache
 .vscode
 __pycache__
+aica-manager/
 coverage.xml
 db.sqlite3
 venv

@@ -6,7 +6,6 @@ CONDA := conda run --no-capture-output -n aica
 check-env:
 ifndef MODE
 		$(error MODE is undefined)
-
 endif
 
 init: environment.yml
@@ -36,23 +35,26 @@ test: lint security
 				/opt/venv/bin/coverage run --omit='*test*' manage.py test --noinput && \
 				/opt/venv/bin/coverage report --fail-under=30"
 
-start: build
+start: check-env 
 		@docker compose -f docker-compose.yml -f docker-compose-${MODE}.yml up --wait -d
 
 stop: check-env
-		@docker compose -f docker-compose.yml -f docker-compose-${MODE}.yml down 
+		@docker compose -f docker-compose.yml -f docker-compose-${MODE}.yml down --remove-orphans
 
 stop_purge: check-env
-		@docker compose -f docker-compose.yml -f docker-compose-${MODE}.yml down -v
+		@docker compose -f docker-compose.yml -f docker-compose-${MODE}.yml down --remove-orphans -v
 
 rebuild: build stop start
 
+rebuild_purge: build stop_purge start
+
 restart: stop start
 
-web_attack: check-env
-		@docker compose -f docker-compose.yml -f docker-compose-emu.yml exec target /bin/bash -c "ipset add allowlist attacker"
-		@docker compose -f docker-compose.yml -f docker-compose-emu.yml exec attacker /bin/bash -c "source attacker/bin/activate && python -m unittest discover -s /root/tests -p 'test_*.py'"
-		@docker compose -f docker-compose.yml -f docker-compose-emu.yml exec target /bin/bash -c "ipset del allowlist attacker"
+# Not currently working, but want to fix in the future
+# web_attack: check-env
+# 		@docker compose -f docker-compose.yml -f docker-compose-emu.yml exec target /bin/bash -c "ipset add allowlist attacker"
+# 		@docker compose -f docker-compose.yml -f docker-compose-emu.yml exec attacker /bin/bash -c "source ./attacker/bin/activate && python -m unittest discover -s ./tests/ -p 'test_*.py'"
+# 		@docker compose -f docker-compose.yml -f docker-compose-emu.yml exec target /bin/bash -c "ipset del allowlist attacker"
 
 logs: check-env
 		@docker compose -f docker-compose.yml -f docker-compose-${MODE}.yml logs -f

@@ -392,7 +392,7 @@ def nginx_accesslog_to_knowledge(
 
     # dateparser can't seem to handle this format
     request_time = datetime.datetime.strptime(
-        log_dict["dateandtime"], "%d/%b/%Y:%H:%M:%S %z"
+        str(log_dict["dateandtime"]), "%d/%b/%Y:%H:%M:%S %z"
     )
 
     if not request_time:
@@ -487,7 +487,9 @@ def caddy_accesslog_to_knowledge(log_dict: Dict[str, Any]) -> List[_STIXBase]:
     knowledge_nodes = []
 
     # dateparser can't seem to handle this format
-    request_time = datetime.datetime.strptime(log_dict["ts"], "%d/%b/%Y:%H:%M:%S %z")
+    request_time = datetime.datetime.strptime(
+        str(log_dict["ts"]), "%d/%b/%Y:%H:%M:%S %z"
+    )
 
     if not request_time:
         raise ValueError(f"Couldn't parse timestamp {log_dict['ts']}")
@@ -764,14 +766,11 @@ def suricata_alert_to_knowledge(alert: Dict[str, Any]) -> List[_STIXBase]:
     # Check for existing indicator in DB. Create if it doesn't exist, reference if it does.
     alert_sig_ids = graph.get_indicator_ids_by_name(alert_name)
     if len(alert_sig_ids) == 0:
-        attack_pattern_ids = graph.get_attack_pattern_ids_by_name(
+        attack_pattern_ids = graph.get_attack_pattern_ids_by_category(
             alert["alert"]["category"]
         )
         if len(attack_pattern_ids) == 0:
-            attack_pattern = AttackPattern(
-                name=alert["alert"]["category"],
-            )
-            knowledge_nodes.append(attack_pattern)
+            raise ValueError(f"Unknown Suricata attack pattern: {alert['alert']}")
         else:
             attack_pattern = AttackPattern(
                 id=attack_pattern_ids[0],
@@ -890,14 +889,7 @@ def clamav_alert_to_knowledge(alert: Dict[str, Any]) -> List[_STIXBase]:
     knowledge_nodes.append(malware_pattern_rel)
 
     try:
-        sighting = Sighting(
-            description="clamav_alert",
-            last_seen=timestamp,
-            count=1,
-            observed_data_refs=[observation],
-            sighting_of_ref=alert_indicator,
-            where_sighted_refs=[host],
-        )
+        sighting = Relationship(host, "hosts", malware)
         knowledge_nodes.append(sighting)
     except Exception as e:
         logger.error(e)
@@ -988,14 +980,11 @@ def knowledge_to_neo(
                 node.id,
                 f"{node.type}",
                 {
-                    **{
-                        x: node[x]
-                        for x in node.properties_populated()
-                        if x not in ["id", "type"]
-                        and not x.endswith("_ref")
-                        and not x.endswith("_refs")
-                    },
-                    **{"identifier": node["id"]},
+                    x: node[x]
+                    for x in node.properties_populated()
+                    if x not in ["id", "type"]
+                    and not x.endswith("_ref")
+                    and not x.endswith("_refs")
                 },
             )
             for x in node.properties_populated():

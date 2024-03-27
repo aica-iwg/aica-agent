@@ -1,28 +1,35 @@
-FROM alpine:3.19
+FROM kalilinux/kali-rolling:latest 
 
-COPY requirements.txt .
-RUN apk update && apk upgrade && \
-    apk add \
+USER root
+
+# Use the Cloudflare Mirror (see http://http.kali.org/README?mirrorlist)
+ENV APT_MIRROR="kali.download/kali/"
+RUN sed --in-place --regexp-extended "s#http.kali.org/kali#${APT_MIRROR}#g" /etc/apt/sources.list
+
+# Recommend kali-linux-headless package, but very large so not installing here
+RUN apt-get update && \
+    apt-get upgrade -y && \
+    apt-get install -y --no-install-recommends \
+        build-essential \
         nmap \
-        nmap-scripts \
-        bash \
-        openssh \
-        chromium \
-        chromium-chromedriver \
-        py3-pip \
-        build-base \
+        openssh-server \
         python3-dev \
-        libffi-dev
-
-RUN python3 -m venv attacker && \
-    source attacker/bin/activate && \
-    pip install -Ur requirements.txt
+        python3-pip \
+        python3-venv
 
 RUN ssh-keygen -A
 
-RUN adduser -D ssh_user
-
-COPY tests/ /root/tests
-
 COPY docker_entrypoint.sh /usr/local/bin/
 RUN chmod +x /usr/local/bin/docker_entrypoint.sh
+
+RUN useradd kali
+
+USER kali
+
+WORKDIR /home/kali
+
+COPY requirements.txt .
+RUN python3 -m venv attacker && \
+    ./attacker/bin/python -m pip install -Ur requirements.txt
+
+COPY tests/ ./tests
