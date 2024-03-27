@@ -23,20 +23,20 @@ import logging
 import os
 import pandas as pd
 import requests
-import time
 import yaml
 
-from celery.app import shared_task
 from celery.signals import worker_ready
 from celery.utils.log import get_task_logger
+from collections import defaultdict
 from io import StringIO
-from numpy import ndarray
-from py2neo import ConnectionUnavailable  # type: ignore
-from stix2 import AttackPattern, Note, Software  # type: ignore
+from stix2 import Note, Relationship, Software  # type: ignore
 from typing import Any, Dict
 
+from aica_django.connectors.DNP3 import replay_pcap, capture_dnp3
+
+from aica_django.converters.AICAStix import AICAAttackPattern
 from aica_django.connectors.DocumentDatabase import AicaMongo
-from aica_django.connectors.GraphDatabase import AicaNeo4j
+from aica_django.connectors.GraphDatabase import AicaNeo4j, prune_netflow_data
 from aica_django.connectors.Netflow import network_flow_capture
 from aica_django.connectors.HTTPServer import poll_nginx_accesslogs
 from aica_django.connectors.CaddyServer import poll_caddy_accesslogs
@@ -44,13 +44,12 @@ from aica_django.connectors.NetworkScan import periodic_network_scan
 from aica_django.connectors.IntrusionDetection import poll_suricata_alerts
 from aica_django.connectors.Antivirus import poll_clamav_alerts
 from aica_django.connectors.WAF import poll_waf_alerts
-from aica_django.converters.Knowledge import knowledge_to_neo
+from aica_django.converters.Knowledge import knowledge_to_neo, fake_note_root
 
 logger = get_task_logger(__name__)
 
 
-@shared_task(name="ma-offline_loader-create_clamav")
-def create_clamav() -> bool:
+def create_malware_categories() -> None:
     """
     Load a static list of ClamAV malware categories into the graph.
 
@@ -86,18 +85,45 @@ def create_clamav() -> bool:
         "Spyware",
         "Test",
     ]
+
+    logger.info("Creating malware categories from ClamAV data...")
+
     malware_categories = []
     for category in clamav_categories:
-        malware_signature = AttackPattern(name=f"clamav:{category}")
+        attack_pattern_name = f"clamav:{category}"
+        malware_signature = AICAAttackPattern(name=attack_pattern_name)
         malware_categories.append(malware_signature)
 
     knowledge_to_neo(malware_categories)
 
-    return True
+    logger.info("Created malware categories from ClamAV data.")
 
 
-@shared_task(name="ma-offline_loader-create_ports")
-def create_ports() -> bool:
+port_root = Software(
+    id="software--e136328d-3962-4af7-b9e5-6306fcc8d555", name="Generic Port Usage Info"
+)
+
+top_10_port_note = Note(
+    id="note--f3cd780d-9f32-4211-b26c-42118dbbe207",
+    abstract="top_10_port",
+    content="top_10_port",
+    object_refs=[fake_note_root],
+)
+top_100_port_note = Note(
+    id="note--2adf3880-1a5f-4b1c-8c88-c9722238dcf0",
+    abstract="top_100_port",
+    content="top_100_port",
+    object_refs=[fake_note_root],
+)
+top_1000_port_note = Note(
+    id="note--40d34e90-9a9b-4350-97c6-01d64824a081",
+    abstract="top_1000_port",
+    content="top_1000_port",
+    object_refs=[fake_note_root],
+)
+
+
+def create_port_info() -> None:
     """
     Load Nmap's list (from web) of port/service info into the graph.
 
@@ -107,6 +133,9 @@ def create_ports() -> bool:
     nmap_services_url = (
         "https://raw.githubusercontent.com/nmap/nmap/master/nmap-services"
     )
+
+    logger.info("Creating port info from nmap data...")
+
     resp = requests.get(nmap_services_url)
     try:
         resp.raise_for_status()
@@ -121,27 +150,30 @@ def create_ports() -> bool:
         names=["service", "port", "frequency", "comment"],
         index_col=False,
     )
+    nmap_df = nmap_df[nmap_df["service"] != "unknown"]
+
+    # We want all parts of service, except the last part in the case of hyphenated
+    nmap_df["software"] = nmap_df["service"].apply(
+        lambda x: "-".join(
+            x.split("-")[
+                : len(x.split("-")) - 1 if len(x.split("-")) > 1 else len(x.split("-"))
+            ]
+        )
+    )
+
     nmap_df[["port_number", "protocol"]] = nmap_df["port"].str.split("/", expand=True)
     nmap_df.drop(columns=["comment", "port"], axis=1, inplace=True)
-    nmap_df.sort_values(by="frequency", inplace=True, ascending=False)
-    nmap_df = nmap_df.reset_index(drop=True)
 
-    port_objects = []
+    # For performance reasons (startup is slow creating these)
+    nmap_df = nmap_df[nmap_df["frequency"] > 0]
 
-    port_root = Software(name="Generic Port Usage Info")
-    port_objects.append(port_root)
+    nmap_df["rank"] = nmap_df["frequency"].rank(ascending=False)
 
-    for index, row in nmap_df.iterrows():
-        rank = nmap_df.index.get_loc(key=index)
-        if isinstance(rank, int):
-            rank = int(rank)
-        elif isinstance(rank, slice):
-            rank = int(rank.start)
-        elif isinstance(rank, ndarray):
-            rank = int(rank[0])
-        else:
-            raise ValueError
+    port_objects = [port_root, top_10_port_note, top_100_port_note, top_1000_port_note]
 
+    port_software_map = defaultdict(list)
+
+    for _, row in nmap_df.iterrows():
         port_object = Note(
             abstract=f"{row['port_number']}/{row['protocol']}",
             content=json.dumps(
@@ -150,24 +182,39 @@ def create_ports() -> bool:
                     "protocol": row["protocol"],
                     "service": row["service"],
                     "frequency": row["frequency"],
-                    "rank": rank,
-                    "top10": rank < 10,
-                    "top100": rank < 100,
-                    "top1000": rank < 1000,
-                    "source": nmap_services_url,
+                    "rank": row["rank"],
                 }
             ),
             object_refs=[port_root.id],
         )
         port_objects.append(port_object)
 
+        if row["rank"] <= 10:
+            port_objects.append(Relationship(top_10_port_note, "object", port_object))
+        if row["rank"] <= 100:
+            port_objects.append(Relationship(top_100_port_note, "object", port_object))
+        if row["rank"] <= 1000:
+            port_objects.append(Relationship(top_1000_port_note, "object", port_object))
+
+        port_software_map[row["software"]].append(port_object)
+
+    for software, port_notes in port_software_map.items():
+        software_obj = Software(name=software)
+        port_objects.append(software_obj)
+        for port_note in port_notes:
+            port_rel = Relationship(
+                relationship_type="object",
+                source_ref=port_note,
+                target_ref=software_obj,
+            )
+            port_objects.append(port_rel)
+
     knowledge_to_neo(port_objects)
 
-    return True
+    logger.info("Created port info from nmap data.")
 
 
-@shared_task(name="ma-offline_loader-create_suricata")
-def create_suricata_categories() -> bool:
+def create_suricata_categories() -> None:
     """
     Load Suricata's list (from web) of alert categories into the graph.
 
@@ -175,6 +222,9 @@ def create_suricata_categories() -> bool:
     @rtype: bool
     """
     suricata_classes_url = "https://rules.emergingthreats.net/open/suricata-5.0/rules/classification.config"
+
+    logger.info("Creating Suricata alert classes...")
+
     resp = requests.get(suricata_classes_url)
     try:
         resp.raise_for_status()
@@ -191,21 +241,20 @@ def create_suricata_categories() -> bool:
 
     attack_patterns = []
     for _, row in suricata_df.iterrows():
-        attack_pattern = AttackPattern(
-            type="attack-pattern",
-            name=row["name"],
-            description=row["description"],
-            custom_properties={"severity": row["priority"]},
+        attack_pattern_name = row["name"]
+        attack_pattern = AICAAttackPattern(
+            name=attack_pattern_name,
         )
+
         attack_patterns.append(attack_pattern)
 
     knowledge_to_neo(attack_patterns)
 
-    return True
+    logger.info("Created Suricata alert classes.")
 
 
 @worker_ready.connect
-def initialize(**kwargs: Dict[Any, Any]) -> bool:
+def initialize(**kwargs: Dict[Any, Any]) -> None:
     """
     The function called in this module as soon as Celery says we're ready to start. It performs
     any initial setup needed to bootstrap the agent, and then fires any async/periodic jobs.
@@ -226,44 +275,53 @@ def initialize(**kwargs: Dict[Any, Any]) -> bool:
         mongo_db["alert_response_actions"].insert_many(alert_actions)
 
     if os.environ.get("SKIP_TASKS"):
-        return True
+        return
 
-    # Wait for graph to come up and then set uniqueness constraints
-    while True:
-        try:
-            graph = AicaNeo4j()
-            break
-        except ConnectionUnavailable:
-            time.sleep(1)
+    graph = AicaNeo4j()
+
+    ### Preload Contextual Data ###
 
     # Load ClamAV Categories into Graph
-    create_clamav.apply_async()
-
-    # Get nmap-services and load into Graph
-    create_ports.apply_async()
+    create_malware_categories()
 
     # Get Suricata rule classes and load into Graph
-    create_suricata_categories.apply_async()
+    create_suricata_categories()
+
+    # Get nmap-services and load into Graph
+    create_port_info()
+
+    ### Start Tasks ###
 
     # Start netflow collector
-    network_flow_capture.apply_async()
+    network_flow_capture.delay()
 
     # Start periodic network scans of local subnets in background
-    periodic_network_scan.apply_async()
+    periodic_network_scan.delay()
 
     # Start polling for Nginx access logs
-    poll_nginx_accesslogs.apply_async()
+    poll_nginx_accesslogs.delay()
 
     # Start polling for Caddy access logs
-    poll_caddy_accesslogs.apply_async()
+    poll_caddy_accesslogs.delay()
 
     # Start polling for IDS alerts in background
-    poll_suricata_alerts.apply_async()
+    poll_suricata_alerts.delay()
 
     # Start polling for AV alerts in background
-    poll_clamav_alerts.apply_async()
+    poll_clamav_alerts.delay()
 
     # Start polling for WAF alerts in background
-    poll_waf_alerts.apply_async()
+    poll_waf_alerts.delay()
 
-    return True
+    # Start the Netflow graph pruner in background
+    prune_netflow_data.delay()
+
+    ### TESTING ONLY ###
+
+    # Switch to live capture later
+    # replay_pcap.delay(
+    #     kwargs={
+    #         "pcap_file": "pcaps/20200514_DNP3_Disable_Unsolicited_Messages_Attack/DNP3 PCAP Files/20200514_DNP3_Disable_Unsolicited_Messages_Attack_UOWM_DNP3_Dataset_Master.pcap"
+    #     }
+    # )
+    # capture_dnp3().delay(args=["eth2"])

@@ -1,4 +1,0 @@
-INTERFACE="eth2"
-FLOW_COLLECTOR="localhost:2055"
-
-OTHER_ARGS="-fip"

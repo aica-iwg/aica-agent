@@ -27,7 +27,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.getenv("DJANGO_SECRET")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = False
 
 ALLOWED_HOSTS = [
     "*",
@@ -49,7 +49,6 @@ INSTALLED_APPS = [
     "aica_django.microagents.knowledge_base",
     "aica_django.microagents.offline_loader",
     "aica_django.microagents.online_learning",
-    "bootstrap5",
 ]
 
 MIDDLEWARE = [
@@ -158,6 +157,7 @@ CELERY_BROKER_URL = (
     f"amqp://{os.getenv('CELERY_USER')}:{os.getenv('CELERY_PASSWORD')}@"
     f"{os.getenv('CELERY_HOST')}:{os.getenv('CELERY_PORT')}//"
 )
+CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
 
 CELERY_SERIALIZER = "json"
 

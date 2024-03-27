@@ -23,5 +23,8 @@ supervisord -c /etc/supervisord.conf &
 # Start Nginx
 nginx
 
+# Start netflow exporter
+fprobe -fip -i eth1 manager:2055
+
 # Start caddy
 /root/caddy run --config /coraza/Caddyfile --adapter caddyfile --watch

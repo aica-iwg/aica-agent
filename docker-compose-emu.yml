@@ -25,7 +25,8 @@ services:
       - manager/.env
     command: /usr/local/bin/docker_entrypoint.sh
     networks:
-      - target
+      target:
+        ipv4_address: 10.107.100.180
     depends_on:
       - target
 
@@ -39,7 +40,9 @@ services:
       - NET_ADMIN  # For iptables/ipset
       - SYS_ADMIN  # For ClamAV on-access scanning (fanotify)
     networks:
-      - target
+      bridge:
+      target:
+        ipv4_address: 10.107.100.170
     healthcheck:
       test: [ "CMD-SHELL", "ls /tmp | grep eicar" ]
       interval: 10s
@@ -58,7 +61,8 @@ services:
     volumes:
       - ./honeypot/opencanary.conf:/etc/opencanaryd/opencanary.conf
     networks:
-      - target
+      control:
+        ipv4_address: 10.107.50.190
 
   ids:
     build: ./ids
@@ -82,7 +86,8 @@ services:
       - xpack.security.enabled=true
       - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
     networks:
-      - control
+      control:
+        ipv4_address: 10.107.50.240
     ulimits:
       memlock:
         soft: -1
@@ -110,8 +115,10 @@ services:
       elasticsearch:
         condition: service_healthy
     networks:
-      - control
-      - target
+      control:
+        ipv4_address: 10.107.50.250
+      target:
+        ipv4_address: 10.107.100.250
     ports:
       - "9000:9000"  # Graylog web GUI
     healthcheck:
@@ -119,6 +126,3 @@ services:
       interval: 10s
       timeout: 10s
       retries: 5
-
-networks:
-  target:

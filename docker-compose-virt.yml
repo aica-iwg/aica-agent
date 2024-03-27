@@ -5,6 +5,3 @@ services:
   manager:
     environment:
       MODE: "virt"
-
-networks:
-  target:
