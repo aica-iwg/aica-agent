@@ -16,7 +16,7 @@ neo4j==5.18.0
 netaddr==1.2.1
 netflow==0.12.2
 netifaces2==0.0.21
-pandas==2.2.0
+pandas==2.2.1
 paramiko==3.4.0
 psycopg2==2.9.9
 pymongo==4.6.2
