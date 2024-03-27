@@ -63,6 +63,8 @@ def parse_dnp3_packet(packet: pyshark.packet.packet.Packet) -> dict[str, str]:
     log_dict["srcport"] = packet.tcp.srcport
     log_dict["dstport"] = packet.tcp.dstport
 
+    return log_dict
+
 
 @shared_task(name="send_dnp3_command")
 def send_dnp3_command() -> None:

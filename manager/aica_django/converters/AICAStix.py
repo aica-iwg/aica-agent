@@ -2,27 +2,27 @@ import datetime
 import hashlib
 import uuid
 
-from stix2 import AttackPattern, Identity, Incident, Indicator, Note
+from stix2 import AttackPattern, Identity, Incident, Indicator, Note  # type:ignore
 from stix2.base import _STIXBase  # type: ignore
-from typing import List
+from typing import Dict, List, Optional
 
 # These overwrite the default classes to create a deterministic ID where STIX doesn't otherwise provide one
 
 
-def str_to_uuid(input_str: str) -> uuid:
+def str_to_uuid(input_str: str) -> uuid.UUID:
     m = hashlib.md5(usedforsecurity=False)
     m.update(input_str.encode("utf-8"))
     return uuid.UUID(int=int(m.hexdigest(), 16), version=4)
 
 
-class AICAAttackPattern(AttackPattern):
+class AICAAttackPattern(AttackPattern):  # type: ignore
     def __init__(
         self,
-        name,
-        external_references=None,
-        description=None,
-        aliases=None,
-        kill_chain_phases=None,
+        name: str,
+        external_references: Optional[List[Dict[str, str]]] = None,
+        description: Optional[str] = None,
+        aliases: Optional[List[str]] = None,
+        kill_chain_phases: Optional[List[str]] = None,
     ) -> None:
         super().__init__(
             id=f"attack-pattern--{str_to_uuid(name)}",
@@ -34,18 +34,18 @@ class AICAAttackPattern(AttackPattern):
         )
 
 
-class AICAIndicator(Indicator):
+class AICAIndicator(Indicator):  # type: ignore
     def __init__(
         self,
         name: str,
-        description: str = None,
-        indicator_types: List[str] = None,
-        pattern: str = None,
-        pattern_type: str = None,
-        pattern_version: str = None,
-        valid_from: datetime.datetime = None,
-        valid_until: datetime.datetime = None,
-        kill_chain_phases: List[str] = None,
+        description: Optional[str] = None,
+        indicator_types: Optional[List[str]] = None,
+        pattern: Optional[str] = None,
+        pattern_type: Optional[str] = None,
+        pattern_version: Optional[str] = None,
+        valid_from: Optional[datetime.datetime] = None,
+        valid_until: Optional[datetime.datetime] = None,
+        kill_chain_phases: Optional[List[str]] = None,
     ) -> None:
         super().__init__(
             id=f"indicator--{str_to_uuid(name)}",
@@ -61,15 +61,15 @@ class AICAIndicator(Indicator):
         )
 
 
-class AICAIdentity(Identity):
+class AICAIdentity(Identity):  # type: ignore
     def __init__(
         self,
         name: str,
-        description: str = None,
-        roles: List[str] = None,
-        identity_class: str = None,
-        sectors: List[str] = None,
-        contact_information: str = None,
+        description: Optional[str] = None,
+        roles: Optional[List[str]] = None,
+        identity_class: Optional[str] = None,
+        sectors: Optional[List[str]] = None,
+        contact_information: Optional[str] = None,
     ) -> None:
         super().__init__(
             id=f"identity--{str_to_uuid(name)}",
@@ -82,11 +82,11 @@ class AICAIdentity(Identity):
         )
 
 
-class AICAIncident(Incident):
+class AICAIncident(Incident):  # type: ignore
     def __init__(
         self,
         name: str,
-        description: str = None,
+        description: Optional[str] = None,
     ) -> None:
         super().__init__(
             id=f"incident--{str_to_uuid(name)}",
@@ -95,13 +95,13 @@ class AICAIncident(Incident):
         )
 
 
-class AICANote(Note):
+class AICANote(Note):  # type: ignore
     def __init__(
         self,
         abstract: str,
         object_refs: List[_STIXBase],
-        content: str = None,
-        authors: List[str] = None,
+        content: Optional[str] = None,
+        authors: Optional[List[str]] = None,
     ) -> None:
         super().__init__(
             id=f"note--{str_to_uuid(abstract)}",
