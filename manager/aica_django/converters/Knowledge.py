@@ -799,7 +799,9 @@ def suricata_alert_to_knowledge(alert: Dict[str, Any]) -> List[_STIXBase]:
         pattern="Not Provided",  # Required field, but we don't have this info
         pattern_type="suricata",
         pattern_version=alert["alert"]["rev"],
-        valid_from=datetime.datetime.fromtimestamp(0),  # Required by STIX but we don't care
+        valid_from=datetime.datetime.fromtimestamp(
+            0
+        ),  # Required by STIX but we don't care
     )
     knowledge_nodes.append(indicator)
     indicates_rel = Relationship(
