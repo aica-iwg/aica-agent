@@ -15,7 +15,7 @@ kombu==5.3.5
 neo4j==5.18.0
 netaddr==1.2.1
 netflow==0.12.2
-netifaces2==0.0.21
+netifaces2==0.0.22
 pandas==2.2.0
 paramiko==3.4.0
 psycopg2==2.9.9
