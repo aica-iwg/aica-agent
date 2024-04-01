@@ -35,11 +35,11 @@ from stix2 import (  # type: ignore
     Malware,  # TODO: Create AICA Version
     MACAddress,
     NetworkTraffic,
-    ObservedData,  # TODO: Create AICA Version
+    ObservedData,
     Relationship,
     Sighting,
     Software,
-    Tool,  # TODO: Create AICA Version
+    Tool,
 )
 from typing import Any, Dict, List, Optional, Union
 
@@ -49,6 +49,7 @@ from aica_django.converters.AICAStix import (
     AICAIncident,
     AICAIdentity,
     AICAIndicator,
+    AICANetworkTraffic,
     AICANote,
 )
 
@@ -427,7 +428,7 @@ def normalize_mac_addr(mac_addr: str) -> str:
 
 def netflow_to_knowledge(
     flow: Dict[str, str]
-) -> List[Union[NetworkTraffic, IPv4Address, IPv6Address]]:
+) -> List[Union[AICANetworkTraffic, IPv4Address, IPv6Address]]:
     """
     Converts a netflow dictionary (from the Python netflow library) to knowledge objects.
 
@@ -479,7 +480,7 @@ def netflow_to_knowledge(
     }
 
     # is_active must be false if end_time is set (per STIX)
-    traffic = NetworkTraffic(is_active=False, **params)
+    traffic = AICANetworkTraffic(is_active=False, **params)
 
     knowledge_nodes.append(traffic)
 
@@ -547,7 +548,7 @@ def nginx_accesslog_to_knowledge(
         },
     )
 
-    traffic = NetworkTraffic(
+    traffic = AICANetworkTraffic(
         protocols="http",
         start=request_time,
         src_ref=source_addr,
@@ -609,7 +610,8 @@ def caddy_accesslog_to_knowledge(log_dict: Dict[str, Any]) -> List[_STIXBase]:
             "Referer": log_dict["request"]["headers"]["Referer"],
         },
     )
-    traffic = NetworkTraffic(
+
+    traffic = AICANetworkTraffic(
         protocols="http",
         start=request_time,
         src_ref=src_addr,
@@ -772,7 +774,7 @@ def suricata_alert_to_knowledge(alert: Dict[str, Any]) -> List[_STIXBase]:
         "start": start_time,
     }
 
-    traffic = NetworkTraffic(
+    traffic = AICANetworkTraffic(
         **params,
     )
 
