@@ -14,11 +14,15 @@ import time
 from celery import current_app
 from celery.utils.log import get_task_logger
 from neo4j import GraphDatabase  # type: ignore
+from sklearn.feature_extraction.text import HashingVectorizer  # type: ignore
 from stix2.base import _STIXBase  # type: ignore
 from typing import Any, Dict, List, Optional, Union
 from urllib.parse import quote_plus
 
 logger = get_task_logger(__name__)
+
+# 2^22 is somewhat arbitrary, but is ~4M and intended to balance accuracy with performance
+vectorizer = HashingVectorizer(n_features=2**22)
 
 
 def sanitize_cypher(text: str) -> str:
@@ -226,10 +230,13 @@ class AicaNeo4j:
 
         queries = []
 
-        for node_id, node_label, node_property_list in zip(
-            node_ids, node_labels, node_property_lists
+        node_id_vectors = vectorizer.fit_transform(node_ids)
+
+        for node_id, node_label, node_property_list, node_id_vector in zip(
+            node_ids, node_labels, node_property_lists, node_id_vectors
         ):
             node_property_list["identifier"] = node_id
+            node_property_list["identifier_vec"] = node_id_vector
             queries.append(
                 f"MERGE (n:`{node_label}` "
                 + f"{dict_to_cypher({k: v for k, v in node_property_list.items() if k not in merge_exclude_properties})}) "

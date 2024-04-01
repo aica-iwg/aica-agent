@@ -1,10 +1,21 @@
 import datetime
 import hashlib
+import json
 import uuid
 
-from stix2 import AttackPattern, Identity, Incident, Indicator, Note  # type:ignore
+from stix2 import (  # type:ignore
+    Artifact,
+    AttackPattern,
+    Identity,
+    Incident,
+    Indicator,
+    IPv4Address,
+    IPv6Address,
+    NetworkTraffic,
+    Note,
+)
 from stix2.base import _STIXBase  # type: ignore
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
 # These overwrite the default classes to create a deterministic ID where STIX doesn't otherwise provide one
 
@@ -92,6 +103,64 @@ class AICAIncident(Incident):  # type: ignore
             id=f"incident--{str_to_uuid(name)}",
             name=name,
             description=description,
+        )
+
+
+class AICANetworkTraffic(NetworkTraffic):  # type: ignore
+    def __init__(
+        self,
+        protocols: str,
+        src_ref: Union[IPv4Address, IPv6Address],
+        dst_ref: Union[IPv4Address, IPv6Address],
+        src_port: Optional[int] = None,
+        dst_port: Optional[int] = None,
+        start: Optional[datetime.datetime] = None,
+        end: Optional[datetime.datetime] = None,
+        is_active: Optional[bool] = None,
+        src_byte_count: Optional[int] = None,
+        dst_byte_count: Optional[int] = None,
+        src_packets: Optional[int] = None,
+        dst_packets: Optional[int] = None,
+        ipfix: Optional[Dict[str, Any]] = None,
+        src_payload_ref: Optional[Artifact] = None,
+        dst_payload_ref: Optional[Artifact] = None,
+        encapsulates_refs: Optional[
+            List[Union["AICANetworkTraffic", NetworkTraffic]]
+        ] = None,
+        encapsulated_by_ref: Optional[
+            Union["AICANetworkTraffic", NetworkTraffic]
+        ] = None,
+        extensions: Optional[Dict[str, Any]] = None,
+        custom_properties: Optional[Dict[str, str]] = {},
+    ) -> None:
+        id_dict = {
+            "protocols": protocols,
+            "src": src_ref["value"],
+            "dst": dst_ref["value"],
+            "dst_port": dst_port,
+        }
+
+        super().__init__(
+            id=f"network-traffic--{str_to_uuid(json.dumps(id_dict))}",
+            protocols=protocols,
+            src_ref=src_ref,
+            dst_ref=dst_ref,
+            src_port=src_port,
+            dst_port=dst_port,
+            start=start,
+            end=end,
+            is_active=is_active,
+            src_byte_count=src_byte_count,
+            dst_byte_count=dst_byte_count,
+            src_packets=src_packets,
+            dst_packets=dst_packets,
+            ipfix=ipfix,
+            src_payload_ref=src_payload_ref,
+            dst_payload_ref=dst_payload_ref,
+            encapsulates_refs=encapsulates_refs,
+            encapsulated_by_ref=encapsulated_by_ref,
+            extensions=extensions,
+            custom_properties=custom_properties,
         )
 
 

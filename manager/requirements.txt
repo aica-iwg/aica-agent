@@ -25,6 +25,7 @@ python-dotenv==1.0.1
 python3-nmap==1.6.0
 pyyaml==6.0.1
 requests==2.31.0
+scikit-learn==1.4.1.post1
 sqlalchemy==2.0.27
 stix2==3.0.1
 supervisor-stdout==0.1.1
