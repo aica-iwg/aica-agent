@@ -610,6 +610,7 @@ def caddy_accesslog_to_knowledge(log_dict: Dict[str, Any]) -> List[_STIXBase]:
             "Referer": log_dict["request"]["headers"]["Referer"],
         },
     )
+
     traffic = AICANetworkTraffic(
         protocols="http",
         start=request_time,
