@@ -6,6 +6,7 @@
 .vscode
 __pycache__
 aica-manager/
+pcaps/
 coverage.xml
 db.sqlite3
 venv

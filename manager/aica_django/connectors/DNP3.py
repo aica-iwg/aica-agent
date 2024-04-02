@@ -31,12 +31,6 @@ def rgetattr(obj, attr, *args):
     return functools.reduce(_getattr, [obj] + attr.split("."))
 
 
-# Thanks: https://stackoverflow.com/a/71612377
-def convert(x, n_bytes=2, order="big"):
-    msb, *lsb = x.to_bytes(n_bytes, byteorder=order)
-    return (msb, *lsb)
-
-
 def object_try_get(
     source_obj: dict, destination_dict: dict, source_attr: str, destination_key: str
 ):
