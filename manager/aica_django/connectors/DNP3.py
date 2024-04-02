@@ -18,22 +18,26 @@ import pyshark  # type: ignore
 from celery import current_app
 from celery.app import shared_task
 from celery.utils.log import get_task_logger
+from typing import Any
 
 
 logger = get_task_logger(__name__)
 
 
 # Thanks: https://stackoverflow.com/a/31174427
-def rgetattr(obj, attr, *args):
-    def _getattr(obj, attr):
-        return getattr(obj, attr, *args)
+def rgetattr(obj: object, attr: str) -> object:
+    def _getattr(obj: object, attr: object) -> object:
+        return getattr(obj, str(attr))
 
     return functools.reduce(_getattr, [obj] + attr.split("."))
 
 
 def object_try_get(
-    source_obj: dict, destination_dict: dict, source_attr: str, destination_key: str
-):
+    source_obj: dict[str, Any],
+    destination_dict: dict[str, Any],
+    source_attr: str,
+    destination_key: str,
+) -> dict[str, Any]:
     try:
         destination_dict[destination_key] = rgetattr(source_obj, source_attr)
     except AttributeError:
@@ -43,7 +47,7 @@ def object_try_get(
 
 
 @shared_task(name="replay_dnp3_pcap")
-def replay_pcap(pcap_file: str, send_task=True) -> None:
+def replay_pcap(pcap_file: str, send_task: bool = True) -> None:
     with pyshark.FileCapture(pcap_file, display_filter="dnp3") as cap:
         for packet in cap:
             packet_dict = parse_dnp3_packet(packet)
