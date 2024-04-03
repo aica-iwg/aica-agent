@@ -10,3 +10,4 @@ pcaps/
 coverage.xml
 db.sqlite3
 venv
+/scratchwork

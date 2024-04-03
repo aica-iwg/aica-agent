@@ -12,7 +12,9 @@ This project will build on the ideas of the AICA framework as outlined in [Thero
 4. Install miniconda from [https://docs.conda.io/en/latest/miniconda.html#linux-installers](), you will need to add your chosen installation location to your shell's PATH variable.
 5. Ensure `make` is installed, for example in Ubuntu this is part of the `build-essentials` package you can install with apt.
 6. Clone this repo, and open in IDE of your choice (ensure .gitignore is updated as necessary)
-7. Copy `manager/.env.sample` to `manager/.env` and make any necessary changes
+7. Copy content of `manager/.env.sample` to a new file `manager/.env`.
+    * Within `manager/.env`, be sure to replace the `<"FILLME">` entries with new info (can be whatever password you'd like. Doesn't matter).  
+    * For `GRAYLOG_ROOT_PASSWORD_SHA2` use `echo password | sha256sum`. Copy the text for this password only.
 8. Set the MODE variable like `export MODE=emu` (for Bash, other shells may vary).
 9. You can now run `make deps` to build your development environment, then `make build` to build the Docker containers, and `make start` to launch AICA. See more below.
 
@@ -25,7 +27,9 @@ This project will build on the ideas of the AICA framework as outlined in [Thero
 5. Install Make from [https://gnuwin32.sourceforge.net/packages/make.htm](); yes this is from 2006
 6. Add Make to System Path: `C:\Program Files (x86)\GnuWin32\bin`
 7. Clone this repo, and open in IDE of your choice (ensure .gitignore is updated as necessary)
-8. Copy `manager/.env.sample` to `manager/.env` and make any necessary changes
+8. Copy content of `manager/.env.sample` to a new file `manager/.env`.
+    * Within `manager/.env`, be sure to replace the `<"FILLME">` entries with new info (can be whatever password you'd like. Doesn't matter).  
+    * For `GRAYLOG_ROOT_PASSWORD_SHA2` use `echo password | sha256sum`. Copy the text for this password only.
 9. In Powershell, set the MODE variable like: `$env:MODE = 'emu'`
 10. You can now run `make deps` to build your development environment, then `make build` to build the Docker containers, and `make start` to launch AICA. See more below.
 
@@ -41,7 +45,7 @@ Once you have a passing build, you should commit your changes to a branch with a
 
 ## Running
 
-This code should be run via the Makefile. You will need to specify whether you want to start this in emulation mode or virtualized mode with the MODE environment variable (i.e., MODE should be either `emu` or `virt`). The virtualized mode is currently a stub and is meant for future expansion. 
+This code should be run via the Makefile. You will need to specify whether you want to start this in emulation mode or virtualized mode with the MODE environment variable (i.e., `export MODE=emu` or `export MODE=virt`). The virtualized mode is currently a stub and is meant for future expansion. 
 
 When starting from scratch, run the following: `make build && make start`. Subsequently, use `make stop` and `make start` (or `make restart`) to stop/start the containers and `make build` to build them again (`make rebuild` is a handy alias for stop/build/start). You can use `make clean` to clean up all container- and code-related files. 
 
@@ -51,9 +55,9 @@ You can view logs from the Dockerized containers with `make logs`. This will sho
 
 You can monitor the agent through several interfaces:
 
-* [http://localhost:8000](): Primary front-end. Django app as defined in `manager/aica_django/`.
-* [http://localhost:7474](): Neo4j web interface
-* [http://localhost:5555](): Celery Flower instance, where you can monitor task execution
+* [http://localhost:8000](http://localhost:8000): Primary front-end. Django app as defined in `manager/aica_django/`.
+* [http://localhost:7474](http://localhost:7474): Neo4j web interface
+* [http://localhost:5555](http://localhost:5555): Celery Flower instance, where you can monitor task execution
 
 ## Code in this repository
 
