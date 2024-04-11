@@ -1,6 +1,7 @@
 #!/bin/bash
+set -e
 
-cd /usr/src/app || exit 1
+cd /usr/src/app
 
 echo "Starting Celery workers and gunicorn"
 cat <<EOF > /etc/supervisor/conf.d/0_env.conf

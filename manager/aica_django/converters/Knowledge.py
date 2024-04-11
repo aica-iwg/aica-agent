@@ -56,7 +56,7 @@ from aica_django.converters.AICAStix import (
 
 logger = get_task_logger(__name__)
 
-graph = AicaNeo4j(create_constraints=False)
+graph = AicaNeo4j(initialize_graph=False)
 
 # https://www.iana.org/assignments/protocol-numbers/protocol-numbers.xhtml
 ip_protos = {

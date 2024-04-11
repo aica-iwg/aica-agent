@@ -16,8 +16,10 @@ neo4j==5.18.0
 netaddr==1.2.1
 netflow==0.12.2
 netifaces2==0.0.21
+networkx==3.3
 pandas==2.2.0
 paramiko==3.4.0
+pecanpy==2.0.9
 psycopg2==2.9.9
 pymongo==4.6.2
 pyshark==0.6
@@ -29,4 +31,5 @@ scikit-learn==1.4.1.post1
 sqlalchemy==2.0.27
 stix2==3.0.1
 supervisor-stdout==0.1.1
+watchdog==4.0.0
 vt-py==0.18.0

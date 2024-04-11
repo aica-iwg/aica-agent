@@ -21,6 +21,7 @@ services:
       manager_graphdb:
         condition: service_healthy
     volumes:
+      - graphml_share:/graph_data
       # For testing
       - ./pcaps:/usr/src/app/pcaps
     networks:
@@ -93,6 +94,7 @@ services:
       - manager/.env
     volumes:
       - neo_data:/var/lib/neo4j/data
+      - graphml_share:/graph_data
     ports:
       - "7474:7474"  # Neo4j web GUI
       - "7687:7687"  # Neo4j API port (needed for web GUI)
@@ -110,6 +112,7 @@ volumes:
   mongo_data:
   pg_data:
   neo_data:
+  graphml_share:
 
 networks:
   bridge:
