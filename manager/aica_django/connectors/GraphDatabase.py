@@ -61,9 +61,9 @@ def process_graphml(path: str) -> None:
 
 
 class GraphMLHandler(FileSystemEventHandler):  # type: ignore
-    def __init__(self, quiesce_period=60):
+    def __init__(self, quiesce_period: int = 60) -> None:
         self.quiesce_period = quiesce_period
-        self.last_change = 0
+        self.last_change = 0.0
 
     def on_created(self, event: FileCreatedEvent) -> None:
         self.on_modified(event)
@@ -93,7 +93,7 @@ def poll_graphml() -> None:
         process_graphml(graphml_path)
 
     observer = Observer()
-    observer.schedule(GraphMLHandler(), graphml_path)
+    observer.schedule(GraphMLHandler(), graphml_path)  # type: ignore
     observer.start()
 
     # Should never return
