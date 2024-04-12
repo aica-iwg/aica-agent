@@ -19,8 +19,8 @@ from sklearn.feature_extraction.text import HashingVectorizer  # type: ignore
 from stix2.base import _STIXBase  # type: ignore
 from typing import Any, Dict, List, Optional, Union
 from urllib.parse import quote_plus
-from watchdog.events import FileSystemEventHandler, FileCreatedEvent, FileModifiedEvent
-from watchdog.observers import Observer
+from watchdog.events import FileSystemEventHandler, FileCreatedEvent, FileModifiedEvent  # type: ignore
+from watchdog.observers import Observer  # type: ignore
 
 logger = get_task_logger(__name__)
 
@@ -60,12 +60,25 @@ def process_graphml(path: str) -> None:
     logger.error("GraphML function not yet implemented!")
 
 
-class GraphMLHandler(FileSystemEventHandler):
+class GraphMLHandler(FileSystemEventHandler):  # type: ignore
+    def __init__(self, quiesce_period=60):
+        self.quiesce_period = quiesce_period
+        self.last_change = 0 
+
     def on_created(self, event: FileCreatedEvent) -> None:
         self.on_modified(event)
 
     def on_modified(self, event: FileModifiedEvent) -> None:
-        process_graphml(graphml_path)
+        current_time = time.time()
+
+        # If the file has been modified recently, ignore the event
+        if current_time - self.last_change < self.quiesce_period:
+            logger.debug(f"Not processing GraphML file, last time: {self.last_change}, current time: {current_time}")
+            return
+        else:
+            logger.debug(f"Processing changed GraphML file, last time: {self.last_change}, current time: {current_time}")
+            process_graphml(graphml_path)
+            self.last_change = current_time
 
 
 @shared_task(name="poll-graphml")
