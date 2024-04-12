@@ -76,12 +76,13 @@ class GraphMLHandler(FileSystemEventHandler):  # type: ignore
             logger.debug(
                 f"Not processing GraphML file, last time: {self.last_change}, current time: {current_time}"
             )
-            return
         else:
             logger.debug(
                 f"Processing changed GraphML file, last time: {self.last_change}, current time: {current_time}"
             )
             process_graphml(graphml_path)
+
+        if current_time > self.last_change:
             self.last_change = current_time
 
 
@@ -93,7 +94,7 @@ def poll_graphml() -> None:
         process_graphml(graphml_path)
 
     observer = Observer()
-    observer.schedule(GraphMLHandler(), graphml_path)  # type: ignore
+    observer.schedule(GraphMLHandler(), graphml_path)
     observer.start()
 
     # Should never return
