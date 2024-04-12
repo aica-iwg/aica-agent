@@ -63,7 +63,7 @@ def process_graphml(path: str) -> None:
 class GraphMLHandler(FileSystemEventHandler):  # type: ignore
     def __init__(self, quiesce_period=60):
         self.quiesce_period = quiesce_period
-        self.last_change = 0 
+        self.last_change = 0
 
     def on_created(self, event: FileCreatedEvent) -> None:
         self.on_modified(event)
@@ -73,10 +73,14 @@ class GraphMLHandler(FileSystemEventHandler):  # type: ignore
 
         # If the file has been modified recently, ignore the event
         if current_time - self.last_change < self.quiesce_period:
-            logger.debug(f"Not processing GraphML file, last time: {self.last_change}, current time: {current_time}")
+            logger.debug(
+                f"Not processing GraphML file, last time: {self.last_change}, current time: {current_time}"
+            )
             return
         else:
-            logger.debug(f"Processing changed GraphML file, last time: {self.last_change}, current time: {current_time}")
+            logger.debug(
+                f"Processing changed GraphML file, last time: {self.last_change}, current time: {current_time}"
+            )
             process_graphml(graphml_path)
             self.last_change = current_time
 
