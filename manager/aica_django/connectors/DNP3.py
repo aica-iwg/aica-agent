@@ -96,9 +96,8 @@ def parse_dnp3_packet(packet: pyshark.packet.packet.Packet) -> dict[str, str]:
     else:
         dnp3_dict["dnp3_datalink_function"] = packet.dnp3.ctl_secfunc
 
-    dnp3_dict["dnp3_datalink_dst"] = (
-        packet.dnp3.dst
-    )  # Note: there may be multiple DNP3 dsts/srcs per IP!
+    # Note: there may be multiple DNP3 dsts/srcs per IP!
+    dnp3_dict["dnp3_datalink_dst"] = packet.dnp3.dst
     dnp3_dict["dnp3_datalink_src"] = packet.dnp3.src
 
     # DNP3 Application Header

@@ -12,14 +12,19 @@ import stix2  # type: ignore
 import time
 
 from celery import current_app
+from celery.app import shared_task
 from celery.utils.log import get_task_logger
 from neo4j import GraphDatabase  # type: ignore
 from sklearn.feature_extraction.text import HashingVectorizer  # type: ignore
 from stix2.base import _STIXBase  # type: ignore
 from typing import Any, Dict, List, Optional, Union
 from urllib.parse import quote_plus
+from watchdog.events import FileSystemEventHandler, FileCreatedEvent, FileModifiedEvent  # type: ignore
+from watchdog.observers import Observer  # type: ignore
 
 logger = get_task_logger(__name__)
+
+graphml_path = "/graph_data/aica.graphml"
 
 # 2^22 is somewhat arbitrary, but is ~4M and intended to balance accuracy with performance
 vectorizer = HashingVectorizer(n_features=2**22)
@@ -45,6 +50,55 @@ def dict_to_cypher(input_dict: dict[str, Any]) -> str:
     return_string = "{" + ", ".join(values) + "}"
 
     return return_string
+
+
+def process_graphml(path: str) -> None:
+    # TODO: This is where we'd do whatever processing on the GraphML file we want
+    # For example, converting the node ID vectors back from a string into a CSR matrix,
+    # running PecanPy to generate the graph embeddings, kicking off clustering/classification,
+    # and pushing labels back onto nodes in the Neo4J graph.
+    logger.error("GraphML function not yet implemented!")
+
+
+class GraphMLHandler(FileSystemEventHandler):  # type: ignore
+    def __init__(self, quiesce_period: int = 60) -> None:
+        self.quiesce_period = quiesce_period
+        self.last_change = 0.0
+
+    def on_created(self, event: FileCreatedEvent) -> None:
+        self.on_modified(event)
+
+    def on_modified(self, event: FileModifiedEvent) -> None:
+        current_time = time.time()
+
+        # If the file has been modified recently, ignore the event
+        if current_time - self.last_change < self.quiesce_period:
+            logger.debug(
+                f"Not processing GraphML file, last time: {self.last_change}, current time: {current_time}"
+            )
+        else:
+            logger.debug(
+                f"Processing changed GraphML file, last time: {self.last_change}, current time: {current_time}"
+            )
+            process_graphml(graphml_path)
+
+        if current_time > self.last_change:
+            self.last_change = current_time
+
+
+@shared_task(name="poll-graphml")
+def poll_graphml() -> None:
+    logger.info(f"Running {__name__}: poll_graphml")
+
+    if os.path.isfile(graphml_path):
+        process_graphml(graphml_path)
+
+    observer = Observer()
+    observer.schedule(GraphMLHandler(), graphml_path)
+    observer.start()
+
+    # Should never return
+    observer.join()
 
 
 class KnowledgeNode:
@@ -137,7 +191,7 @@ class AicaNeo4j:
         port: int = 0,
         user: str = "",
         password: str = "",
-        create_constraints: bool = True,
+        initialize_graph: bool = True,
     ) -> None:
         """
         Initialize a new AiceNeo4j object.
@@ -162,7 +216,7 @@ class AicaNeo4j:
 
         self.graph = GraphDatabase.driver(uri, auth=(user, password))
 
-        if create_constraints:
+        if initialize_graph:
             for label in list(
                 set(
                     [
@@ -196,6 +250,14 @@ class AicaNeo4j:
                     + f"FOR (n:`{label}`) REQUIRE n.identifier IS UNIQUE"
                 )
                 self.graph.execute_query(id_unique)
+
+            # Periodic export of graph to graphML for analysis
+            export_freq = str(int(os.getenv("AICA_GRAPHML_EXPORT_FREQ", default=1800)))
+            export_query = (
+                'CALL apoc.export.graphml.all("/graph_data/aica.graphml", {})'
+            )
+            schedule_query = f"CALL apoc.periodic.repeat('export-graphml', '{export_query}', {export_freq});"
+            self.graph.execute_query(schedule_query)
 
     def add_node(
         self,
@@ -439,7 +501,7 @@ def prune_netflow_data(
     # This function removes all network traffic items that were created at least
     # _minutes_ ago and are not connected to any observations
 
-    graph = AicaNeo4j(create_constraints=False)
+    graph = AicaNeo4j(initialize_graph=False)
 
     # Not using f-string here since it gets messy with braces in the query.
     # This might get better with Python 3.12+.

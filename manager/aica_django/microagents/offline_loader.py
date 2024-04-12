@@ -36,7 +36,11 @@ from aica_django.connectors.DNP3 import replay_pcap, capture_dnp3
 
 from aica_django.converters.AICAStix import AICAAttackPattern
 from aica_django.connectors.DocumentDatabase import AicaMongo
-from aica_django.connectors.GraphDatabase import AicaNeo4j, prune_netflow_data
+from aica_django.connectors.GraphDatabase import (
+    AicaNeo4j,
+    poll_graphml,
+    prune_netflow_data,
+)
 from aica_django.connectors.Netflow import network_flow_capture
 from aica_django.connectors.HTTPServer import poll_nginx_accesslogs
 from aica_django.connectors.CaddyServer import poll_caddy_accesslogs
@@ -312,6 +316,11 @@ def initialize(**kwargs: Dict[Any, Any]) -> None:
 
     # Start polling for WAF alerts in background
     poll_waf_alerts.delay()
+
+    # Start polling for exports of the knowledge graph for processing
+    # We really don't like doing things this way, but Neo4J's inability to understand sparse matrices
+    # (as needed for graph embedding generation from vectorized node IDs) forced us into it.
+    poll_graphml.delay()
 
     # Start the Netflow graph pruner in background
     prune_netflow_data.delay()
