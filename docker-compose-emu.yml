@@ -68,8 +68,8 @@ services:
     volumes:
       - ./honeypot/opencanary.conf:/etc/opencanaryd/opencanary.conf
     networks:
-      control:
-        ipv4_address: 10.107.50.190
+      target:
+        ipv4_address: 10.107.100.190
   
 networks:
   target:

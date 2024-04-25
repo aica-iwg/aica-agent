@@ -11,8 +11,6 @@ Functions:
 import argparse
 import functools
 import glob
-import hashlib
-import json
 import pyshark  # type: ignore
 
 from celery import current_app
@@ -150,7 +148,7 @@ if __name__ == "__main__":
             replay_dnp3_pcap(pcap_file)
 
 
-class DNP3RequestExt(_Extension):  # type: ignore
+class DNP3RequestExt(_Extension):
     """For more detailed information on this object's properties, see
     `the STIX 2.0 specification <http://docs.oasis-open.org/cti/stix/v2.0/cs01/part4-cyber-observable-objects/stix-v2.0-cs01-part4-cyber-observable-objects.html#_Toc496716262>`__.
     """  # noqa
