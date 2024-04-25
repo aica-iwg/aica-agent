@@ -22,7 +22,7 @@ import re2 as re  # type: ignore
 
 from celery.utils.log import get_task_logger
 from ipwhois import IPWhois  # type: ignore
-from stix2.base import _STIXBase  # type: ignore
+from mac_vendor_lookup import MacLookup, VendorNotFoundError
 from stix2 import (  # type: ignore
     AutonomousSystem,
     Directory,
@@ -41,9 +41,12 @@ from stix2 import (  # type: ignore
     Software,
     Tool,
 )
+from stix2.base import _STIXBase  # type: ignore
+from stix2.registration import _register_extension
 from typing import Any, Dict, List, Optional, Union
 
 from aica_django.connectors.GraphDatabase import AicaNeo4j
+from aica_django.connectors.DNP3 import DNP3RequestExt
 from aica_django.converters.AICAStix import (
     AICAAttackPattern,
     AICAIncident,
@@ -259,6 +262,8 @@ is_link_local_note = AICANote(
     content="ip_is_link_local",
     object_refs=[fake_note_root],
 )
+
+mac_lookup = MacLookup()
 
 
 def get_ip_context(ip_addr: Union[IPv4Address, IPv6Address]) -> List[_STIXBase]:
@@ -523,6 +528,7 @@ def nginx_accesslog_to_knowledge(
     ip_version = ipaddress.ip_address(log_dict["src_ip"]).version
     ip_src_addr = log_dict["src_ip"]
     if ip_version == 4:
+        protocols = ["ipv4", "tcp", "http"]
         source_addr = IPv4Address(value=ip_src_addr)
         knowledge_nodes.extend(get_ip_context(source_addr))
 
@@ -531,6 +537,7 @@ def nginx_accesslog_to_knowledge(
         knowledge_nodes.extend(get_ip_context(dest_addr))
 
     elif ip_version == 6:
+        protocols = ["ipv6", "tcp", "http"]
         ip_src_addr = str(ipaddress.ip_address(log_dict["src_ip"]))
         source_addr = IPv6Address(value=ip_src_addr)
         knowledge_nodes.extend(get_ip_context(source_addr))
@@ -549,7 +556,7 @@ def nginx_accesslog_to_knowledge(
     )
 
     traffic = AICANetworkTraffic(
-        protocols="http",
+        protocols=protocols,
         start=request_time,
         src_ref=source_addr,
         dst_ref=dest_addr,
@@ -590,12 +597,14 @@ def caddy_accesslog_to_knowledge(log_dict: Dict[str, Any]) -> List[_STIXBase]:
         raise ValueError(f"Couldn't parse timestamp {log_dict['ts']}")
 
     if type(ipaddress.ip_address(log_dict["src_ip"])) is ipaddress.IPv4Address:
+        protocols = ["ipv4", "tcp", "http"]
         src_addr = IPv4Address(value=log_dict["src_ip"])
         knowledge_nodes.extend(get_ip_context(src_addr))
 
         dest_addr = IPv4Address(value=log_dict["dst_ip"])
         knowledge_nodes.extend(get_ip_context(dest_addr))
     else:
+        protocols = ["ipv6", "tcp", "http"]
         src_addr = IPv6Address(value=log_dict["src_ip"])
         knowledge_nodes.extend(get_ip_context(src_addr))
 
@@ -612,7 +621,7 @@ def caddy_accesslog_to_knowledge(log_dict: Dict[str, Any]) -> List[_STIXBase]:
     )
 
     traffic = AICANetworkTraffic(
-        protocols="http",
+        protocols=protocols,
         start=request_time,
         src_ref=src_addr,
         dst_ref=dest_addr,
@@ -671,19 +680,13 @@ def nmap_scan_to_knowledge(scan_results: Dict[str, Any]) -> List[_STIXBase]:
             knowledge_nodes.append(mac_addr)
 
             try:
-                vendor_abstract = f"vendor: {scan_results[host]['vendor']}"
-                vendor_note = AICANote(
-                    abstract=vendor_abstract,
-                    content=vendor_abstract,
+                mac_vendor = AICANote(
+                    value=f"MAC Vendor: {mac_lookup.lookup(scan_results[host]['macaddress'])}",
                     object_refs=[mac_addr],
                 )
-
-                knowledge_nodes.append(vendor_note)
-            except KeyError:
-                # Vendor not in data, not a big deal
-                logger.debug(
-                    f"No vendor found in object for {scan_results[host]['macaddress']}"
-                )
+                knowledge_nodes.append(mac_vendor)
+            except VendorNotFoundError:
+                logger.info(f"Unable to find vendor for MAC: {scan_results[host]['macaddress']}")
 
         mac_addr_list = [mac_addr] if mac_addr else []
 
@@ -958,6 +961,9 @@ def waf_alert_to_knowledge(alert: Dict[str, Any]) -> List[_STIXBase]:
     return knowledge_nodes
 
 
+_register_extension(DNP3RequestExt)
+
+
 def dnp3_to_knowledge(log_dict: dict[str, str]) -> List[_STIXBase]:
     """
     Converts a DNP3 message (as returned from aica_django.connectors.DNP3.parse_dnp3_packet)
@@ -971,8 +977,86 @@ def dnp3_to_knowledge(log_dict: dict[str, str]) -> List[_STIXBase]:
 
     knowledge_nodes: List[_STIXBase] = []
 
-    # TODO
-    print(knowledge_nodes)
+    # dateparser can't seem to handle this format
+    request_time = dateparser.parse(log_dict["sniff_timestamp"])
+
+    if not request_time:
+        raise ValueError(f"Couldn't parse timestamp {log_dict['sniff_timestamp']}")
+
+    src_mac_addr = MACAddress(value=log_dict["src_mac"])
+    knowledge_nodes.append(src_mac_addr)
+
+    try:
+        src_mac_vendor = AICANote(
+            value=f"MAC Vendor: {mac_lookup.lookup(log_dict['src_mac'])}",
+            object_refs=[src_mac_addr],
+        )
+        knowledge_nodes.append(src_mac_vendor)
+    except VendorNotFoundError:
+        logger.info(f"Unable to find vendor for MAC: {log_dict['src_mac']}")
+
+    dst_mac_addr = MACAddress(value=log_dict["dst_mac"])
+    knowledge_nodes.append(dst_mac_addr)
+
+    try:
+        dst_mac_vendor = AICANote(
+            value=f"MAC Vendor: {mac_lookup.lookup(log_dict['dst_mac'])}",
+            object_refs=[dst_mac_addr],
+        )
+        knowledge_nodes.append(dst_mac_vendor)
+    except VendorNotFoundError:
+        logger.info(f"Unable to find vendor for MAC: {log_dict['dst_mac']}")
+
+    # Create source host nodes (and link to protocol node)
+    ip_version = ipaddress.ip_address(log_dict["src_ip"]).version
+    ip_src_addr = log_dict["src_ip"]
+    if ip_version == 4:
+        protocols = ["ipv4", "tcp", "dnp3"]
+        source_addr = IPv4Address(value=ip_src_addr, resolves_to_refs=[src_mac_addr])
+        knowledge_nodes.extend(get_ip_context(source_addr))
+
+        ip_dest_addr = str(ipaddress.ip_address(log_dict["dst_ip"]))
+        dest_addr = IPv4Address(value=ip_dest_addr, resolves_to_refs=[dst_mac_addr])
+        knowledge_nodes.extend(get_ip_context(dest_addr))
+
+    elif ip_version == 6:
+        protocols = ["ipv6", "tcp", "dnp3"]
+        ip_src_addr = str(ipaddress.ip_address(log_dict["src_ip"]))
+        source_addr = IPv6Address(value=ip_src_addr, resolves_to_refs=[src_mac_addr])
+        knowledge_nodes.extend(get_ip_context(source_addr))
+
+        ip_dest_addr = str(ipaddress.ip_address(log_dict["dst_ip"]))
+        dest_addr = IPv6Address(value=ip_dest_addr, resolves_to_refs=[dst_mac_addr])
+        knowledge_nodes.extend(get_ip_context(dest_addr))
+
+    dnp3_req_ext = DNP3RequestExt(
+        dnp3_application_function=log_dict["dnp3_application_function"],
+        dnp3_application_iin=log_dict["dnp3_application_iin"],
+        dnp3_application_obj=log_dict["dnp3_application_obj"],
+        dnp3_application_objq_code=log_dict["dnp3_application_objq_code"],
+        dnp3_application_objq_index=log_dict["dnp3_application_objq_index"],
+        dnp3_application_objq_prefix=log_dict["dnp3_application_objq_prefix"],
+        dnp3_application_objq_range=log_dict["dnp3_application_objq_range"],
+        dnp3_application_unsolicited_from_slave=log_dict[
+            "dnp3_application_unsolicited_from_slave"
+        ],
+        dnp3_datalink_dst=log_dict["dnp3_datalink_dst"],
+        dnp3_datalink_from_master=log_dict["dnp3_datalink_from_master"],
+        dnp3_datalink_from_primary=log_dict["dnp3_datalink_from_primary"],
+        dnp3_datalink_function=log_dict["dnp3_datalink_function"],
+        dnp3_datalink_src=log_dict["dnp3_datalink_src"],
+    )
+
+    traffic = AICANetworkTraffic(
+        protocols=protocols,
+        start=request_time,
+        src_ref=source_addr,
+        dst_ref=dest_addr,
+        src_port=int(log_dict["src_port"]),
+        dst_port=int(log_dict["dst_port"]),
+        extensions={"dnp3-request-ext": dnp3_req_ext},
+    )
+    knowledge_nodes.append(traffic)
 
     return knowledge_nodes
 

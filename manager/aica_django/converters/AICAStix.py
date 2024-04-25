@@ -138,6 +138,7 @@ class AICANetworkTraffic(NetworkTraffic):  # type: ignore
             "src": src_ref["value"],
             "dst": dst_ref["value"],
             "dst_port": dst_port,
+            "extensions": str(extensions),
         }
 
         super().__init__(

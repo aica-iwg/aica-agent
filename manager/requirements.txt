@@ -12,6 +12,7 @@ gunicorn==21.2.0
 ipwhois==1.2.0
 joblib==1.4.0
 kombu==5.3.7
+mac-vendor-lookup==0.1.12
 neo4j==5.19.0
 netaddr==1.2.1
 netflow==0.12.2
