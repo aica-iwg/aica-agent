@@ -109,7 +109,7 @@ class AICAIncident(Incident):  # type: ignore
 class AICANetworkTraffic(NetworkTraffic):  # type: ignore
     def __init__(
         self,
-        protocols: str,
+        protocols: Union[str, list[str]],
         src_ref: Union[IPv4Address, IPv6Address],
         dst_ref: Union[IPv4Address, IPv6Address],
         src_port: Optional[int] = None,
@@ -138,6 +138,7 @@ class AICANetworkTraffic(NetworkTraffic):  # type: ignore
             "src": src_ref["value"],
             "dst": dst_ref["value"],
             "dst_port": dst_port,
+            "extensions": str(extensions),
         }
 
         super().__init__(

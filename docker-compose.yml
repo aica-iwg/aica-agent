@@ -28,8 +28,6 @@ services:
       bridge:
       control:
         ipv4_address: 10.107.50.150
-      target:
-        ipv4_address: 10.107.100.150
 
   manager_db:
     image: postgres:13.8-bullseye
@@ -108,9 +106,65 @@ services:
       timeout: 10s
       retries: 10 
 
+  elasticsearch:
+    build: elasticsearch
+    container_name: elasticsearch
+    # Required so that ES generates an acceptable SAN in its HTTPS Cert
+    hostname: "elasticsearch"
+    env_file:
+      - manager/.env
+    environment:
+      - node.name=elasticsearch
+      - cluster.name=aica
+      - discovery.type=single-node
+      - xpack.security.enabled=true
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    networks:
+      control:
+        ipv4_address: 10.107.50.240
+    volumes:
+      - es_data:/usr/share/elasticsearch/data
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+    healthcheck:
+      test: ["CMD-SHELL",
+              "curl --insecure -u elastic:$${ELASTIC_PASSWORD} -s -X GET 'http://localhost:9200/_cluster/health?pretty' 
+              | grep '\"status\" : \"green\"'"]
+      interval: 10s
+      timeout: 30s
+      retries: 20
+
+  siem:
+    build: siem
+    container_name: siem
+    env_file:
+      manager/.env
+    depends_on:
+      manager_mongodb:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
+    networks:
+      control:
+        ipv4_address: 10.107.50.250
+    ports:
+      - "9000:9000"  # Graylog web GUI
+    healthcheck:
+      test: [ "CMD-SHELL", "wget http://localhost:9000"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+
 volumes:
   mongo_data:
   pg_data:
+  es_data:
   neo_data:
   graphml_share:
 
@@ -124,11 +178,3 @@ networks:
         - subnet: 10.107.50.0/24 
           ip_range: 10.107.50.128/25
           gateway: 10.107.50.1 
-  target:
-    internal: true
-    ipam:
-      driver: default
-      config:
-        - subnet: 10.107.100.0/24 
-          ip_range: 10.107.100.128/25
-          gateway: 10.107.100.1

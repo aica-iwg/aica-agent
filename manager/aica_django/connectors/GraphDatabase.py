@@ -5,6 +5,7 @@ Classes:
     AicaNeo4j: The object to instantiate to create a persistent interface with Neo4j
 """
 
+import datetime
 import inspect
 import os
 import re2 as re  # type: ignore
@@ -131,7 +132,7 @@ class KnowledgeNode:
         labels_string = ":".join(self._labels)
 
         props_string = ",".join(
-            [f'{k}: "{v}"' for k, v in {**self._props, "accolade_id": self._id}.items()]
+            [f'{k}: "{v}"' for k, v in {**self._props, "identifier": self._id}.items()]
         )
 
         return f"({name}:{labels_string} {{{props_string}}})"
@@ -297,20 +298,28 @@ class AicaNeo4j:
         for node_id, node_label, node_property_list, node_id_vector in zip(
             node_ids, node_labels, node_property_lists, node_id_vectors
         ):
-            node_property_list["identifier"] = node_id
             node_property_list["identifier_vec"] = node_id_vector
+            node_property_list["first_merge"] = datetime.datetime.now()
+            node_property_list["merge_count"] = 1
+            node_property_list = {
+                k: re.sub("'", '"', str(v))
+                for k, v in node_property_list.items()
+                if k not in merge_exclude_properties
+            }
+            create_properties = ", ".join(
+                f"n.{k}='{v}'" for k, v in node_property_list.items()
+            )
             queries.append(
-                f"MERGE (n:`{node_label}` "
-                + f"{dict_to_cypher({k: v for k, v in node_property_list.items() if k not in merge_exclude_properties})}) "
+                f'MERGE (n:`{node_label}` {{identifier: "{node_id}"}}) '
+                + f"ON CREATE SET {create_properties} "
+                + f"ON MATCH SET n.last_merge=timestamp(), n.merge_count=(toInteger(n.merge_count) + 1) "
                 + "RETURN n.identifier"
             )
 
         # We should figure out how to batch this for efficiency - APOC seems to have options
         # but I haven't figured it out yet.
         for query in queries:
-            # logger.info(query)
-            result = self.graph.execute_query(query)
-            # logger.info(result)
+            self.graph.execute_query(query)
 
     def add_relation(
         self,
@@ -377,6 +386,8 @@ class AicaNeo4j:
                             n2.identifier = '{node_b_id}' 
                         MERGE 
                             (n1)-[{relation.get_create_statement()}]-{'>' if directed_tag else ''}(n2)
+                        ON CREATE SET r.first_merge=timestamp(), r.merge_count=1
+                        ON MATCH SET r.last_merge=timestamp(), r.merge_count=(toInteger(r.merge_count) + 1)
                         RETURN type(r)"""
 
             queries.append(query)
@@ -384,7 +395,11 @@ class AicaNeo4j:
         # We should figure out how to batch this for efficiency - APOC seems to have options
         # but I haven't figured it out yet.
         for query in queries:
-            result = self.graph.execute_query(query)
+            self.graph.execute_query(query)
+
+    def import_graphml_data(self, import_file: str) -> None:
+        query = f"CALL apoc.import.graphml('{import_file}', {{}})"
+        self.graph.execute_query(query)
 
     def get_node_ids_by_label(self, label: str) -> List[str]:
         """

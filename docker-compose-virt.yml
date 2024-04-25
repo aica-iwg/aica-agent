@@ -5,3 +5,10 @@ services:
   manager:
     environment:
       MODE: "virt"
+  
+  ids:
+    build: ./ids
+    container_name: ids
+    command: sh /usr/local/bin/docker_entrypoint.sh
+    cap_add:
+      - NET_ADMIN
