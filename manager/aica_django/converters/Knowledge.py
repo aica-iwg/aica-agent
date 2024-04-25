@@ -22,7 +22,7 @@ import re2 as re  # type: ignore
 
 from celery.utils.log import get_task_logger
 from ipwhois import IPWhois  # type: ignore
-from mac_vendor_lookup import MacLookup, VendorNotFoundError
+from mac_vendor_lookup import MacLookup, VendorNotFoundError  # type: ignore
 from stix2 import (  # type: ignore
     AutonomousSystem,
     Directory,
@@ -42,7 +42,7 @@ from stix2 import (  # type: ignore
     Tool,
 )
 from stix2.base import _STIXBase  # type: ignore
-from stix2.registration import _register_extension
+from stix2.registration import _register_extension  # type: ignore
 from typing import Any, Dict, List, Optional, Union
 
 from aica_django.connectors.GraphDatabase import AicaNeo4j
@@ -680,13 +680,17 @@ def nmap_scan_to_knowledge(scan_results: Dict[str, Any]) -> List[_STIXBase]:
             knowledge_nodes.append(mac_addr)
 
             try:
+                vendor = mac_lookup.lookup(scan_results[host]["macaddress"])
                 mac_vendor = AICANote(
-                    value=f"MAC Vendor: {mac_lookup.lookup(scan_results[host]['macaddress'])}",
+                    abstract=f"MAC Vendor: {vendor}",
+                    content=f"MAC Vendor: {vendor}",
                     object_refs=[mac_addr],
                 )
                 knowledge_nodes.append(mac_vendor)
             except VendorNotFoundError:
-                logger.info(f"Unable to find vendor for MAC: {scan_results[host]['macaddress']}")
+                logger.info(
+                    f"Unable to find vendor for MAC: {scan_results[host]['macaddress']}"
+                )
 
         mac_addr_list = [mac_addr] if mac_addr else []
 
@@ -987,8 +991,10 @@ def dnp3_to_knowledge(log_dict: dict[str, str]) -> List[_STIXBase]:
     knowledge_nodes.append(src_mac_addr)
 
     try:
+        vendor = mac_lookup.lookup(log_dict["src_mac"])
         src_mac_vendor = AICANote(
-            value=f"MAC Vendor: {mac_lookup.lookup(log_dict['src_mac'])}",
+            abstract=f"MAC Vendor: {vendor}",
+            content=f"MAC Vendor: {vendor}",
             object_refs=[src_mac_addr],
         )
         knowledge_nodes.append(src_mac_vendor)
@@ -999,8 +1005,10 @@ def dnp3_to_knowledge(log_dict: dict[str, str]) -> List[_STIXBase]:
     knowledge_nodes.append(dst_mac_addr)
 
     try:
+        vendor = mac_lookup.lookup(log_dict["dst_mac"])
         dst_mac_vendor = AICANote(
-            value=f"MAC Vendor: {mac_lookup.lookup(log_dict['dst_mac'])}",
+            abstract=f"MAC Vendor: {vendor}",
+            content=f"MAC Vendor: {vendor}",
             object_refs=[dst_mac_addr],
         )
         knowledge_nodes.append(dst_mac_vendor)

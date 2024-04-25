@@ -52,10 +52,10 @@ from aica_django.converters.Knowledge import knowledge_to_neo, fake_note_root
 
 logger = get_task_logger(__name__)
 
+graph = AicaNeo4j()
 
-def create_malware_categories(
-    import_file: Optional[str] = None, graph: Optional[AicaNeo4j] = None
-) -> None:
+
+def create_malware_categories(import_file: Optional[str] = None) -> None:
     """
     Load a static list of ClamAV malware categories into the graph.
 
@@ -133,9 +133,7 @@ top_1000_port_note = Note(
 )
 
 
-def create_port_info(
-    import_file: Optional[str] = None, graph: Optional[AicaNeo4j] = None
-) -> None:
+def create_port_info(import_file: Optional[str] = None) -> None:
     """
     Load Nmap's list (from web) of port/service info into the graph.
 
@@ -247,9 +245,7 @@ def create_port_info(
         logger.info("Created port info from nmap data.")
 
 
-def create_suricata_categories(
-    import_file: Optional[str] = None, graph: Optional[AicaNeo4j] = None
-) -> None:
+def create_suricata_categories(import_file: Optional[str] = None) -> None:
     """
     Load Suricata's list (from web) of alert categories into the graph.
 
@@ -316,8 +312,6 @@ def initialize(**kwargs: Dict[Any, Any]) -> None:
     if os.environ.get("SKIP_TASKS"):
         return
 
-    graph = AicaNeo4j()
-
     ### Preload Contextual Data ###
     # (To update this data, run each of these functions without import_file and export with APOC to an updated file)
     # Although this is a bit clunky, creating this data from scratch (esp nmap port info) takes a while, so we don't
@@ -325,18 +319,16 @@ def initialize(**kwargs: Dict[Any, Any]) -> None:
 
     # Load ClamAV Categories into Graph
     create_malware_categories(
-        import_file="/graph_data/aica-malware_categories-20240425.graphml", graph=graph
+        import_file="/graph_data/aica-malware_categories-20240425.graphml"
     )
 
     # Get Suricata rule classes and load into Graph
     create_suricata_categories(
-        import_file="/graph_data/aica-suricata_categories-20240425.graphml", graph=graph
+        import_file="/graph_data/aica-suricata_categories-20240425.graphml"
     )
 
     # Get nmap-services and load into Graph
-    create_port_info(
-        import_file="/graph_data/aica-nmap_port_info-20240425.graphml", graph=graph
-    )
+    create_port_info(import_file="/graph_data/aica-nmap_port_info-20240425.graphml")
 
     ### Start Tasks ###
 

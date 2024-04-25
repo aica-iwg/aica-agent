@@ -19,8 +19,8 @@ from celery import current_app
 from celery.app import shared_task
 from celery.utils.log import get_task_logger
 from collections import OrderedDict
-from stix2.base import _Extension
-from stix2.properties import StringProperty
+from stix2.base import _Extension  # type: ignore
+from stix2.properties import StringProperty  # type: ignore
 from typing import Any
 
 
@@ -147,10 +147,10 @@ if __name__ == "__main__":
 
     for pcap_file_expr in args.pcap_file:
         for pcap_file in glob.glob(pcap_file_expr):
-            replay_dnp3_pcap(pcap_file, send_task=False)
+            replay_dnp3_pcap(pcap_file)
 
 
-class DNP3RequestExt(_Extension):
+class DNP3RequestExt(_Extension):  # type: ignore
     """For more detailed information on this object's properties, see
     `the STIX 2.0 specification <http://docs.oasis-open.org/cti/stix/v2.0/cs01/part4-cyber-observable-objects/stix-v2.0-cs01-part4-cyber-observable-objects.html#_Toc496716262>`__.
     """  # noqa
