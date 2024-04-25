@@ -8,7 +8,7 @@ django-extensions==3.2.3
 fasteners==0.19
 flower==2.0.1
 google-re2==1.1
-gunicorn==21.2.0
+gunicorn==22.0.0
 ipwhois==1.2.0
 joblib==1.4.0
 kombu==5.3.7
