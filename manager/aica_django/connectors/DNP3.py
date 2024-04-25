@@ -11,8 +11,6 @@ Functions:
 import argparse
 import functools
 import glob
-import hashlib
-import json
 import pyshark  # type: ignore
 
 from celery import current_app
