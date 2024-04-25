@@ -320,7 +320,10 @@ def initialize(**kwargs: Dict[Any, Any]) -> None:
     # Load ClamAV Categories into Graph
     create_malware_categories(
         import_file="/graph_data/aica-malware_categories-20240425.graphml"
+<<<<<<< HEAD
         import_file="/graph_data/aica-malware_categories-20240425.graphml", graph=graph
+=======
+>>>>>>> 4a1f94f (Linting/Typing)
     )
 
     # Get Suricata rule classes and load into Graph
