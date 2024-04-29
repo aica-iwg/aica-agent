@@ -41,7 +41,7 @@ Once you have a passing build, you should commit your changes to a branch with a
 
 ## Running
 
-This code should be run via the Makefile. You will need to specify whether you want to start this in emulation mode or virtualized mode with the MODE environment variable (i.e., MODE should be either `emu` or `virt`). The virtualized mode is currently a stub and is meant for future expansion. 
+This code should be run via the Makefile. You will need to specify whether you want to start this in emulation mode or virtualized mode with the MODE environment variable (i.e., MODE should be either `emu` or `virt`). If using "virt" mode, which is intended for live usage capturing from a real network outside the Docker environment, you much copy the docker-compose-local-overrides.yaml.example file to docker-compose-local-overrides.yaml and modify as appropriate. 
 
 When starting from scratch, run the following: `make build && make start`. Subsequently, use `make stop` and `make start` (or `make restart`) to stop/start the containers and `make build` to build them again (`make rebuild` is a handy alias for stop/build/start). You can use `make clean` to clean up all container- and code-related files. 
 

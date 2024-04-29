@@ -3,7 +3,7 @@
 
 vars:
   address-groups:
-    HOME_NET: "[192.168.0.0/16,10.0.0.0/8,172.16.0.0/12]"
+    HOME_NET: "[]"
     EXTERNAL_NET: "!$HOME_NET"
     HTTP_SERVERS: "$HOME_NET"
     SMTP_SERVERS: "$HOME_NET"
@@ -102,7 +102,7 @@ outputs:
         - nfs
         - smb
         - tftp
-        - ikev2
+        - ike
         - dcerpc
         - krb5
         - snmp
@@ -1355,7 +1355,7 @@ threading:
   # set to this value, a fatal error occurs.
   #
   # Generally, the per-thread stack-size should not exceed 8MB.
-  #stack-size: 8mb
+  stack-size: 8mb
 
 # Luajit has a strange memory requirement, its 'states' need to be in the
 # first 2G of the process' memory.

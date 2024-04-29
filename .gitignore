@@ -6,7 +6,8 @@
 .vscode
 __pycache__
 aica-manager/
-pcaps/
 coverage.xml
 db.sqlite3
+docker-compose-local-overrides.yaml
+pcaps/
 venv

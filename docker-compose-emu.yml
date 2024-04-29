@@ -1,15 +1,16 @@
----
-version: "3.8"
-
 services:
   manager:
     environment:
-      - MODE=emu
+      MODE: "emu"
+      TAP_IF: "eth1"
+      HOME_NET: "10.107.100.0/24"
     # For Testing, ensure these containers start with manager
     depends_on:
       siem:
         condition: service_healthy
     networks:
+      # Docker brings interfaces up in alphabetical order (except internal, which are last)
+      # but this or "tap_net" (in virt mode) should both come up as eth1
       target:
         ipv4_address: 10.107.100.150
   
@@ -24,6 +25,10 @@ services:
     command: sh /usr/local/bin/docker_entrypoint.sh
     cap_add:
       - NET_ADMIN
+    environment:
+      # Manager/Target host IP only
+      SURICATA_IF: "eth0"
+      HOME_NET: "10.107.100.150/32,10.107.100.170/32"
     network_mode: service:target
 
   attacker:

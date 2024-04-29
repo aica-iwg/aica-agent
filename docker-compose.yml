@@ -1,6 +1,3 @@
----
-version: "3.8"
-
 services:
   manager:
     build: manager
@@ -28,6 +25,9 @@ services:
       bridge:
       control:
         ipv4_address: 10.107.50.150
+    # For PCAPs
+    cap_add:
+      - NET_ADMIN
 
   manager_db:
     image: postgres:13.8-bullseye
@@ -84,10 +84,10 @@ services:
     restart: unless-stopped
     environment:
       # https://neo4j.com/docs/operations-manual/current/docker/ref-settings/
-      - NEO4J_dbms_security_procedures_unrestricted=apoc.*,gds.*
-      - apoc.export.file.enabled=true
-      - apoc.import.file.enabled=true
-      - apoc.import.file.use_neo4j_config=false
+      NEO4J_dbms_security_procedures_unrestricted: "apoc.*,gds.*"
+      apoc.export.file.enabled: true
+      apoc.import.file.enabled: true
+      apoc.import.file.use_neo4j_config: false
     env_file:
       - manager/.env
     volumes:
@@ -114,11 +114,11 @@ services:
     env_file:
       - manager/.env
     environment:
-      - node.name=elasticsearch
-      - cluster.name=aica
-      - discovery.type=single-node
-      - xpack.security.enabled=true
-      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+      node.name: "elasticsearch"
+      cluster.name: "aica"
+      discovery.type: "single-node"
+      xpack.security.enabled: true
+      ES_JAVA_OPTS: "-Xms512m -Xmx512m"
     networks:
       control:
         ipv4_address: 10.107.50.240

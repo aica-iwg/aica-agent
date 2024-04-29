@@ -333,38 +333,40 @@ def initialize(**kwargs: Dict[Any, Any]) -> None:
     ### Start Tasks ###
 
     # Start netflow collector
-    network_flow_capture.delay()
+    network_flow_capture.apply_async()
 
     # Start periodic network scans of local subnets in background
-    periodic_network_scan.delay()
+    # If HOME_NET isn't specified, this will fallback to scanning local nets based on interface configs
+    logger.info(f"TEST123: {os.getenv('HOME_NET')}")
+    periodic_network_scan.apply_async(kwargs={"nmap_target": os.getenv("HOME_NET")})
 
     # Start polling for Nginx access logs
-    poll_nginx_accesslogs.delay()
+    poll_nginx_accesslogs.apply_async()
 
     # Start polling for Caddy access logs
-    poll_caddy_accesslogs.delay()
+    poll_caddy_accesslogs.apply_async()
 
     # Start polling for IDS alerts in background
-    poll_suricata_alerts.delay()
+    poll_suricata_alerts.apply_async()
 
     # Start polling for AV alerts in background
-    poll_clamav_alerts.delay()
+    poll_clamav_alerts.apply_async()
 
     # Start polling for WAF alerts in background
-    poll_waf_alerts.delay()
+    poll_waf_alerts.apply_async()
 
     # Start polling for exports of the knowledge graph for processing
     # We really don't like doing things this way, but Neo4J's inability to understand sparse matrices
     # (as needed for graph embedding generation from vectorized node IDs) forced us into it.
-    poll_graphml.delay()
+    poll_graphml.apply_async()
 
     # Start the Netflow graph pruner in background
-    prune_netflow_data.delay()
+    prune_netflow_data.apply_async()
 
-    ### TESTING ONLY ###
+    # For testing
+    # replay_dnp3_pcap.delay(
+    #     pcap_file="pcaps/20200514_DNP3_Disable_Unsolicited_Messages_Attack/DNP3 PCAP Files/20200514_DNP3_Disable_Unsolicited_Messages_Attack_UOWM_DNP3_Dataset_Master.pcap"
+    # )
 
-    # Switch to live capture later
-    replay_dnp3_pcap.delay(
-        pcap_file="pcaps/20200514_DNP3_Disable_Unsolicited_Messages_Attack/DNP3 PCAP Files/20200514_DNP3_Disable_Unsolicited_Messages_Attack_UOWM_DNP3_Dataset_Master.pcap"
-    )
-    # capture_dnp3().delay(args=["eth2"])
+    # For live use
+    capture_dnp3.apply_async(kwargs={"interface": os.getenv["TAP_IF"]})
