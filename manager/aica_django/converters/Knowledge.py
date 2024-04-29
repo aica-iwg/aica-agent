@@ -307,6 +307,8 @@ def get_ip_context(ip_addr: Union[IPv4Address, IPv6Address]) -> List[_STIXBase]:
         note_refs.append(is_link_local_note)
         return_nodes.append(is_link_local_note)
 
+    asn = None
+
     if not any([is_private, is_multicast, is_reserved, is_loopback, is_link_local]):
         whois_obj = IPWhois(ip_string)
         whois_data = whois_obj.lookup_rdap(depth=1)
