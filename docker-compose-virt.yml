@@ -1,10 +1,14 @@
----
-version: "3.8"
-
 services:
   manager:
     environment:
       MODE: "virt"
+      TAP_IF: "eth1"
+      # This has to go here pending resolution of https://github.com/docker/compose/issues/11404 
+      HOME_NET: "146.137.56.0/24"
+    networks:
+      # Docker brings interfaces up in alphabetical order (except internal, which are last)
+      # but this or "target" (in emu mode) should both come up as eth1
+      - tap_net
   
   ids:
     build: ./ids
@@ -12,3 +16,13 @@ services:
     command: sh /usr/local/bin/docker_entrypoint.sh
     cap_add:
       - NET_ADMIN
+    environment:
+      SURICATA_IF: "eth0"
+      # This has to go here pending resolution of https://github.com/docker/compose/issues/11404 
+      HOME_NET: "146.137.56.0/24"
+    networks:
+      tap_net:  # Should be eth0
+      control:  # Should be eth1 (internal networks comes last)
+
+include:
+  - docker-compose-local-overrides.yaml

@@ -31,7 +31,6 @@ from stix2 import (  # type: ignore
     HTTPRequestExt,
     IPv4Address,
     IPv6Address,
-    Location,
     Malware,  # TODO: Create AICA Version
     MACAddress,
     NetworkTraffic,
@@ -43,7 +42,7 @@ from stix2 import (  # type: ignore
 )
 from stix2.base import _STIXBase  # type: ignore
 from stix2.registration import _register_extension  # type: ignore
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Union
 
 from aica_django.connectors.GraphDatabase import AicaNeo4j
 from aica_django.connectors.DNP3 import DNP3RequestExt
@@ -52,6 +51,7 @@ from aica_django.converters.AICAStix import (
     AICAIncident,
     AICAIdentity,
     AICAIndicator,
+    AICALocation,
     AICANetworkTraffic,
     AICANote,
 )
@@ -307,6 +307,8 @@ def get_ip_context(ip_addr: Union[IPv4Address, IPv6Address]) -> List[_STIXBase]:
         note_refs.append(is_link_local_note)
         return_nodes.append(is_link_local_note)
 
+    asn = None
+
     if not any([is_private, is_multicast, is_reserved, is_loopback, is_link_local]):
         whois_obj = IPWhois(ip_string)
         whois_data = whois_obj.lookup_rdap(depth=1)
@@ -316,27 +318,39 @@ def get_ip_context(ip_addr: Union[IPv4Address, IPv6Address]) -> List[_STIXBase]:
             asn = AutonomousSystem(
                 number=whois_data["asn"], rir=whois_data["asn_registry"]
             )
-            new_ip_addr_kwargs["belongs_to"] = asn
-            cidr_kwargs["belongs_to"] = asn
             return_nodes.append(asn)
 
         if whois_data["asn_country_code"]:
-            location = Location(country=whois_data["asn_country_code"])
+            location = AICALocation(country=whois_data["asn_country_code"])
             return_nodes.append(location)
         else:
             location = None
 
         if whois_data["entities"]:
-            new_ip_addr_kwargs["custom_properties"].update({"has_owner_refs": []})
-            cidr_kwargs["custom_properties"].update({"has_owner_refs": []})
+            if "custom_properties" in new_ip_addr_kwargs.keys():
+                new_ip_addr_kwargs["custom_properties"].update({"has_owner_refs": []})
+            else:
+                new_ip_addr_kwargs["custom_properties"] = {"has_owner_refs": []}
+
+            if "custom_properties" in new_ip_addr_kwargs.keys():
+                cidr_kwargs["custom_properties"].update({"has_owner_refs": []})
+            else:
+                cidr_kwargs["custom_properties"] = {"has_owner_refs": []}
+
             for entity in whois_data["entities"]:
                 entity_kwargs = {"name": entity}
-                if location:
-                    entity_kwargs["located_at"] = location
                 entity = AICAIdentity(**entity_kwargs)
                 new_ip_addr_kwargs["custom_properties"]["has_owner_refs"].append(entity)
                 cidr_kwargs["custom_properties"]["has_owner_refs"].append(entity)
                 return_nodes.append(entity)
+
+                if location:
+                    location_rel = Relationship(
+                        source_ref=entity,
+                        target_ref=location,
+                        relationship_type="located-at",
+                    )
+                    return_nodes.append(location_rel)
 
         if whois_data["asn_cidr"]:
             cidr_kwargs.update({"value": whois_data["asn_cidr"]})
@@ -347,12 +361,24 @@ def get_ip_context(ip_addr: Union[IPv4Address, IPv6Address]) -> List[_STIXBase]:
                 asn_cidr = IPv6Address(**cidr_kwargs)
             return_nodes.append(asn_cidr)
 
+            if asn:
+                asn_rel = Relationship(
+                    source_ref=asn_cidr, target_ref=asn, relationship_type="belongs-to"
+                )
+                return_nodes.append(asn_rel)
+
     if isinstance(ip_addr, IPv4Address):
         ip_stix = IPv4Address(**new_ip_addr_kwargs)
         return_nodes.append(IPv4Address(**new_ip_addr_kwargs))
     else:
         ip_stix = IPv4Address(**new_ip_addr_kwargs)
         return_nodes.append(IPv6Address(**new_ip_addr_kwargs))
+
+    if asn:
+        asn_rel = Relationship(
+            source_ref=ip_stix, target_ref=asn, relationship_type="belongs-to"
+        )
+        return_nodes.append(asn_rel)
 
     for note_ref in note_refs:
         note_rel = Relationship(
@@ -649,10 +675,6 @@ def nmap_scan_to_knowledge(scan_results: Dict[str, Any]) -> List[_STIXBase]:
 
     knowledge_nodes = []
 
-    scan_time: Optional[datetime.datetime] = dateparser.parse(
-        scan_results["runtime"]["time"]
-    )
-
     # Not needed and makes iteration below messy
     if "stats" in scan_results:
         del scan_results["stats"]
@@ -676,11 +698,11 @@ def nmap_scan_to_knowledge(scan_results: Dict[str, Any]) -> List[_STIXBase]:
 
         consists_of = []
         if scan_results[host]["macaddress"]:
-            mac_addr = MACAddress(value=scan_results[host]["macaddress"])
+            mac_addr = MACAddress(value=scan_results[host]["macaddress"]["addr"])
             knowledge_nodes.append(mac_addr)
 
             try:
-                vendor = mac_lookup.lookup(scan_results[host]["macaddress"])
+                vendor = mac_lookup.lookup(scan_results[host]["macaddress"]["addr"])
                 mac_vendor = AICANote(
                     abstract=f"MAC Vendor: {vendor}",
                     content=f"MAC Vendor: {vendor}",
@@ -689,10 +711,12 @@ def nmap_scan_to_knowledge(scan_results: Dict[str, Any]) -> List[_STIXBase]:
                 knowledge_nodes.append(mac_vendor)
             except VendorNotFoundError:
                 logger.info(
-                    f"Unable to find vendor for MAC: {scan_results[host]['macaddress']}"
+                    f"Unable to find vendor for MAC: {scan_results[host]['macaddress']['addr']}"
                 )
 
-        mac_addr_list = [mac_addr] if mac_addr else []
+            mac_addr_list = [mac_addr] if mac_addr else []
+        else:
+            mac_addr_list = []
 
         ip_addr = ipaddress.ip_address(host)
         # Update if new IP address or we found a MAC address, which could be new
