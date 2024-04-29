@@ -369,4 +369,4 @@ def initialize(**kwargs: Dict[Any, Any]) -> None:
     # )
 
     # For live use
-    capture_dnp3.apply_async(kwargs={"interface": os.getenv["TAP_IF"]})
+    capture_dnp3.apply_async(kwargs={"interface": os.getenv("TAP_IF")})
