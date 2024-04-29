@@ -337,7 +337,6 @@ def initialize(**kwargs: Dict[Any, Any]) -> None:
 
     # Start periodic network scans of local subnets in background
     # If HOME_NET isn't specified, this will fallback to scanning local nets based on interface configs
-    logger.info(f"TEST123: {os.getenv('HOME_NET')}")
     periodic_network_scan.apply_async(kwargs={"nmap_target": os.getenv("HOME_NET")})
 
     # Start polling for Nginx access logs
