@@ -1,3 +1,5 @@
+---
+
 # Can't put these here until this is resolved: https://github.com/docker/compose/issues/11404
 # For now, you need to modify this directly into the docker-compose-virt.yml file (but no not check into git)
 #services:

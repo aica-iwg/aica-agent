@@ -1,3 +1,5 @@
+---
+
 services:
   manager:
     environment:
@@ -13,7 +15,7 @@ services:
       # but this or "tap_net" (in virt mode) should both come up as eth1
       target:
         ipv4_address: 10.107.100.150
-  
+
   siem:
     networks:
       target:
@@ -56,7 +58,7 @@ services:
       target:
         ipv4_address: 10.107.100.170
     healthcheck:
-      test: [ "CMD-SHELL", "ls /tmp | grep eicar" ]
+      test: ["CMD-SHELL", "ls /tmp | grep eicar"]
       interval: 10s
       timeout: 10s
       retries: 5
@@ -75,13 +77,13 @@ services:
     networks:
       target:
         ipv4_address: 10.107.100.190
-  
+
 networks:
   target:
     internal: true
     ipam:
       driver: default
       config:
-        - subnet: 10.107.100.0/24 
+        - subnet: 10.107.100.0/24
           ip_range: 10.107.100.128/25
           gateway: 10.107.100.1

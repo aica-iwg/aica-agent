@@ -1,8 +1,10 @@
+---
+
 name: CI Test Action
 
 on:
   pull_request:
-    branches: [ main ]
+    branches: [main]
 
 env:
   MODE: emu
@@ -14,22 +16,22 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v3
+      - uses: actions/checkout@v3
 
-    - uses: conda-incubator/setup-miniconda@v2
-      with:
-        auto-update-conda: true
-        python-version: ${{ matrix.python-version }}
-      
-    - name: Set up environment 
-      run:  echo $ENV_FILE | base64 --decode > manager/.env && make init 
-    
-    - name: Build Containers 
-      run:  make build
+      - uses: conda-incubator/setup-miniconda@v2
+        with:
+          auto-update-conda: true
+          python-version: ${{ matrix.python-version }}
 
-    - name: Run tests
-      run:  make test
+      - name: Set up environment
+        run: echo $ENV_FILE | base64 --decode > manager/.env && make init
 
-    - name: Dump docker logs on failure
-      if: failure()
-      uses: jwalton/gh-docker-logs@v2
+      - name: Build Containers
+        run: make build
+
+      - name: Run tests
+        run: make test
+
+      - name: Dump docker logs on failure
+        if: failure()
+        uses: jwalton/gh-docker-logs@v2
