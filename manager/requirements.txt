@@ -1,4 +1,4 @@
-Django==4.2.11
+Django==5.0.6
 amqp==5.2.0
 backoff==2.2.1
 celery==5.3.6
