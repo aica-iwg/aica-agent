@@ -1,3 +1,5 @@
+---
+
 services:
   manager:
     build: manager
@@ -6,8 +8,8 @@ services:
     env_file:
       - manager/.env
     ports:
-      - "8000:8000" # Django frontend
-      - "5555:5555" # Celery Flower
+      - "8000:8000"  # Django frontend
+      - "5555:5555"  # Celery Flower
     depends_on:
       manager_mq:
         condition: service_healthy
@@ -79,7 +81,7 @@ services:
       retries: 5
 
   manager_graphdb:
-    build: manager_graphdb 
+    build: manager_graphdb
     container_name: manager_graphdb
     restart: unless-stopped
     environment:
@@ -101,10 +103,10 @@ services:
       control:
         ipv4_address: 10.107.50.230
     healthcheck:
-      test: [ "CMD-SHELL", "wget http://localhost:7474/" ]
+      test: ["CMD-SHELL", "wget http://localhost:7474/"]
       interval: 10s
       timeout: 10s
-      retries: 10 
+      retries: 10
 
   elasticsearch:
     build: elasticsearch
@@ -134,8 +136,8 @@ services:
           memory: 1g
     healthcheck:
       test: ["CMD-SHELL",
-              "curl --insecure -u elastic:$${ELASTIC_PASSWORD} -s -X GET 'http://localhost:9200/_cluster/health?pretty' 
-              | grep '\"status\" : \"green\"'"]
+             "curl --insecure -u elastic:$${ELASTIC_PASSWORD} -s -X GET 'http://localhost:9200/_cluster/health?pretty'
+             | grep '\"status\" : \"green\"'"]
       interval: 10s
       timeout: 30s
       retries: 20
@@ -156,7 +158,7 @@ services:
     ports:
       - "9000:9000"  # Graylog web GUI
     healthcheck:
-      test: [ "CMD-SHELL", "wget http://localhost:9000"]
+      test: ["CMD-SHELL", "wget http://localhost:9000"]
       interval: 10s
       timeout: 10s
       retries: 5
@@ -175,6 +177,6 @@ networks:
     ipam:
       driver: default
       config:
-        - subnet: 10.107.50.0/24 
+        - subnet: 10.107.50.0/24
           ip_range: 10.107.50.128/25
-          gateway: 10.107.50.1 
+          gateway: 10.107.50.1

@@ -313,22 +313,23 @@ def initialize(**kwargs: Dict[Any, Any]) -> None:
         return
 
     ### Preload Contextual Data ###
-    # (To update this data, run each of these functions without import_file and export with APOC to an updated file)
+    # To update this data, run each of these functions without import_file and export with APOC to an updated file, like:
+    #     CALL apoc.export.graphml.all("aica-suricata_categories-20240513.graphml", {format:"gephi", useTypes:true})
     # Although this is a bit clunky, creating this data from scratch (esp nmap port info) takes a while, so we don't
     # want to do it on each start of the agent if we can avoid it.
 
     # Load ClamAV Categories into Graph
     create_malware_categories(
-        import_file="/graph_data/aica-malware_categories-20240425.graphml"
+        import_file="/graph_data/aica-malware_categories-20240513.graphml"
     )
 
     # Get Suricata rule classes and load into Graph
     create_suricata_categories(
-        import_file="/graph_data/aica-suricata_categories-20240425.graphml"
+        import_file="/graph_data/aica-suricata_categories-20240513.graphml"
     )
 
     # Get nmap-services and load into Graph
-    create_port_info(import_file="/graph_data/aica-nmap_port_info-20240425.graphml")
+    create_port_info(import_file="/graph_data/aica-nmap_port_info-20240513.graphml")
 
     ### Start Tasks ###
 
@@ -354,6 +355,9 @@ def initialize(**kwargs: Dict[Any, Any]) -> None:
     # Start polling for WAF alerts in background
     poll_waf_alerts.apply_async()
 
+    # Start the DNP3 capture in background
+    capture_dnp3.apply_async(kwargs={"interface": os.getenv("TAP_IF")})
+
     # Start polling for exports of the knowledge graph for processing
     # We really don't like doing things this way, but Neo4J's inability to understand sparse matrices
     # (as needed for graph embedding generation from vectorized node IDs) forced us into it.
@@ -361,11 +365,3 @@ def initialize(**kwargs: Dict[Any, Any]) -> None:
 
     # Start the Netflow graph pruner in background
     prune_netflow_data.apply_async()
-
-    # For testing
-    # replay_dnp3_pcap.delay(
-    #     pcap_file="pcaps/20200514_DNP3_Disable_Unsolicited_Messages_Attack/DNP3 PCAP Files/20200514_DNP3_Disable_Unsolicited_Messages_Attack_UOWM_DNP3_Dataset_Master.pcap"
-    # )
-
-    # For live use
-    capture_dnp3.apply_async(kwargs={"interface": os.getenv("TAP_IF")})

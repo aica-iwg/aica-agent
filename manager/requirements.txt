@@ -32,5 +32,7 @@ scikit-learn==1.4.2
 sqlalchemy==2.0.29
 stix2==3.0.1
 supervisor-stdout==0.1.1
+torch==2.3.0
+torch-geometric==2.5.3
 watchdog==4.0.0
 vt-py==0.18.0

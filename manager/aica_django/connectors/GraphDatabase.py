@@ -7,7 +7,9 @@ Classes:
 
 import datetime
 import inspect
+import networkx as nx
 import os
+import random
 import re2 as re  # type: ignore
 import stix2  # type: ignore
 import time
@@ -15,7 +17,10 @@ import time
 from celery import current_app
 from celery.app import shared_task
 from celery.utils.log import get_task_logger
+from io import BytesIO, StringIO
 from neo4j import GraphDatabase  # type: ignore
+from networkx.readwrite import read_graphml
+from scipy.io import mmread, mmwrite  # type: ignore
 from sklearn.feature_extraction.text import HashingVectorizer  # type: ignore
 from stix2.base import _STIXBase  # type: ignore
 from typing import Any, Dict, List, Optional, Union
@@ -56,8 +61,7 @@ def dict_to_cypher(input_dict: dict[str, Any]) -> str:
 def process_graphml(path: str) -> None:
     # TODO: This is where we'd do whatever processing on the GraphML file we want
     # For example, converting the node ID vectors back from a string into a CSR matrix,
-    # running PecanPy to generate the graph embeddings, kicking off clustering/classification,
-    # and pushing labels back onto nodes in the Neo4J graph.
+    # generating the graph embeddings, and pushing info back onto nodes in the Neo4J graph.
     logger.error("GraphML function not yet implemented!")
 
 
@@ -254,9 +258,7 @@ class AicaNeo4j:
 
             # Periodic export of graph to graphML for analysis
             export_freq = str(int(os.getenv("AICA_GRAPHML_EXPORT_FREQ", default=1800)))
-            export_query = (
-                'CALL apoc.export.graphml.all("/graph_data/aica.graphml", {})'
-            )
+            export_query = 'CALL apoc.export.graphml.all("/graph_data/aica.graphml", {format:"gephi", useTypes:true})'
             schedule_query = f"CALL apoc.periodic.repeat('export-graphml', '{export_query}', {export_freq});"
             self.graph.execute_query(schedule_query)
 
@@ -298,8 +300,12 @@ class AicaNeo4j:
         for node_id, node_label, node_property_list, node_id_vector in zip(
             node_ids, node_labels, node_property_lists, node_id_vectors
         ):
-            node_property_list["identifier_vec"] = node_id_vector
-            node_property_list["first_merge"] = datetime.datetime.now()
+            now = int(datetime.datetime.now().timestamp())
+            mm_array = BytesIO()
+            mmwrite(mm_array, node_id_vector)
+            node_property_list["identifier_vec"] = mm_array.getvalue().decode("latin1")
+            node_property_list["first_merge"] = now
+            node_property_list["last_merge"] = now
             node_property_list["merge_count"] = 1
             node_property_list = {
                 k: re.sub("'", '"', str(v))
@@ -312,7 +318,7 @@ class AicaNeo4j:
             queries.append(
                 f'MERGE (n:`{node_label}` {{identifier: "{node_id}"}}) '
                 + f"ON CREATE SET {create_properties} "
-                + f"ON MATCH SET n.last_merge=timestamp(), n.merge_count=(toInteger(n.merge_count) + 1) "
+                + f"ON MATCH SET n.last_merge={now}, n.merge_count=(toInteger(n.merge_count) + 1) "
                 + "RETURN n.identifier"
             )
 
