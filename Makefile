@@ -1,12 +1,19 @@
 export DOCKER_SCAN_SUGGEST := false
 export DOCKER_BUILDKIT := 1
 
-CONDA := conda run --no-capture-output -n aica
+CONDA_IMPL := /home/iprieto/.local/bin/micromamba
+CONDA := @${CONDA_IMPL} run --no-capture-output -n aica
 
 check-env:
 ifndef MODE
 		$(error MODE is undefined)
 endif
+
+
+conda-init:
+		@${CONDA_IMPL} create -n aica-bootstrap-env
+		@${CONDA_IMPL} install -y -n aica-bootstrap-env pyyaml packaging
+
 
 init: environment.yml
 		@conda env update -f environment.yml
