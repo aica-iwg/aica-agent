@@ -31,16 +31,16 @@ dependencies:
   - watchdog=4.0.0
   - vt-py=0.18.0
   - pip:
-    - fasteners==0.19
-    - ipwhois==1.2.0
-    - mac-vendor-lookup==0.1.12
-    - neo4j==5.19.0
-    - netaddr==1.2.1
-    - netflow==0.12.2
-    - netifaces2==0.0.21
-    - pecanpy==2.0.9
-    - python3-nmap==1.6.0
-    - stix2==3.0.1
-    - supervisor-stdout==0.1.1
-    - torch-geometric==2.5.3
-    - torch==2.3.0
+      - fasteners==0.19
+      - ipwhois==1.2.0
+      - mac-vendor-lookup==0.1.12
+      - neo4j==5.19.0
+      - netaddr==1.2.1
+      - netflow==0.12.2
+      - netifaces2==0.0.21
+      - pecanpy==2.0.9
+      - python3-nmap==1.6.0
+      - stix2==3.0.1
+      - supervisor-stdout==0.1.1
+      - torch-geometric==2.5.3
+      - torch==2.3.0
