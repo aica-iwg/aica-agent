@@ -18,6 +18,7 @@ dev-init:
 
 		@${CONDA_IMPL} env create -f attacker/environment.yml
 		@${CONDA_IMPL} env create -f honeypot/environment.yml
+		@${CONDA_IMPL} env create -f manager/environment.yml
 		
 
 
