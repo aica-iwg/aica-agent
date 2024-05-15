@@ -1,0 +1,67 @@
+---
+channels:
+- conda-forge
+dependencies:
+- python=3.11
+- mypy=1.8.*
+- yamllint=1.35.*
+- pip=24.*
+- pip:
+  - bandit==1.7.7
+  - bashlint==0.1.1
+  - black==24.2.0
+  - celery-types==0.22.0
+  - charset-normalizer==3.3.2
+  - django-stubs==4.2.7
+  - networkx-stubs==0.0.1
+  - pandas-stubs==2.2.0.240218
+  - safety==3.0.1
+  - types-requests==2.31.0.20240218
+  - types-dateparser==1.1.4.20240106
+  - types-openpyxl==3.1.0.20240220
+  - types-paramiko==3.4.0.20240103
+  - urllib3==2.2.1
+  - Django==4.2.11
+  - amqp==5.2.0
+  - backoff==2.2.1
+  - celery==5.3.6
+  - coverage==7.4.4
+  - dateparser==1.2.0
+  - django-extensions==3.2.3
+  - fasteners==0.19
+  - flower==2.0.1
+  - google-re2==1.1
+  - gunicorn==21.2.0
+  - ipwhois==1.2.0
+  - joblib==1.4.0
+  - kombu==5.3.7
+  - mac-vendor-lookup==0.1.12
+  - neo4j==5.19.0
+  - netaddr==1.2.1
+  - netflow==0.12.2
+  - netifaces2==0.0.21
+  - networkx==3.3
+  - pandas==2.2.2
+  - paramiko==3.4.0
+  - pecanpy==2.0.9
+  - pymongo==4.6.3
+  - pyshark==0.6
+  - python-dotenv==1.0.1
+  - python3-nmap==1.6.0
+  - pyyaml==6.0.1
+  - requests==2.21.0
+  - scikit-learn==1.4.2
+  - sqlalchemy==2.0.29
+  - stix2==3.0.1
+  - supervisor-stdout==0.1.1
+  - torch==2.3.0
+  - torch-geometric==2.5.3
+  - watchdog==4.0.0
+  - vt-py==0.18.0
+  - scapy==2.5.0
+  - pcapyplus==1.0.1
+  - opencanary==0.9.2
+  - PyJWT==2.8.0
+  - selenium==4.18.1
+  - psycopg2-binary==2.9.9
+name: aica-devel

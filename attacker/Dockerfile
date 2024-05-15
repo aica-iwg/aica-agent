@@ -17,21 +17,27 @@ RUN apt-get update && \
         openssh-server \
         python3-dev \
         python3-pip \
-        python3-venv
+        python3-venv \
+        curl
 
 RUN ssh-keygen -A
 
 COPY docker_entrypoint.sh /usr/local/bin/
 RUN chmod +x /usr/local/bin/docker_entrypoint.sh
 
-RUN useradd kali
+
+
+RUN useradd -m kali
 
 USER kali
 
+
 WORKDIR /home/kali
 
-COPY requirements.txt .
-RUN python3 -m venv attacker && \
-    ./attacker/bin/python -m pip install -Ur requirements.txt
+#Install micromamba
+RUN curl -Ls https://micro.mamba.pm/api/micromamba/linux-64/latest | tar -xvj bin/micromamba
+COPY environment-attacker.yml .
+RUN bin/micromamba env create -f environment-attacker.yml
+
 
 COPY tests/ ./tests

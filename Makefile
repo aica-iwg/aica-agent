@@ -10,13 +10,19 @@ ifndef MODE
 endif
 
 
-conda-init:
+dev-init:
 		@${CONDA_IMPL} create -n aica-bootstrap-env
 		@${CONDA_IMPL} install -y -n aica-bootstrap-env pyyaml packaging
+		@${CONDA_IMPL} run -n aica-bootstrap-env python3 compute_dev.py
 
 
-init: environment.yml
-		@conda env update -f environment.yml
+		@${CONDA_IMPL} env create -f attacker/environment.yml
+		@${CONDA_IMPL} env create -f honeypot/environment.yml
+		
+
+
+init: environment-core.yml
+		@${CONDA_IMPL} env create -f environment-core.yml
 
 black:
 		@${CONDA} black -q manager/ attacker/
@@ -33,7 +39,7 @@ security:
 		@${CONDA} safety check -r honeypot/requirements.txt
 
 build: check-env
-		@docker compose -f docker-compose.yml -f docker-compose-${MODE}.yml build
+		@docker compose -f docker-compose.yml -f docker-compose-${MODE}.yml build 
 
 test: lint security
 		@MODE=emu docker compose -f docker-compose.yml -f docker-compose-emu.yml \
