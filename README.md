@@ -33,7 +33,7 @@ This project will build on the ideas of the AICA framework as outlined in [Thero
 
 It is important to ensure your main branch is up-to-date before each working session, and you should commit your changes incrementally and often to ensure minimal divergence and chance of merge conflicts. Changes should be "intact" functionally (i.e., don't submit partially-completed work) and keep the main repository in a working state. This means you should think about functionality in the smallest possible chunks to keep your contributed work up to date.
 
-You can bootstrap your environment with `make dev-init`, which will create a conda environment for building and testing. 
+You can bootstrap your environment with `make init`, which will create a conda environment for building and testing. 
 
 Changes must be pushed to a branch and PR'ed to main. Before pushing your changes, you should first locally execute a `make test` and ensure it completes successfully. If it does not, either fix the issues or propose exclusions to the relevant test areas (will be subject to peer review).
 
