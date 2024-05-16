@@ -20,6 +20,9 @@ jobs:
 
       - uses: mamba-org/setup-micromamba@v1.8.1
 
+      - name: Fetch dependancies
+        run: sudo apt-get install libpcap-dev
+
       - name: Set up environment
         run: echo $ENV_FILE | base64 --decode > manager/.env && make init
 
