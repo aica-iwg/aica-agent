@@ -17,4 +17,4 @@ RUN micromamba install -y -n base -f /tmp/env.yml && \
     micromamba clean --all --yes
 
 USER root
-ENTRYPOINT ["/usr/local/bin/_entrypoint.sh", "/opt/conda/bin/opencanaryd", "--dev"]
+#ENTRYPOINT ["/usr/local/bin/_entrypoint.sh", "/opt/conda/bin/opencanaryd", "--dev"]

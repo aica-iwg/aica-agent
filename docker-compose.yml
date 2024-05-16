@@ -30,7 +30,6 @@ services:
     # For PCAPs
     cap_add:
       - NET_ADMIN
-    
 
   manager_db:
     image: postgres:13.8-bullseye

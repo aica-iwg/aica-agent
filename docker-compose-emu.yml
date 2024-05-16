@@ -71,7 +71,7 @@ services:
   honeypot:
     build: honeypot
     container_name: honeypot
-    command: bash -c "source canary/bin/activate && /canary/bin/opencanaryd --dev"
+    command: bash -c "/usr/local/bin/_entrypoint.sh && /opt/conda/bin/opencanaryd --dev"
     volumes:
       - ./honeypot/opencanary.conf:/etc/opencanaryd/opencanary.conf
     networks:

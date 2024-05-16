@@ -29,7 +29,7 @@ black:
 		@${CONDA} black -q manager/ attacker/
 
 lint:
-		#@${CONDA} yamllint .
+		@${CONDA} yamllint .
 		@${CONDA} bashlint .
 		@${CONDA} black --check --diff -q manager/ attacker/
 		@${CONDA} mypy --install-types --warn-unreachable --strict --non-interactive --exclude test manager/
@@ -49,8 +49,8 @@ build: check-env
 		@docker compose -f docker-compose.yml -f docker-compose-${MODE}.yml build 
 
 test-initless: lint security-precheck security-postcheck
-		@MODE=emu docker compose -f docker-compose.yml -f docker-compose-emu.yml \
-			run -e SKIP_TASKS=true --rm \
+		@MODE=emu docker compose -f docker-compose.yml -f docker-compose-emu.yml up --wait -d && \
+			docker exec -e SKIP_TASKS=true \
 			manager /bin/bash -c " \
 				/usr/src/app/bin/micromamba run -n base coverage run --omit='*test*' manage.py test --noinput && \
 				/usr/src/app/bin/micromamba run -n base coverage report --fail-under=30"
