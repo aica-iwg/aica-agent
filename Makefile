@@ -1,7 +1,7 @@
 export DOCKER_SCAN_SUGGEST := false
 export DOCKER_BUILDKIT := 1
 
-MAMBA_RUN := @${MAMBA_EXE} run -n aica-make
+MAMBA_RUN := ${MAMBA_EXE} run -n aica-make
 
 check-env:
 ifndef MODE
@@ -25,9 +25,9 @@ security-precheck:
 		@${MAMBA_RUN} safety check -r attacker/environment-attacker.yml
 
 security-postcheck:
-		@${MAMBA_EXE} list -n manager-dev --json | (/home/iprieto/.local/bin/micromamba run -n aica-make jake ddt -t CONDA_JSON)
-		@${MAMBA_EXE} list -n honeypot-dev --json | (/home/iprieto/.local/bin/micromamba run -n aica-make jake ddt -t CONDA_JSON)
-		@${MAMBA_EXE} list -n attacker-dev --json | (/home/iprieto/.local/bin/micromamba run -n aica-make jake ddt -t CONDA_JSON)
+		@${MAMBA_EXE} list -n manager-dev --json | (${MAMBA_RUN} jake ddt -t CONDA_JSON)
+		@${MAMBA_EXE} list -n honeypot-dev --json | (${MAMBA_RUN} jake ddt -t CONDA_JSON)
+		@${MAMBA_EXE} list -n attacker-dev --json | (${MAMBA_RUN} jake ddt -t CONDA_JSON)
 
 
 init: init-core-env security-precheck init-dev-envs security-postcheck
