@@ -73,5 +73,5 @@ COPY . .
 COPY docker_entrypoint.sh /usr/local/bin/docker_entrypoint.sh
 RUN chmod +x /usr/local/bin/docker_entrypoint.sh
 
-CMD /usr/local/bin/docker_entrypoint.sh
+CMD ["bin/micromamba", "run", "-n", "base", "/usr/local/bin/docker_entrypoint.sh"]
 

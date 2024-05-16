@@ -1,4 +1,8 @@
 #!/bin/bash
+# echo "Activating micromamba enviroment"
+# eval "$(/usr/src/app/bin/micromamba shell hook --shell bash )"
+# /usr/src/app/bin/micromamba activate base
+
 set -e
 
 cd /usr/src/app
@@ -22,9 +26,7 @@ service supervisor start
 # Tell Celery to not run tasks on the following manage.py invocations
 export SKIP_TASKS=true
 
-echo "Activating micromamba enviroment"
-eval "$(micromamba shell hook --shell )"
-/usr/src/app/bin/micromamba activate base
+
 
 # Apply database migrations
 echo "Creating Django Database"

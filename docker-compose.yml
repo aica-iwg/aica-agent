@@ -4,7 +4,7 @@ services:
   manager:
     build: manager
     container_name: manager
-    restart: unless-stopped
+    restart: on-failure:2 #unless-stopped
     env_file:
       - manager/.env
     ports:
@@ -30,6 +30,7 @@ services:
     # For PCAPs
     cap_add:
       - NET_ADMIN
+    
 
   manager_db:
     image: postgres:13.8-bullseye
