@@ -5,6 +5,7 @@ extends: default
 ignore: |
   aica-manager/
   target/etc/aica-config.yml
+  */environment.yml
 
 rules:
   line-length:

@@ -23,6 +23,7 @@ service supervisor start
 export SKIP_TASKS=true
 
 echo "Activating micromamba enviroment"
+eval "$(micromamba shell hook --shell )"
 /usr/src/app/bin/micromamba activate base
 
 # Apply database migrations
