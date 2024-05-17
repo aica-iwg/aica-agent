@@ -18,11 +18,28 @@ init-dev-envs:
 		@${MAMBA_EXE} -y env create -f honeypot/environment.yml
 		@${MAMBA_EXE} -y env create -f manager/environment.yml
 
-security-precheck:
-		@${MAMBA_RUN} bandit -q -ll -ii -r manager/
-		@${MAMBA_RUN} safety check -r manager/environment-manager.yml
-		@${MAMBA_RUN} safety check -r honeypot/environment-honeypot.yml
-		@${MAMBA_RUN} safety check -r attacker/environment-attacker.yml
+security-precheck-init:
+		@${MAMBA_EXE} -y env create -f environment-security.yml
+		@${MAMBA_EXE} run -n aica-secprecheck python3 compute_security.py
+
+security-precheck-bandit:
+		@${MAMBA_EXE} run -n aica-secprecheck bandit -q -ll -ii -r manager/
+
+security-precheck-safety-core:
+		@${MAMBA_EXE} run -n aica-secprecheck safety check -r reqs.txt
+
+security-precheck-safety-attacker:
+		@${MAMBA_EXE} run -n aica-secprecheck safety check -r attacker/reqs.txt
+
+security-precheck-safety-honeypot:
+		@${MAMBA_EXE} run -n aica-secprecheck safety check -r honeypot/reqs.txt
+
+security-precheck-safety-manager:
+		@${MAMBA_EXE} run -n aica-secprecheck safety check -r manager/reqs.txt
+
+security-precheck: security-precheck-init security-precheck-bandit security-precheck-safety-core security-precheck-safety-attacker security-precheck-safety-honeypot security-precheck-safety-manager
+
+		
 
 security-postcheck:
 		@${MAMBA_EXE} list -n manager-dev --json | (${MAMBA_RUN} jake ddt -t CONDA_JSON)
@@ -30,7 +47,7 @@ security-postcheck:
 		@${MAMBA_EXE} list -n attacker-dev --json | (${MAMBA_RUN} jake ddt -t CONDA_JSON)
 
 
-init: init-core-env security-precheck init-dev-envs security-postcheck
+init: security-precheck init-core-env init-dev-envs security-postcheck
 		
 
 

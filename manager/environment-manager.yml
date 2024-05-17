@@ -3,9 +3,9 @@ name: base
 channels:
   - conda-forge
 dependencies:
-  - python=3.11
+  - python=3.11.9
   - pip=24.*
-  - Django=4.2.11
+  - Django=4.2.13
   - amqp=5.2.0
   - backoff=2.2.1
   - celery=5.3.6

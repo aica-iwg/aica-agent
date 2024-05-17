@@ -1,0 +1,13 @@
+---
+name: aica-secprecheck
+channels:
+  - conda-forge
+dependencies: #MUST BE IDENTICAL VERSIONS TO CORE PACKAGE
+  - python=3.11.9
+  - pip=24.*
+  - pyyaml
+  # Some things are down here for better cross-platform compatibility
+  - pip: 
+      - bandit==1.7.7
+      - safety==3.0.1
+      - jake

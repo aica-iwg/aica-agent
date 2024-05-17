@@ -3,7 +3,7 @@ name: aica-make
 channels:
   - conda-forge
 dependencies:
-  - python=3.11
+  - python=3.11.9
   - mypy=1.8.*
   - yamllint=1.35.*
   - pip=24.*
@@ -13,7 +13,7 @@ dependencies:
   - pip:
       - bandit==1.7.7
       - bashlint==0.1.1
-      - black==24.2.0
+      - black==24.3.0
       - celery-types==0.22.0
       - charset-normalizer==3.3.2
       - django-stubs==4.2.7

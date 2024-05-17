@@ -3,7 +3,7 @@ name: base
 channels:
   - conda-forge
 dependencies:
-  - python=3.11
+  - python=3.11.9
   - pip=24.*
   - scapy=2.5.0
   - pip:
