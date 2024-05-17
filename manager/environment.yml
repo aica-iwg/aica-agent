@@ -42,5 +42,6 @@ dependencies:
   - stix2==3.0.1
   - supervisor-stdout==0.1.1
   - torch-geometric==2.5.3
+  - --extra-index-url https://download.pytorch.org/whl/cpu
   - torch==2.3.0
 name: manager-dev

@@ -37,7 +37,13 @@ def main() -> None:
             handle["dependencies"]=[dep + "=" + deps[dep] for dep in deps.keys()]
             
             if len(pipDeps) != 0:
-                handle["dependencies"].append({"pip":[dep + "==" + pipDeps[dep] for dep in pipDeps.keys()]})
+                parsedPip = {"pip":[dep + "==" + pipDeps[dep] for dep in pipDeps.keys()]}
+                if "torch" in pipDeps.keys():
+                    torchloc = parsedPip["pip"].index("torch=="+ pipDeps["torch"])
+                    parsedPip["pip"].insert(torchloc, "--extra-index-url https://download.pytorch.org/whl/cpu")
+
+                handle["dependencies"].append(parsedPip)
+                
             
             with open(reqLoc+"/environment.yml", "w") as computedEnvFp:
                 computedEnvFp.write("---\n")
