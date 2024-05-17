@@ -26,16 +26,16 @@ security-precheck-bandit:
 		@${MAMBA_EXE} run -n aica-secprecheck bandit -q -ll -ii -r manager/
 
 security-precheck-safety-core:
-		@${MAMBA_EXE} run -n aica-secprecheck safety check -r reqs.txt
+		@${MAMBA_EXE} run -n aica-secprecheck safety check -r reqs.txt --policy-file .safety-check-policy.yml
 
 security-precheck-safety-attacker:
-		@${MAMBA_EXE} run -n aica-secprecheck safety check -r attacker/reqs.txt
+		@${MAMBA_EXE} run -n aica-secprecheck safety check -r attacker/reqs.txt --policy-file .safety-check-policy.yml
 
 security-precheck-safety-honeypot:
-		@${MAMBA_EXE} run -n aica-secprecheck safety check -r honeypot/reqs.txt
+		@${MAMBA_EXE} run -n aica-secprecheck safety check -r honeypot/reqs.txt --policy-file .safety-check-policy.yml
 
 security-precheck-safety-manager:
-		@${MAMBA_EXE} run -n aica-secprecheck safety check -r manager/reqs.txt
+		@${MAMBA_EXE} run -n aica-secprecheck safety check -r manager/reqs.txt --policy-file .safety-check-policy.yml
 
 security-precheck: security-precheck-init security-precheck-bandit security-precheck-safety-core security-precheck-safety-attacker security-precheck-safety-honeypot security-precheck-safety-manager
 

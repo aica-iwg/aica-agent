@@ -1,0 +1,9 @@
+security:
+  continue-on-vulnerability-error: False
+  ignore-cvss-severity-below: 0
+  ignore-cvss-unknown-severity: False
+  ignore-vulnerabilities:
+    65052:
+      reason: Disputed + not impacted accd to vendor
+      expires: '2024-06-17'
+
