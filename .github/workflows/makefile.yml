@@ -30,7 +30,7 @@ jobs:
         run: cat manager/environment-manager.yml | sed 's/      - torch==/      - --extra-index-url https:\/\/download.pytorch.org\/whl\/cpu\n&/' > manager/environment-manager.yml
 
       - name: CI-Specific optimization (Remove Development Envs)
-        run: micromamba env remove -n attacker-dev && micromamba env remove -n honeypot-dev && micromamba env remove -n manager-env
+        run: micromamba env remove -n attacker-dev && micromamba env remove -n honeypot-dev && micromamba env remove -n manager-dev
 
       - name: CI-Specific optimization (Purge Cache)
         run: pip cache purge && micromamba clean -a
