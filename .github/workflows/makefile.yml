@@ -27,9 +27,7 @@ jobs:
         run: echo $ENV_FILE | base64 --decode > manager/.env && make init
 
       - name: CI-Specific optimization (Disable GPU)
-        run: >
-          sed 's/      - torch==/      - --extra-index-url https:\/\/download.pytorch.org\/whl\/cpu\n&/' \
-          -i manager/environment-manager.yml
+        run: sed 's/      - torch==/      - --extra-index-url https:\/\/download.pytorch.org\/whl\/cpu\n&/' -i manager/environment-manager.yml
 
       - name: CI-Specific optimization (Remove Development Envs)
         run: >
