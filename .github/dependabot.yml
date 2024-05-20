@@ -31,10 +31,6 @@ updates:
     schedule:
       interval: "weekly"
   - package-ecosystem: docker
-    directory: "node_red_target"
-    schedule:
-      interval: "weekly"
-  - package-ecosystem: docker
     directory: "ids"
     schedule:
       interval: "weekly"
@@ -43,14 +39,6 @@ updates:
     schedule:
       interval: "weekly"
   - package-ecosystem: docker
-    directory: "honeypot"
-    schedule:
-      interval: "weekly"
-  - package-ecosystem: pip
-    directory: "manager"
-    schedule:
-      interval: "weekly"
-  - package-ecosystem: pip
     directory: "honeypot"
     schedule:
       interval: "weekly"
