@@ -18,7 +18,6 @@ def shvvl(tag: str, bpf: int) -> bytes:
         hashfunc.update(blockInput)
         out += hashfunc.digest(bpf)
 
-    print(out.hex())
     return out
 
 def shvvl_float(tag: str, bpf: int) -> list[float]:
@@ -27,8 +26,7 @@ def shvvl_float(tag: str, bpf: int) -> list[float]:
         for l in range(8):
             out.append(1.0 if (bite&(1<<l)) != 0 else 0.0)
         
-    print(out)
-    return
+    return out
     
 
 
