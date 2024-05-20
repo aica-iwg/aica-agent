@@ -23,8 +23,17 @@ jobs:
       - name: Fetch dependancies
         run: sudo apt-get install libpcap-dev
 
-      - name: Set up environment
+      - name: Set up and scan environment
         run: echo $ENV_FILE | base64 --decode > manager/.env && make init
+
+      - name: CI-Specific optimization (Disable GPU)
+        run: cat manager/environment-manager.yml | sed 's/      - torch==/      - --extra-index-url https:\/\/download.pytorch.org\/whl\/cpu\n&/' > manager/environment-manager.yml
+
+      - name: CI-Specific optimization (Remove Development Envs)
+        run: micromamba env remove attacker-dev && micromamba env remove honeypot-dev && micromamba env remove manager-env
+
+      - name: CI-Specific optimization (Purge Cache)
+        run: pip cache purge && micromamba clean -a
 
       - name: Build Containers
         run: make build
