@@ -1,4 +1,8 @@
 #!/bin/bash
+# echo "Activating micromamba enviroment"
+# eval "$(/usr/src/app/bin/micromamba shell hook --shell bash )"
+# /usr/src/app/bin/micromamba activate base
+
 set -e
 
 cd /usr/src/app
@@ -22,18 +26,20 @@ service supervisor start
 # Tell Celery to not run tasks on the following manage.py invocations
 export SKIP_TASKS=true
 
+
+
 # Apply database migrations
 echo "Creating Django Database"
-/opt/venv/bin/python3 manage.py sqlcreate -D \
+python3 manage.py sqlcreate -D \
   | grep -v USER \
-  | /opt/venv/bin/python3 manage.py dbshell --database postgres
+  | python3 manage.py dbshell --database postgres
 
-/opt/venv/bin/python3 manage.py makemigrations && /opt/venv/bin/python3 manage.py migrate
+python3 manage.py makemigrations && python3 manage.py migrate
 
 # Create superuser for Django
 if [ "$DJANGO_SUPERUSER_USERNAME" ]; then
     echo "Creating Django Superuser"
-    /opt/venv/bin/python3 manage.py createsuperuser --noinput
+    python3 manage.py createsuperuser --noinput
 fi
 
 echo "Manager started in mode: ${MODE}"

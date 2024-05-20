@@ -18,13 +18,28 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - uses: conda-incubator/setup-miniconda@v2
-        with:
-          auto-update-conda: true
-          python-version: ${{ matrix.python-version }}
+      - uses: mamba-org/setup-micromamba@v1.8.1
 
-      - name: Set up environment
+      - name: Fetch dependancies
+        run: sudo apt-get install libpcap-dev
+
+      - name: Set up and scan environment
         run: echo $ENV_FILE | base64 --decode > manager/.env && make init
+
+      - name: CI-Specific optimization (Disable GPU)
+        run: sed 's/      - torch==/      - --extra-index-url https:\/\/download.pytorch.org\/whl\/cpu\n&/' -i manager/environment-manager.yml
+
+      - name: CI-Specific optimization (Remove Development Envs)
+        run: |
+          micromamba env remove -n attacker-dev
+          micromamba env remove -n honeypot-dev
+          micromamba env remove -n manager-dev
+
+      - name: CI-Specific optimization (Purge Cache)
+        run: pip cache purge && micromamba clean -a
+
+      - name: CI-Specific optimization (Lower SIEM message journal max size)
+        run: echo "RUN sed -i 's/#message_journal_max_size = 5gb/message_journal_max_size = 500mb/' /usr/share/graylog/data/config/graylog.conf" >> siem/Dockerfile
 
       - name: Build Containers
         run: make build

@@ -38,15 +38,13 @@ RUN --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
         tcpdump \
         tshark \
         net-tools \
-        vim
+        vim \
+        curl
 
-COPY requirements.txt .
-
-RUN python3 -m venv /opt/venv && \
-        /opt/venv/bin/pip3 --no-cache install -qU pip
-
-RUN python3 -m venv /opt/venv && \
-        /opt/venv/bin/pip3 --no-cache install -qUr requirements.txt
+#Install micromamba
+RUN curl -Ls https://micro.mamba.pm/api/micromamba/linux-64/latest | tar -xvj bin/micromamba
+COPY environment-manager.yml .
+RUN bin/micromamba env create -f environment-manager.yml
 
 # Install dependencies
 RUN apt-get -y remove \
@@ -75,5 +73,5 @@ COPY . .
 COPY docker_entrypoint.sh /usr/local/bin/docker_entrypoint.sh
 RUN chmod +x /usr/local/bin/docker_entrypoint.sh
 
-CMD /usr/local/bin/docker_entrypoint.sh
+CMD ["bin/micromamba", "run", "-n", "base", "/usr/local/bin/docker_entrypoint.sh"]
 

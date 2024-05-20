@@ -1,0 +1,11 @@
+---
+name: base
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11.9
+  - pip=24.*
+  - scapy=2.5.0
+  - pip:
+      - pcapyplus==1.0.1
+      - opencanary==0.9.2

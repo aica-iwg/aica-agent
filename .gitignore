@@ -11,3 +11,9 @@ db.sqlite3
 docker-compose-local-overrides.yaml
 pcaps/
 venv
+reqs*
+*/reqs*
+
+enviroment.yml
+
+*/environment.yml
