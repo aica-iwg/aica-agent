@@ -27,7 +27,7 @@ jobs:
         run: echo $ENV_FILE | base64 --decode > manager/.env && make init
 
       - name: CI-Specific optimization (Disable GPU)
-        run: cat manager/environment-manager.yml | sed 's/      - torch==/      - --extra-index-url https:\/\/download.pytorch.org\/whl\/cpu\n&/' > manager/environment-manager.yml
+        run: sed 's/      - torch==/      - --extra-index-url https:\/\/download.pytorch.org\/whl\/cpu\n&/' -i manager/environment-manager.yml
 
       - name: CI-Specific optimization (Remove Development Envs)
         run: micromamba env remove -n attacker-dev && micromamba env remove -n honeypot-dev && micromamba env remove -n manager-dev
