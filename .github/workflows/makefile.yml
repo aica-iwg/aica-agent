@@ -38,6 +38,9 @@ jobs:
       - name: CI-Specific optimization (Purge Cache)
         run: pip cache purge && micromamba clean -a
 
+      - name: CI-Specific optimization (Lower SIEM message journal max size)
+        run: echo "RUN sed -i 's/#message_journal_max_size = 5gb/message_journal_max_size = 500mb/' graylog.conf" >> siem/Dockerfile
+
       - name: Build Containers
         run: make build
 
