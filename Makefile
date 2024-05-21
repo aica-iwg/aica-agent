@@ -9,7 +9,7 @@ ifndef MODE
 endif
 
 
-init-core-env:
+init-core-env: security-precheck
 		@${MAMBA_EXE} -y env create -f environment-core.yml
 		@${MAMBA_RUN} python3 compute_dev.py
 
@@ -27,28 +27,36 @@ security-precheck-bandit:
 
 security-precheck-safety-core:
 		@${MAMBA_EXE} run -n aica-secprecheck safety check -r reqs.txt --policy-file .safety-check-policy.yml
+		@${MAMBA_EXE} run -n aica-secprecheck safety check -r reqsDev.txt --policy-file .safety-check-policy.yml
 
 security-precheck-safety-attacker:
 		@${MAMBA_EXE} run -n aica-secprecheck safety check -r attacker/reqs.txt --policy-file .safety-check-policy.yml
+		@${MAMBA_EXE} run -n aica-secprecheck safety check -r attacker/reqsDev.txt --policy-file .safety-check-policy.yml
 
 security-precheck-safety-honeypot:
 		@${MAMBA_EXE} run -n aica-secprecheck safety check -r honeypot/reqs.txt --policy-file .safety-check-policy.yml
+		@${MAMBA_EXE} run -n aica-secprecheck safety check -r honeypot/reqsDev.txt --policy-file .safety-check-policy.yml
 
 security-precheck-safety-manager:
 		@${MAMBA_EXE} run -n aica-secprecheck safety check -r manager/reqs.txt --policy-file .safety-check-policy.yml
+		@${MAMBA_EXE} run -n aica-secprecheck safety check -r manager/reqsDev.txt --policy-file .safety-check-policy.yml
 
 security-precheck: security-precheck-init security-precheck-bandit security-precheck-safety-core security-precheck-safety-attacker security-precheck-safety-honeypot security-precheck-safety-manager
 
 		
 
-security-postcheck:
+security-dev-postcheck:
 		@${MAMBA_EXE} list -n manager-dev --json | (${MAMBA_RUN} jake ddt -t CONDA_JSON)
 		@${MAMBA_EXE} list -n honeypot-dev --json | (${MAMBA_RUN} jake ddt -t CONDA_JSON)
 		@${MAMBA_EXE} list -n attacker-dev --json | (${MAMBA_RUN} jake ddt -t CONDA_JSON)
 
+security-post-launch-check:
+		@(docker exec honeypot micromamba list -n base --json) |  (${MAMBA_RUN} jake ddt -t CONDA_JSON)
+		@(docker exec attacker /home/kali/bin/micromamba list -n base --json) |  (${MAMBA_RUN} jake ddt -t CONDA_JSON)
+		@(docker exec manager /usr/src/app/bin/micromamba list -n base --json) |  (${MAMBA_RUN} jake ddt -t CONDA_JSON)
 
-init: security-precheck init-core-env init-dev-envs security-postcheck
-		
+init: init-core-env init-dev-envs security-dev-postcheck
+
 
 
 black:
@@ -66,18 +74,14 @@ lint:
 build: check-env
 		@docker compose -f docker-compose.yml -f docker-compose-${MODE}.yml build 
 
-tests:
+tests: lint
 		@MODE=emu docker compose -f docker-compose.yml -f docker-compose-emu.yml up --wait -d && \
 			docker exec -e SKIP_TASKS=true \
 			manager /bin/bash -c " \
 				/usr/src/app/bin/micromamba run -n base coverage run --omit='*test*' manage.py test --noinput && \
 				/usr/src/app/bin/micromamba run -n base coverage report --fail-under=30"
 
-test-initless: lint security-precheck security-postcheck tests
-
-
-test: lint tests
-
+test: tests security-post-launch-check
 
 start: check-env 
 		@docker compose -f docker-compose.yml -f docker-compose-${MODE}.yml up --wait -d
