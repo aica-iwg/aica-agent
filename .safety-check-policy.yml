@@ -1,7 +1,9 @@
+---
+
 security:
-  continue-on-vulnerability-error: False
+  continue-on-vulnerability-error: false
   ignore-cvss-severity-below: 0
-  ignore-cvss-unknown-severity: False
+  ignore-cvss-unknown-severity: false
   ignore-vulnerabilities:
     65052:
       reason: Disputed + not impacted accd to vendor

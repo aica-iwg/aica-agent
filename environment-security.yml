@@ -2,7 +2,7 @@
 name: aica-secprecheck
 channels:
   - conda-forge
-dependencies: #MUST BE IDENTICAL VERSIONS TO CORE PACKAGE
+dependencies:  # MUST BE IDENTICAL VERSIONS TO CORE PACKAGE
   - python=3.11.9
   - pip=24.*
   - pyyaml
