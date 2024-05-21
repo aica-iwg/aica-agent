@@ -1,3 +1,6 @@
+*/environment.yml
+*/reqs*
+.DS_Store
 .coverage
 .env
 .idea
@@ -9,11 +12,7 @@ aica-manager/
 coverage.xml
 db.sqlite3
 docker-compose-local-overrides.yaml
-pcaps/
-venv
-reqs*
-*/reqs*
-
 enviroment.yml
-
-*/environment.yml
+pcaps/
+reqs*
+venv

@@ -4,7 +4,7 @@ import requests
 
 from collections import defaultdict
 from io import StringIO
-from stix2 import Note, Relationship, Software
+from stix2 import Note, Relationship, Software  # type: ignore
 from typing import Optional
 
 from aica_django.converters.AICAStix import AICAAttackPattern
@@ -106,7 +106,7 @@ def create_port_info(import_file: Optional[str] = None) -> None:
         try:
             resp.raise_for_status()
         except requests.exceptions.HTTPError as e:
-            raise e("Couldn't fetch nmap services data.")
+            raise requests.exceptions.HTTPError("Couldn't fetch nmap services data.")
         nmap_file = StringIO(resp.text)
         nmap_df = pd.read_csv(
             nmap_file,
@@ -211,7 +211,7 @@ def create_suricata_categories(import_file: Optional[str] = None) -> None:
         try:
             resp.raise_for_status()
         except requests.exceptions.HTTPError as e:
-            raise e("Couldn't fetch suricata class data.")
+            raise requests.exceptions.HTTPError("Couldn't fetch suricata class data.")
         suricata_file = StringIO(resp.text.replace("config classification: ", ""))
         suricata_df = pd.read_csv(
             suricata_file,
