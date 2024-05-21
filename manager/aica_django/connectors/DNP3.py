@@ -60,7 +60,7 @@ def replay_dnp3_pcap(pcap_file: str) -> None:
 
 @shared_task(name="capture_dnp3")
 def capture_dnp3(interface: str) -> None:
-    cap = pyshark.LiveRingCapture(interface=interface, display_filter="dnp3")
+    cap = pyshark.LiveRingCapture(interface=interface, bpf_filter="dnp3")
     cap.sniff(timeout=50)
     for packet in cap.sniff_continuously(packet_count=5):
         packet_dict = parse_dnp3_packet(packet)

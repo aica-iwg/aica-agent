@@ -10,16 +10,16 @@ endif
 
 
 init-core-env:
-		@${MAMBA_EXE} -y env create -f environment-core.yml
+		@${MAMBA_EXE} -y create -f environment-core.yml
 		@${MAMBA_RUN} python3 compute_dev.py
 
 init-dev-envs:
-		@${MAMBA_EXE} -y env create -f attacker/environment.yml
-		@${MAMBA_EXE} -y env create -f honeypot/environment.yml
-		@${MAMBA_EXE} -y env create -f manager/environment.yml
+		@${MAMBA_EXE} -y create -f attacker/environment.yml
+		@${MAMBA_EXE} -y create -f honeypot/environment.yml
+		@${MAMBA_EXE} -y create -f manager/environment.yml
 
 security-precheck-init:
-		@${MAMBA_EXE} -y env create -f environment-security.yml
+		@${MAMBA_EXE} -y create -f environment-security.yml
 		@${MAMBA_EXE} run -n aica-secprecheck python3 compute_security.py
 
 security-precheck-bandit:
