@@ -18,7 +18,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - uses: mamba-org/setup-micromamba@v1.8.1
+      - uses: mamba-org/setup-micromamba@v1.9.0
 
       - name: Fetch dependancies
         run: sudo apt-get install libpcap-dev
