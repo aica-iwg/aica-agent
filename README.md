@@ -7,21 +7,20 @@ This project will build on the ideas of the AICA framework as outlined in [Thero
 ## Setting up Host Environment (MacOS/Linux)
 
 1. Ensure `git` is installed, use package manager (apt, yum, [brew](https://brew.sh/), etc) if needed.
-2. Ensure Python 3.8 or greater is installed, again using your package manager.
-3. Install Docker; instructions are avaiable [here](https://docs.docker.com/desktop/install/linux-install/).
-4. Install miniconda from [https://docs.conda.io/en/latest/miniconda.html#linux-installers](), you will need to add your chosen installation location to your shell's PATH variable.
-5. Ensure `make` is installed, for example in Ubuntu this is part of the `build-essentials` package you can install with apt.
-6. Clone this repo, and open in IDE of your choice (ensure .gitignore is updated as necessary)
-7. Copy `manager/.env.sample` to `manager/.env` and make any necessary changes. Notably, all of the "<FILLME>" passwords should be set to something unique. The GRAYLOG_ROOT_PASSWORD_SHA2 value should be generated like `echo 'SOMEPASSWORD' | sha256sum`, or an equivalent generate of SHA256 hashes. Make sure this is done before you run `make start` for the first time. If these are changed, a `make rebuild_purge` or `make stop_purge; make start` will be required.
-8. Set the MODE variable like `export MODE=emu` (for Bash, other shells may vary).
-9. You can now run `make deps` to build your development environment, then `make build` to build the Docker containers, and `make start` to launch AICA. See more below.
+2. Install Docker; instructions are avaiable [here](https://docs.docker.com/desktop/install/linux-install/).
+3. Install micromamba from [https://mamba.readthedocs.io/en/latest/installation/micromamba-installation.html](), and let it update your PATH. You may need to relog after this step. 
+4. Ensure `make` is installed, for example in Ubuntu this is part of the `build-essentials` package you can install with apt.
+5. Clone this repo, and open in IDE of your choice (ensure .gitignore is updated as necessary)
+6. Copy `manager/.env.sample` to `manager/.env` and make any necessary changes. Notably, all of the "<FILLME>" passwords should be set to something unique. The GRAYLOG_ROOT_PASSWORD_SHA2 value should be generated like `echo 'SOMEPASSWORD' | sha256sum`, or an equivalent generate of SHA256 hashes. Make sure this is done before you run `make start` for the first time. If these are changed, a `make rebuild_purge` or `make stop_purge; make start` will be required.
+7. Set the MODE variable like `export MODE=emu` (for Bash, other shells may vary).
+8. You can now run `make deps` to build your development environment, then `make build` to build the Docker containers, and `make start` to launch AICA. See more below.
 
 ## Setting up Host Environment (Windows)
 
 1. Install git from [https://git-scm.com/download/win](); use Unix-style line endings.
 2. Install Docker from [https://www.docker.com/products/docker-desktop](); a reboot will be required. 
 3. Add Docker to System Path ([instructions](https://learn.microsoft.com/en-us/previous-versions/office/developer/sharepoint-2010/ee537574(v=office.14))): `C:\Program Files\Docker\Docker\resources\bin`
-4. Install miniconda from [https://docs.conda.io/en/latest/miniconda.html](); will also install Python
+4. Install micromamba from [https://mamba.readthedocs.io/en/latest/installation/micromamba-installation.html](), and let it update your PATH. You may need to relog after this step. 
 5. Install Make from [https://gnuwin32.sourceforge.net/packages/make.htm](); yes this is from 2006
 6. Add Make to System Path: `C:\Program Files (x86)\GnuWin32\bin`
 7. Clone this repo, and open in IDE of your choice (ensure .gitignore is updated as necessary)
