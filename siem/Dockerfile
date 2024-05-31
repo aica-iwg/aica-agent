@@ -1,4 +1,4 @@
-FROM graylog/graylog:5.2
+FROM --platform=linux/amd64 graylog/graylog:5.2
 
 COPY syslog-input-graylog.json /usr/share/graylog/data/contentpacks/syslog-input-graylog.json
 ENV GRAYLOG_CONTENT_PACKS_AUTO_INSTALL syslog-input-graylog.json

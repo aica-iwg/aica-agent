@@ -1,4 +1,4 @@
-FROM kalilinux/kali-rolling:latest 
+FROM --platform=linux/amd64 kalilinux/kali-rolling:latest 
 
 USER root
 
