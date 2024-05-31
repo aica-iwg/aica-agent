@@ -39,6 +39,8 @@ services:
     env_file:
       - manager/.env
     command: /usr/local/bin/docker_entrypoint.sh
+    cap_add:
+      - NET_ADMIN  # For nmap, etc
     networks:
       target:
         ipv4_address: 10.107.100.180

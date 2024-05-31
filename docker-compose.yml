@@ -4,7 +4,7 @@ services:
   manager:
     build: manager
     container_name: manager
-    restart: on-failure:2 #unless-stopped
+    restart: on-failure:2  # unless-stopped
     env_file:
       - manager/.env
     ports:
