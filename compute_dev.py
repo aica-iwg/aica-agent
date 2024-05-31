@@ -6,7 +6,10 @@ def pkg_list_to_dict(depsList: list[str], isPip: bool) -> dict:
     for package in depsList:
             if not isPip and type(package) is not str:
                 continue
-            pkgName, pkgVer = package.split("==" if isPip else "=")
+            try:
+                pkgName, pkgVer = package.split("==" if isPip else "=")
+            except ValueError:
+                raise ValueError(f"Couldn't parse one of {depsList} into package name and version")
             depDict[pkgName] = pkgVer
     return depDict
 
