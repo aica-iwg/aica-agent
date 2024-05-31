@@ -20,8 +20,8 @@ jobs:
 
       - uses: mamba-org/setup-micromamba@v1.9.0
 
-      - name: Set up and scan environment
-        run: echo $ENV_FILE | base64 --decode > manager/.env && make init-core-env
+      - name: Set up environment
+        run: echo $ENV_FILE | base64 --decode > manager/.env
 
       - name: CI-Specific optimization (Disable GPU)
         run: sed 's/      - torch==/      - --extra-index-url https:\/\/download.pytorch.org\/whl\/cpu\n&/' -i manager/environment-manager.yml
