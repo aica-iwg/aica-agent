@@ -23,6 +23,9 @@ jobs:
       - name: Set up environment
         run: echo $ENV_FILE | base64 --decode > manager/.env
 
+      - name: Build and check base environment 
+        run: make init-core-env && make lint && make security-precheck
+
       - name: CI-Specific optimization (Disable GPU)
         run: sed 's/      - torch==/      - --extra-index-url https:\/\/download.pytorch.org\/whl\/cpu\n&/' -i manager/environment-manager.yml
 
@@ -31,9 +34,6 @@ jobs:
 
       - name: CI-Specific optimization (Lower SIEM message journal max size)
         run: echo "RUN sed -i 's/#message_journal_max_size = 5gb/message_journal_max_size = 500mb/' /usr/share/graylog/data/config/graylog.conf" >> siem/Dockerfile
-
-      - name: Build and check dev environment
-        run: make init-core-env && make lint && make security-precheck
 
       - name: Build Containers
         run: make build
