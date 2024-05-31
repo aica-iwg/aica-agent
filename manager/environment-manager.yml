@@ -3,8 +3,7 @@ name: base
 channels:
   - conda-forge
 dependencies:
-  - python=3.11.9
-  - pip=24.*
+  - python=3.12.3
   - Django=4.2.13
   - amqp=5.2.0
   - backoff=2.2.1
@@ -30,6 +29,7 @@ dependencies:
   - sqlalchemy=2.0.29
   - watchdog=4.0.0
   - vt-py=0.18.0
+  - pip=24.0
   - pip:
       - fasteners==0.19
       - ipwhois==1.2.0

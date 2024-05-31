@@ -3,12 +3,13 @@ name: aica-make
 channels:
   - conda-forge
 dependencies:
-  - python=3.11.9
+  - python=3.12.3
+  - jake=3.0.*
   - mypy=1.8.*
+  - pyyaml=6.0.*
+  - packaging=24.0
   - yamllint=1.35.*
-  - pip=24.*
-  - pyyaml
-  - packaging
+  - pip=24.0
   # Some things are down here for better cross-platform compatibility
   - pip:
       - bandit==1.7.7
@@ -25,4 +26,3 @@ dependencies:
       - types-openpyxl==3.1.0.20240220
       - types-paramiko==3.4.0.20240103
       - urllib3==2.2.1
-      - jake

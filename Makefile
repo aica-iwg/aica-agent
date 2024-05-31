@@ -42,22 +42,14 @@ security-precheck-safety-manager:
 		@${MAMBA_EXE} run -n aica-secprecheck safety check -r manager/reqsDev.txt --policy-file .safety-check-policy.yml
 
 security-precheck: security-precheck-init security-precheck-bandit security-precheck-safety-core security-precheck-safety-attacker security-precheck-safety-honeypot security-precheck-safety-manager
-
 		
-
-security-dev-postcheck:
-		@${MAMBA_EXE} list -n manager-dev --json | (${MAMBA_RUN} jake ddt -t CONDA_JSON)
-		@${MAMBA_EXE} list -n honeypot-dev --json | (${MAMBA_RUN} jake ddt -t CONDA_JSON)
-		@${MAMBA_EXE} list -n attacker-dev --json | (${MAMBA_RUN} jake ddt -t CONDA_JSON)
 
 security-post-launch-check:
 		@(docker exec honeypot micromamba list -n base --json) |  (${MAMBA_RUN} jake ddt -t CONDA_JSON)
 		@(docker exec attacker /home/kali/bin/micromamba list -n base --json) |  (${MAMBA_RUN} jake ddt -t CONDA_JSON)
 		@(docker exec manager /usr/src/app/bin/micromamba list -n base --json) |  (${MAMBA_RUN} jake ddt -t CONDA_JSON)
 
-init: init-core-env init-dev-envs security-dev-postcheck
-
-
+init: init-core-env init-dev-envs
 
 black:
 		@${MAMBA_RUN} black -q manager/ attacker/
@@ -68,13 +60,10 @@ lint:
 		@${MAMBA_RUN} black --check --diff -q manager/ attacker/
 		@${MAMBA_RUN} mypy --install-types --warn-unreachable --strict --non-interactive --exclude test manager/
 
-
-
-
 build: check-env
 		@docker compose -f docker-compose.yml -f docker-compose-${MODE}.yml build 
 
-tests: lint
+tests:
 		@MODE=emu docker compose -f docker-compose.yml -f docker-compose-emu.yml up --wait -d && \
 			docker exec -e SKIP_TASKS=true \
 			manager /bin/bash -c " \

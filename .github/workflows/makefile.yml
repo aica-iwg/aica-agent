@@ -18,7 +18,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - uses: mamba-org/setup-micromamba@v1.8.1
+      - uses: mamba-org/setup-micromamba@v1.9.0
 
       - name: Fetch dependancies
         run: sudo apt-get install libpcap-dev
@@ -34,6 +34,9 @@ jobs:
 
       - name: CI-Specific optimization (Lower SIEM message journal max size)
         run: echo "RUN sed -i 's/#message_journal_max_size = 5gb/message_journal_max_size = 500mb/' /usr/share/graylog/data/config/graylog.conf" >> siem/Dockerfile
+
+      - name: Build and check dev environment
+        run: make init-core-env && make lint && make security-precheck
 
       - name: Build Containers
         run: make build
