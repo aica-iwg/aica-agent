@@ -23,7 +23,7 @@ jobs:
       - name: Set up environment
         run: echo $ENV_FILE | base64 --decode > manager/.env
 
-      - name: Build and check base environment 
+      - name: Build and check base environment
         run: make init-core-env && make lint && make security-precheck
 
       - name: CI-Specific optimization (Disable GPU)
