@@ -1,7 +1,14 @@
-FROM alpine:3.20
+FROM --platform=linux/amd64 alpine:3.20
 
 RUN apk update && apk upgrade && \
-    apk add bind-tools bash suricata syslog-ng tcpdump fprobe
+    apk add \
+        bind-tools \
+        bash \
+        ca-certificates \
+        suricata \
+        syslog-ng \
+        tcpdump \
+        fprobe
 
 COPY aica-syslog.conf /etc/syslog-ng/conf.d/aica-syslog.conf
 
