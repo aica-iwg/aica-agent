@@ -1,9 +1,20 @@
-FROM node:21-alpine3.19
+FROM node:20-alpine3.20
 
 ENV NODE_ENV=aica-config
 
 RUN apk update && apk upgrade && \
-    apk --no-cache add openssh iptables ipset nginx bind-tools bash syslog-ng clamav supervisor git go
+    apk --no-cache add \
+        openssh \
+        iptables \
+        ipset \
+        nginx \
+        bind-tools \
+        bash \
+        syslog-ng \
+        clamav \
+        supervisor \
+        git \
+        go
 
 # Allow manager to access via SSH commands
 RUN ssh-keygen -A && mkdir -p /root/.ssh
@@ -27,19 +38,19 @@ RUN sed -i 's/^Foreground .*$/Foreground true/g' /etc/clamav/clamd.conf && \
     chmod +x /usr/local/bin/clamonacc.sh
 
 WORKDIR /root
-RUN go install github.com/caddyserver/xcaddy/cmd/xcaddy@latest && \
+RUN go install github.com/caddyserver/xcaddy/cmd/xcaddy@v0.4.2 && \
     /root/go/bin/xcaddy build --with github.com/corazawaf/coraza-caddy/v2 && \
     mkdir -p /coraza/coreruleset && mkdir -p /coraza/sites/localhost && \
     git clone https://github.com/coreruleset/coreruleset.git /coraza/coreruleset && \ 
     cp /coraza/coreruleset/crs-setup.conf.example /coraza/sites/localhost/1_crs_setup.conf
 
-RUN git clone https://github.com/juice-shop/juice-shop.git --depth 1 && \
+RUN git clone https://github.com/juice-shop/juice-shop.git --depth 1 --branch v17.0.0 && \
     mkdir -p /var/log/juice/ && \
     touch /var/log/juice/juiceshop.log && \
     touch /var/log/juice/juiceshop.err.log
 
 WORKDIR /root/juice-shop
-RUN npm i -g typescript ts-node && \
+RUN npm i -g typescript@5.4.5 ts-node@10.9.2 && \
     npm install --omit=dev --unsafe-perm && \
     npm dedupe && \
     mkdir logs && \
