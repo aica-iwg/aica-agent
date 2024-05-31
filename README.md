@@ -12,7 +12,7 @@ This project will build on the ideas of the AICA framework as outlined in [Thero
 4. Install miniconda from [https://docs.conda.io/en/latest/miniconda.html#linux-installers](), you will need to add your chosen installation location to your shell's PATH variable.
 5. Ensure `make` is installed, for example in Ubuntu this is part of the `build-essentials` package you can install with apt.
 6. Clone this repo, and open in IDE of your choice (ensure .gitignore is updated as necessary)
-7. Copy `manager/.env.sample` to `manager/.env` and make any necessary changes
+7. Copy `manager/.env.sample` to `manager/.env` and make any necessary changes. Notably, all of the "<FILLME>" passwords should be set to something unique. The GRAYLOG_ROOT_PASSWORD_SHA2 value should be generated like `echo 'SOMEPASSWORD' | sha256sum`, or an equivalent generate of SHA256 hashes. Make sure this is done before you run `make start` for the first time. If these are changed, a `make rebuild_purge` or `make stop_purge; make start` will be required.
 8. Set the MODE variable like `export MODE=emu` (for Bash, other shells may vary).
 9. You can now run `make deps` to build your development environment, then `make build` to build the Docker containers, and `make start` to launch AICA. See more below.
 
