@@ -143,5 +143,3 @@ if __name__ == "__main__":
     for pcap_file_expr in args.pcap_file:
         for pcap_file in glob.glob(pcap_file_expr):
             replay_dnp3_pcap(pcap_file)
-
-
