@@ -38,8 +38,8 @@ jobs:
       - name: Build Containers
         run: make build
 
-      - name: Run tests
-        run: make test
+      - name: Run tests (make sure we're starting with clean volumes)
+        run: make stop_purge && make test
 
       - name: Dump docker logs on failure
         if: failure()
