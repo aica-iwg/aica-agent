@@ -16,9 +16,6 @@ import pyshark  # type: ignore
 from celery import current_app
 from celery.app import shared_task
 from celery.utils.log import get_task_logger
-from collections import OrderedDict
-from stix2.base import _Extension  # type: ignore
-from stix2.properties import StringProperty  # type: ignore
 from typing import Any
 
 
@@ -148,26 +145,3 @@ if __name__ == "__main__":
             replay_dnp3_pcap(pcap_file)
 
 
-class DNP3RequestExt(_Extension):  # type: ignore
-    """For more detailed information on this object's properties, see
-    `the STIX 2.0 specification <http://docs.oasis-open.org/cti/stix/v2.0/cs01/part4-cyber-observable-objects/stix-v2.0-cs01-part4-cyber-observable-objects.html#_Toc496716262>`__.
-    """  # noqa
-
-    _type = "dnp3-request-ext"
-    _properties = OrderedDict(
-        [
-            ("dnp3_datalink_src", StringProperty(required=True)),
-            ("dnp3_datalink_dst", StringProperty(required=True)),
-            ("dnp3_application_unsolicited_from_slave", StringProperty(required=True)),
-            ("dnp3_datalink_from_master", StringProperty(required=True)),
-            ("dnp3_datalink_from_primary", StringProperty(required=True)),
-            ("dnp3_datalink_function", StringProperty(required=True)),
-            ("dnp3_application_function", StringProperty(required=False)),
-            ("dnp3_application_iin", StringProperty(required=False)),
-            ("dnp3_application_obj", StringProperty(required=False)),
-            ("dnp3_application_objq_code", StringProperty(required=False)),
-            ("dnp3_application_objq_index", StringProperty(required=False)),
-            ("dnp3_application_objq_prefix", StringProperty(required=False)),
-            ("dnp3_application_objq_range", StringProperty(required=False)),
-        ]
-    )
