@@ -3,6 +3,7 @@
 services:
   manager:
     build: manager
+    platform: linux/amd64
     container_name: manager
     restart: on-failure:2  # unless-stopped
     env_file:
@@ -33,6 +34,7 @@ services:
 
   manager_db:
     image: postgres:13.8-bullseye
+    platform: linux/amd64
     container_name: manager_db
     restart: unless-stopped
     env_file:
@@ -50,6 +52,7 @@ services:
 
   manager_mq:
     build: manager_mq
+    platform: linux/amd64
     container_name: manager_mq
     restart: unless-stopped
     volumes:
@@ -65,6 +68,7 @@ services:
 
   manager_mongodb:
     build: manager_mongodb
+    platform: linux/amd64
     container_name: manager_mongodb
     restart: unless-stopped
     env_file:
@@ -82,6 +86,7 @@ services:
 
   manager_graphdb:
     build: manager_graphdb
+    platform: linux/amd64
     container_name: manager_graphdb
     restart: unless-stopped
     environment:
@@ -110,6 +115,7 @@ services:
 
   elasticsearch:
     build: elasticsearch
+    platform: linux/amd64
     container_name: elasticsearch
     # Required so that ES generates an acceptable SAN in its HTTPS Cert
     hostname: "elasticsearch"
@@ -144,6 +150,7 @@ services:
 
   siem:
     build: siem
+    platform: linux/amd64
     container_name: siem
     env_file:
       manager/.env

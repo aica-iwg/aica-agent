@@ -23,6 +23,7 @@ services:
 
   ids:
     build: ./ids
+    platform: linux/amd64
     container_name: ids
     command: sh /usr/local/bin/docker_entrypoint.sh
     cap_add:
@@ -35,6 +36,7 @@ services:
 
   attacker:
     build: attacker
+    platform: linux/amd64
     container_name: attacker
     env_file:
       - manager/.env
@@ -49,6 +51,7 @@ services:
 
   target:
     build: target
+    platform: linux/amd64
     container_name: target
     command: /usr/local/bin/docker_entrypoint.sh
     sysctls:
@@ -72,6 +75,7 @@ services:
 
   honeypot:
     build: honeypot
+    platform: linux/amd64
     container_name: honeypot
     command: bash -c "/usr/local/bin/_entrypoint.sh && /opt/conda/bin/opencanaryd --dev"
     volumes:
