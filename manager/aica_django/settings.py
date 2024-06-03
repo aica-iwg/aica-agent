@@ -44,10 +44,10 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "django_extensions",
-    "aica_django.microagents.behaviour_engine",
-    "aica_django.microagents.decision_making_engine",
-    "aica_django.microagents.knowledge_base",
     "aica_django.microagents.offline_loader",
+    "aica_django.microagents.knowledge_base",
+    "aica_django.microagents.decision_making_engine",
+    "aica_django.microagents.behaviour_engine",
 ]
 
 MIDDLEWARE = [

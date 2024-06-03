@@ -45,7 +45,6 @@ from stix2.registration import _register_extension  # type: ignore
 from typing import Any, Dict, List, Union
 
 from aica_django.connectors.GraphDatabase import AicaNeo4j
-from aica_django.connectors.DNP3 import DNP3RequestExt
 from aica_django.converters.AICAStix import (
     AICAAttackPattern,
     AICAIncident,
@@ -54,6 +53,7 @@ from aica_django.converters.AICAStix import (
     AICALocation,
     AICANetworkTraffic,
     AICANote,
+    DNP3RequestExt,
 )
 
 
@@ -1069,9 +1069,6 @@ def dnp3_to_knowledge(log_dict: dict[str, str]) -> List[_STIXBase]:
         dnp3_application_objq_index=log_dict["dnp3_application_objq_index"],
         dnp3_application_objq_prefix=log_dict["dnp3_application_objq_prefix"],
         dnp3_application_objq_range=log_dict["dnp3_application_objq_range"],
-        dnp3_application_unsolicited_from_slave=log_dict[
-            "dnp3_application_unsolicited_from_slave"
-        ],
         dnp3_datalink_dst=log_dict["dnp3_datalink_dst"],
         dnp3_datalink_from_master=log_dict["dnp3_datalink_from_master"],
         dnp3_datalink_from_primary=log_dict["dnp3_datalink_from_primary"],
