@@ -22,7 +22,7 @@ import re2 as re  # type: ignore
 
 from celery.utils.log import get_task_logger
 from ipwhois import IPWhois  # type: ignore
-from stix2.base import _STIXBase  # type: ignore
+from mac_vendor_lookup import MacLookup, VendorNotFoundError  # type: ignore
 from stix2 import (  # type: ignore
     AutonomousSystem,
     Directory,
@@ -31,7 +31,6 @@ from stix2 import (  # type: ignore
     HTTPRequestExt,
     IPv4Address,
     IPv6Address,
-    Location,
     Malware,  # TODO: Create AICA Version
     MACAddress,
     NetworkTraffic,
@@ -41,14 +40,18 @@ from stix2 import (  # type: ignore
     Software,
     Tool,
 )
-from typing import Any, Dict, List, Optional, Union
+from stix2.base import _STIXBase  # type: ignore
+from stix2.registration import _register_extension  # type: ignore
+from typing import Any, Dict, List, Union
 
 from aica_django.connectors.GraphDatabase import AicaNeo4j
+from aica_django.connectors.DNP3 import DNP3RequestExt
 from aica_django.converters.AICAStix import (
     AICAAttackPattern,
     AICAIncident,
     AICAIdentity,
     AICAIndicator,
+    AICALocation,
     AICANetworkTraffic,
     AICANote,
 )
@@ -56,7 +59,7 @@ from aica_django.converters.AICAStix import (
 
 logger = get_task_logger(__name__)
 
-graph = AicaNeo4j(create_constraints=False)
+graph = AicaNeo4j(initialize_graph=False)
 
 # https://www.iana.org/assignments/protocol-numbers/protocol-numbers.xhtml
 ip_protos = {
@@ -260,6 +263,8 @@ is_link_local_note = AICANote(
     object_refs=[fake_note_root],
 )
 
+mac_lookup = MacLookup()
+
 
 def get_ip_context(ip_addr: Union[IPv4Address, IPv6Address]) -> List[_STIXBase]:
     note_refs = []
@@ -302,6 +307,8 @@ def get_ip_context(ip_addr: Union[IPv4Address, IPv6Address]) -> List[_STIXBase]:
         note_refs.append(is_link_local_note)
         return_nodes.append(is_link_local_note)
 
+    asn = None
+
     if not any([is_private, is_multicast, is_reserved, is_loopback, is_link_local]):
         whois_obj = IPWhois(ip_string)
         whois_data = whois_obj.lookup_rdap(depth=1)
@@ -311,27 +318,39 @@ def get_ip_context(ip_addr: Union[IPv4Address, IPv6Address]) -> List[_STIXBase]:
             asn = AutonomousSystem(
                 number=whois_data["asn"], rir=whois_data["asn_registry"]
             )
-            new_ip_addr_kwargs["belongs_to"] = asn
-            cidr_kwargs["belongs_to"] = asn
             return_nodes.append(asn)
 
         if whois_data["asn_country_code"]:
-            location = Location(country=whois_data["asn_country_code"])
+            location = AICALocation(country=whois_data["asn_country_code"])
             return_nodes.append(location)
         else:
             location = None
 
         if whois_data["entities"]:
-            new_ip_addr_kwargs["custom_properties"].update({"has_owner_refs": []})
-            cidr_kwargs["custom_properties"].update({"has_owner_refs": []})
+            if "custom_properties" in new_ip_addr_kwargs.keys():
+                new_ip_addr_kwargs["custom_properties"].update({"has_owner_refs": []})
+            else:
+                new_ip_addr_kwargs["custom_properties"] = {"has_owner_refs": []}
+
+            if "custom_properties" in new_ip_addr_kwargs.keys():
+                cidr_kwargs["custom_properties"].update({"has_owner_refs": []})
+            else:
+                cidr_kwargs["custom_properties"] = {"has_owner_refs": []}
+
             for entity in whois_data["entities"]:
                 entity_kwargs = {"name": entity}
-                if location:
-                    entity_kwargs["located_at"] = location
                 entity = AICAIdentity(**entity_kwargs)
                 new_ip_addr_kwargs["custom_properties"]["has_owner_refs"].append(entity)
                 cidr_kwargs["custom_properties"]["has_owner_refs"].append(entity)
                 return_nodes.append(entity)
+
+                if location:
+                    location_rel = Relationship(
+                        source_ref=entity,
+                        target_ref=location,
+                        relationship_type="located-at",
+                    )
+                    return_nodes.append(location_rel)
 
         if whois_data["asn_cidr"]:
             cidr_kwargs.update({"value": whois_data["asn_cidr"]})
@@ -342,12 +361,24 @@ def get_ip_context(ip_addr: Union[IPv4Address, IPv6Address]) -> List[_STIXBase]:
                 asn_cidr = IPv6Address(**cidr_kwargs)
             return_nodes.append(asn_cidr)
 
+            if asn:
+                asn_rel = Relationship(
+                    source_ref=asn_cidr, target_ref=asn, relationship_type="belongs-to"
+                )
+                return_nodes.append(asn_rel)
+
     if isinstance(ip_addr, IPv4Address):
         ip_stix = IPv4Address(**new_ip_addr_kwargs)
         return_nodes.append(IPv4Address(**new_ip_addr_kwargs))
     else:
         ip_stix = IPv4Address(**new_ip_addr_kwargs)
         return_nodes.append(IPv6Address(**new_ip_addr_kwargs))
+
+    if asn:
+        asn_rel = Relationship(
+            source_ref=ip_stix, target_ref=asn, relationship_type="belongs-to"
+        )
+        return_nodes.append(asn_rel)
 
     for note_ref in note_refs:
         note_rel = Relationship(
@@ -523,6 +554,7 @@ def nginx_accesslog_to_knowledge(
     ip_version = ipaddress.ip_address(log_dict["src_ip"]).version
     ip_src_addr = log_dict["src_ip"]
     if ip_version == 4:
+        protocols = ["ipv4", "tcp", "http"]
         source_addr = IPv4Address(value=ip_src_addr)
         knowledge_nodes.extend(get_ip_context(source_addr))
 
@@ -531,6 +563,7 @@ def nginx_accesslog_to_knowledge(
         knowledge_nodes.extend(get_ip_context(dest_addr))
 
     elif ip_version == 6:
+        protocols = ["ipv6", "tcp", "http"]
         ip_src_addr = str(ipaddress.ip_address(log_dict["src_ip"]))
         source_addr = IPv6Address(value=ip_src_addr)
         knowledge_nodes.extend(get_ip_context(source_addr))
@@ -549,7 +582,7 @@ def nginx_accesslog_to_knowledge(
     )
 
     traffic = AICANetworkTraffic(
-        protocols="http",
+        protocols=protocols,
         start=request_time,
         src_ref=source_addr,
         dst_ref=dest_addr,
@@ -590,12 +623,14 @@ def caddy_accesslog_to_knowledge(log_dict: Dict[str, Any]) -> List[_STIXBase]:
         raise ValueError(f"Couldn't parse timestamp {log_dict['ts']}")
 
     if type(ipaddress.ip_address(log_dict["src_ip"])) is ipaddress.IPv4Address:
+        protocols = ["ipv4", "tcp", "http"]
         src_addr = IPv4Address(value=log_dict["src_ip"])
         knowledge_nodes.extend(get_ip_context(src_addr))
 
         dest_addr = IPv4Address(value=log_dict["dst_ip"])
         knowledge_nodes.extend(get_ip_context(dest_addr))
     else:
+        protocols = ["ipv6", "tcp", "http"]
         src_addr = IPv6Address(value=log_dict["src_ip"])
         knowledge_nodes.extend(get_ip_context(src_addr))
 
@@ -612,7 +647,7 @@ def caddy_accesslog_to_knowledge(log_dict: Dict[str, Any]) -> List[_STIXBase]:
     )
 
     traffic = AICANetworkTraffic(
-        protocols="http",
+        protocols=protocols,
         start=request_time,
         src_ref=src_addr,
         dst_ref=dest_addr,
@@ -640,10 +675,6 @@ def nmap_scan_to_knowledge(scan_results: Dict[str, Any]) -> List[_STIXBase]:
 
     knowledge_nodes = []
 
-    scan_time: Optional[datetime.datetime] = dateparser.parse(
-        scan_results["runtime"]["time"]
-    )
-
     # Not needed and makes iteration below messy
     if "stats" in scan_results:
         del scan_results["stats"]
@@ -667,25 +698,25 @@ def nmap_scan_to_knowledge(scan_results: Dict[str, Any]) -> List[_STIXBase]:
 
         consists_of = []
         if scan_results[host]["macaddress"]:
-            mac_addr = MACAddress(value=scan_results[host]["macaddress"])
+            mac_addr = MACAddress(value=scan_results[host]["macaddress"]["addr"])
             knowledge_nodes.append(mac_addr)
 
             try:
-                vendor_abstract = f"vendor: {scan_results[host]['vendor']}"
-                vendor_note = AICANote(
-                    abstract=vendor_abstract,
-                    content=vendor_abstract,
+                vendor = mac_lookup.lookup(scan_results[host]["macaddress"]["addr"])
+                mac_vendor = AICANote(
+                    abstract=f"MAC Vendor: {vendor}",
+                    content=f"MAC Vendor: {vendor}",
                     object_refs=[mac_addr],
                 )
-
-                knowledge_nodes.append(vendor_note)
-            except KeyError:
-                # Vendor not in data, not a big deal
-                logger.debug(
-                    f"No vendor found in object for {scan_results[host]['macaddress']}"
+                knowledge_nodes.append(mac_vendor)
+            except VendorNotFoundError:
+                logger.info(
+                    f"Unable to find vendor for MAC: {scan_results[host]['macaddress']['addr']}"
                 )
 
-        mac_addr_list = [mac_addr] if mac_addr else []
+            mac_addr_list = [mac_addr] if mac_addr else []
+        else:
+            mac_addr_list = []
 
         ip_addr = ipaddress.ip_address(host)
         # Update if new IP address or we found a MAC address, which could be new
@@ -958,6 +989,9 @@ def waf_alert_to_knowledge(alert: Dict[str, Any]) -> List[_STIXBase]:
     return knowledge_nodes
 
 
+_register_extension(DNP3RequestExt)
+
+
 def dnp3_to_knowledge(log_dict: dict[str, str]) -> List[_STIXBase]:
     """
     Converts a DNP3 message (as returned from aica_django.connectors.DNP3.parse_dnp3_packet)
@@ -971,8 +1005,90 @@ def dnp3_to_knowledge(log_dict: dict[str, str]) -> List[_STIXBase]:
 
     knowledge_nodes: List[_STIXBase] = []
 
-    # TODO
-    print(knowledge_nodes)
+    # dateparser can't seem to handle this format
+    request_time = dateparser.parse(log_dict["sniff_timestamp"])
+
+    if not request_time:
+        raise ValueError(f"Couldn't parse timestamp {log_dict['sniff_timestamp']}")
+
+    src_mac_addr = MACAddress(value=log_dict["src_mac"])
+    knowledge_nodes.append(src_mac_addr)
+
+    try:
+        vendor = mac_lookup.lookup(log_dict["src_mac"])
+        src_mac_vendor = AICANote(
+            abstract=f"MAC Vendor: {vendor}",
+            content=f"MAC Vendor: {vendor}",
+            object_refs=[src_mac_addr],
+        )
+        knowledge_nodes.append(src_mac_vendor)
+    except VendorNotFoundError:
+        logger.info(f"Unable to find vendor for MAC: {log_dict['src_mac']}")
+
+    dst_mac_addr = MACAddress(value=log_dict["dst_mac"])
+    knowledge_nodes.append(dst_mac_addr)
+
+    try:
+        vendor = mac_lookup.lookup(log_dict["dst_mac"])
+        dst_mac_vendor = AICANote(
+            abstract=f"MAC Vendor: {vendor}",
+            content=f"MAC Vendor: {vendor}",
+            object_refs=[dst_mac_addr],
+        )
+        knowledge_nodes.append(dst_mac_vendor)
+    except VendorNotFoundError:
+        logger.info(f"Unable to find vendor for MAC: {log_dict['dst_mac']}")
+
+    # Create source host nodes (and link to protocol node)
+    ip_version = ipaddress.ip_address(log_dict["src_ip"]).version
+    ip_src_addr = log_dict["src_ip"]
+    if ip_version == 4:
+        protocols = ["ipv4", "tcp", "dnp3"]
+        source_addr = IPv4Address(value=ip_src_addr, resolves_to_refs=[src_mac_addr])
+        knowledge_nodes.extend(get_ip_context(source_addr))
+
+        ip_dest_addr = str(ipaddress.ip_address(log_dict["dst_ip"]))
+        dest_addr = IPv4Address(value=ip_dest_addr, resolves_to_refs=[dst_mac_addr])
+        knowledge_nodes.extend(get_ip_context(dest_addr))
+
+    elif ip_version == 6:
+        protocols = ["ipv6", "tcp", "dnp3"]
+        ip_src_addr = str(ipaddress.ip_address(log_dict["src_ip"]))
+        source_addr = IPv6Address(value=ip_src_addr, resolves_to_refs=[src_mac_addr])
+        knowledge_nodes.extend(get_ip_context(source_addr))
+
+        ip_dest_addr = str(ipaddress.ip_address(log_dict["dst_ip"]))
+        dest_addr = IPv6Address(value=ip_dest_addr, resolves_to_refs=[dst_mac_addr])
+        knowledge_nodes.extend(get_ip_context(dest_addr))
+
+    dnp3_req_ext = DNP3RequestExt(
+        dnp3_application_function=log_dict["dnp3_application_function"],
+        dnp3_application_iin=log_dict["dnp3_application_iin"],
+        dnp3_application_obj=log_dict["dnp3_application_obj"],
+        dnp3_application_objq_code=log_dict["dnp3_application_objq_code"],
+        dnp3_application_objq_index=log_dict["dnp3_application_objq_index"],
+        dnp3_application_objq_prefix=log_dict["dnp3_application_objq_prefix"],
+        dnp3_application_objq_range=log_dict["dnp3_application_objq_range"],
+        dnp3_application_unsolicited_from_slave=log_dict[
+            "dnp3_application_unsolicited_from_slave"
+        ],
+        dnp3_datalink_dst=log_dict["dnp3_datalink_dst"],
+        dnp3_datalink_from_master=log_dict["dnp3_datalink_from_master"],
+        dnp3_datalink_from_primary=log_dict["dnp3_datalink_from_primary"],
+        dnp3_datalink_function=log_dict["dnp3_datalink_function"],
+        dnp3_datalink_src=log_dict["dnp3_datalink_src"],
+    )
+
+    traffic = AICANetworkTraffic(
+        protocols=protocols,
+        start=request_time,
+        src_ref=source_addr,
+        dst_ref=dest_addr,
+        src_port=int(log_dict["src_port"]),
+        dst_port=int(log_dict["dst_port"]),
+        extensions={"dnp3-request-ext": dnp3_req_ext},
+    )
+    knowledge_nodes.append(traffic)
 
     return knowledge_nodes
 

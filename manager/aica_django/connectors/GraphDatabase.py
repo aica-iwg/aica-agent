@@ -5,21 +5,36 @@ Classes:
     AicaNeo4j: The object to instantiate to create a persistent interface with Neo4j
 """
 
+import datetime
 import inspect
+import networkx as nx
 import os
+import random
 import re2 as re  # type: ignore
 import stix2  # type: ignore
 import time
 
 from celery import current_app
+from celery.app import shared_task
 from celery.utils.log import get_task_logger
+from io import BytesIO, StringIO
 from neo4j import GraphDatabase  # type: ignore
+from networkx.readwrite import read_graphml
+from scipy.io import mmread, mmwrite  # type: ignore
 from sklearn.feature_extraction.text import HashingVectorizer  # type: ignore
 from stix2.base import _STIXBase  # type: ignore
 from typing import Any, Dict, List, Optional, Union
 from urllib.parse import quote_plus
+from watchdog.events import FileSystemEventHandler, FileCreatedEvent, FileModifiedEvent  # type: ignore
+from watchdog.observers import Observer  # type: ignore
+import torch
+from torch_geometric.data import Data
+from torch_geometric.nn import SAGEConv
+import torch.nn.functional as F
 
 logger = get_task_logger(__name__)
+
+graphml_path = "/graph_data/aica.graphml"
 
 # 2^22 is somewhat arbitrary, but is ~4M and intended to balance accuracy with performance
 vectorizer = HashingVectorizer(n_features=2**22)
@@ -45,6 +60,79 @@ def dict_to_cypher(input_dict: dict[str, Any]) -> str:
     return_string = "{" + ", ".join(values) + "}"
 
     return return_string
+
+
+class GraphSAGE(torch.nn.Module):
+    def __init__(self, in_dim, hidden_dim, out_dim, aggr='mean', dropout=0.2):
+        super().__init__()
+        self.dropout = dropout
+        self.conv1 = SAGEConv(in_dim, hidden_dim, aggr=aggr)
+        self.conv2 = SAGEConv(hidden_dim, hidden_dim, aggr=aggr)
+        self.conv3 = SAGEConv(hidden_dim, out_dim, aggr=aggr)
+        
+    
+    def forward(self, data):
+        x = self.conv1(data.x, data.adj_t)
+        x = F.tanh(x)
+        x = F.dropout(x, p=self.dropout)
+        
+        x = self.conv2(x, data.adj_t)
+        x = F.tanh(x)
+        x = F.dropout(x, p=self.dropout)
+        
+        x = self.conv3(x, data.adj_t)
+        x = F.tanh(x)
+        x = F.dropout(x, p=self.dropout)
+    
+        return x
+
+
+def process_graphml(path: str) -> None:
+    # TODO: This is where we'd do whatever processing on the GraphML file we want
+    # For example, converting the node ID vectors back from a string into a CSR matrix,
+    # generating the graph embeddings, and pushing info back onto nodes in the Neo4J graph.
+    logger.error("GraphML function not yet implemented!")
+
+
+class GraphMLHandler(FileSystemEventHandler):  # type: ignore
+    def __init__(self, quiesce_period: int = 60) -> None:
+        self.quiesce_period = quiesce_period
+        self.last_change = 0.0
+
+    def on_created(self, event: FileCreatedEvent) -> None:
+        self.on_modified(event)
+
+    def on_modified(self, event: FileModifiedEvent) -> None:
+        current_time = time.time()
+
+        # If the file has been modified recently, ignore the event
+        if current_time - self.last_change < self.quiesce_period:
+            logger.debug(
+                f"Not processing GraphML file, last time: {self.last_change}, current time: {current_time}"
+            )
+        else:
+            logger.debug(
+                f"Processing changed GraphML file, last time: {self.last_change}, current time: {current_time}"
+            )
+            process_graphml(graphml_path)
+
+        if current_time > self.last_change:
+            self.last_change = current_time
+
+
+@shared_task(name="poll-graphml")
+def poll_graphml() -> None:
+    logger.info(f"Running {__name__}: poll_graphml")
+
+    if os.path.isfile(graphml_path):
+        process_graphml(graphml_path)
+
+    observer = Observer()
+    observer.schedule(GraphMLHandler(), graphml_path)
+    observer.start()
+
+    # Should never return
+    observer.join()
 
 
 class KnowledgeNode:
@@ -77,7 +165,7 @@ class KnowledgeNode:
         labels_string = ":".join(self._labels)
 
         props_string = ",".join(
-            [f'{k}: "{v}"' for k, v in {**self._props, "accolade_id": self._id}.items()]
+            [f'{k}: "{v}"' for k, v in {**self._props, "identifier": self._id}.items()]
         )
 
         return f"({name}:{labels_string} {{{props_string}}})"
@@ -137,7 +225,7 @@ class AicaNeo4j:
         port: int = 0,
         user: str = "",
         password: str = "",
-        create_constraints: bool = True,
+        initialize_graph: bool = True,
     ) -> None:
         """
         Initialize a new AiceNeo4j object.
@@ -162,7 +250,7 @@ class AicaNeo4j:
 
         self.graph = GraphDatabase.driver(uri, auth=(user, password))
 
-        if create_constraints:
+        if initialize_graph:
             for label in list(
                 set(
                     [
@@ -196,6 +284,12 @@ class AicaNeo4j:
                     + f"FOR (n:`{label}`) REQUIRE n.identifier IS UNIQUE"
                 )
                 self.graph.execute_query(id_unique)
+
+            # Periodic export of graph to graphML for analysis
+            export_freq = str(int(os.getenv("AICA_GRAPHML_EXPORT_FREQ", default=1800)))
+            export_query = 'CALL apoc.export.graphml.all("/graph_data/aica.graphml", {format:"gephi", useTypes:true})'
+            schedule_query = f"CALL apoc.periodic.repeat('export-graphml', '{export_query}', {export_freq});"
+            self.graph.execute_query(schedule_query)
 
     def add_node(
         self,
@@ -235,20 +329,32 @@ class AicaNeo4j:
         for node_id, node_label, node_property_list, node_id_vector in zip(
             node_ids, node_labels, node_property_lists, node_id_vectors
         ):
-            node_property_list["identifier"] = node_id
-            node_property_list["identifier_vec"] = node_id_vector
+            now = int(datetime.datetime.now().timestamp())
+            mm_array = BytesIO()
+            mmwrite(mm_array, node_id_vector)
+            node_property_list["identifier_vec"] = mm_array.getvalue().decode("latin1")
+            node_property_list["first_merge"] = now
+            node_property_list["last_merge"] = now
+            node_property_list["merge_count"] = 1
+            node_property_list = {
+                k: re.sub("'", '"', str(v))
+                for k, v in node_property_list.items()
+                if k not in merge_exclude_properties
+            }
+            create_properties = ", ".join(
+                f"n.{k}='{v}'" for k, v in node_property_list.items()
+            )
             queries.append(
-                f"MERGE (n:`{node_label}` "
-                + f"{dict_to_cypher({k: v for k, v in node_property_list.items() if k not in merge_exclude_properties})}) "
+                f'MERGE (n:`{node_label}` {{identifier: "{node_id}"}}) '
+                + f"ON CREATE SET {create_properties} "
+                + f"ON MATCH SET n.last_merge={now}, n.merge_count=(toInteger(n.merge_count) + 1) "
                 + "RETURN n.identifier"
             )
 
         # We should figure out how to batch this for efficiency - APOC seems to have options
         # but I haven't figured it out yet.
         for query in queries:
-            # logger.info(query)
-            result = self.graph.execute_query(query)
-            # logger.info(result)
+            self.graph.execute_query(query)
 
     def add_relation(
         self,
@@ -315,6 +421,8 @@ class AicaNeo4j:
                             n2.identifier = '{node_b_id}' 
                         MERGE 
                             (n1)-[{relation.get_create_statement()}]-{'>' if directed_tag else ''}(n2)
+                        ON CREATE SET r.first_merge=timestamp(), r.merge_count=1
+                        ON MATCH SET r.last_merge=timestamp(), r.merge_count=(toInteger(r.merge_count) + 1)
                         RETURN type(r)"""
 
             queries.append(query)
@@ -322,7 +430,11 @@ class AicaNeo4j:
         # We should figure out how to batch this for efficiency - APOC seems to have options
         # but I haven't figured it out yet.
         for query in queries:
-            result = self.graph.execute_query(query)
+            self.graph.execute_query(query)
+
+    def import_graphml_data(self, import_file: str) -> None:
+        query = f"CALL apoc.import.graphml('{import_file}', {{}})"
+        self.graph.execute_query(query)
 
     def get_node_ids_by_label(self, label: str) -> List[str]:
         """
@@ -439,7 +551,7 @@ def prune_netflow_data(
     # This function removes all network traffic items that were created at least
     # _minutes_ ago and are not connected to any observations
 
-    graph = AicaNeo4j(create_constraints=False)
+    graph = AicaNeo4j(initialize_graph=False)
 
     # Not using f-string here since it gets messy with braces in the query.
     # This might get better with Python 3.12+.

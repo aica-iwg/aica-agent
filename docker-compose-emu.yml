@@ -1,22 +1,37 @@
 ---
-version: "3.8"
 
 services:
   manager:
     environment:
-      - MODE=emu
+      MODE: "emu"
+      TAP_IF: "eth1"
+      HOME_NET: "10.107.100.0/24"
     # For Testing, ensure these containers start with manager
     depends_on:
       siem:
         condition: service_healthy
-      attacker:
-        condition: service_started
+    networks:
+      # Docker brings interfaces up in alphabetical order (except internal, which are last)
+      # but this or "tap_net" (in virt mode) should both come up as eth1
       target:
-        condition: service_started
-      honeypot:
-        condition: service_started
-      ids:
-        condition: service_started
+        ipv4_address: 10.107.100.150
+
+  siem:
+    networks:
+      target:
+        ipv4_address: 10.107.100.250
+
+  ids:
+    build: ./ids
+    container_name: ids
+    command: sh /usr/local/bin/docker_entrypoint.sh
+    cap_add:
+      - NET_ADMIN
+    environment:
+      # Manager/Target host IP only
+      SURICATA_IF: "eth0"
+      HOME_NET: "10.107.100.150/32,10.107.100.170/32"
+    network_mode: service:target
 
   attacker:
     build: attacker
@@ -43,7 +58,7 @@ services:
       target:
         ipv4_address: 10.107.100.170
     healthcheck:
-      test: [ "CMD-SHELL", "ls /tmp | grep eicar" ]
+      test: ["CMD-SHELL", "ls /tmp | grep eicar"]
       interval: 10s
       timeout: 10s
       retries: 5
@@ -60,68 +75,15 @@ services:
     volumes:
       - ./honeypot/opencanary.conf:/etc/opencanaryd/opencanary.conf
     networks:
-      control:
-        ipv4_address: 10.107.50.190
-
-  ids:
-    build: ./ids
-    container_name: ids
-    command: sh /usr/local/bin/docker_entrypoint.sh
-    cap_add:
-      - NET_ADMIN
-    network_mode: service:target
-
-  elasticsearch:
-    build: elasticsearch
-    container_name: elasticsearch
-    # Required so that ES generates an acceptable SAN in its HTTPS Cert
-    hostname: "elasticsearch"
-    env_file:
-      - manager/.env
-    environment:
-      - node.name=elasticsearch
-      - cluster.name=aica
-      - discovery.type=single-node
-      - xpack.security.enabled=true
-      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
-    networks:
-      control:
-        ipv4_address: 10.107.50.240
-    ulimits:
-      memlock:
-        soft: -1
-        hard: -1
-    deploy:
-      resources:
-        limits:
-          memory: 1g
-    healthcheck:
-      test: ["CMD-SHELL",
-              "curl --insecure -u elastic:$${ELASTIC_PASSWORD} -s -X GET 'http://localhost:9200/_cluster/health?pretty' 
-              | grep '\"status\" : \"green\"'"]
-      interval: 10s
-      timeout: 30s
-      retries: 20
-
-  siem:
-    build: siem
-    container_name: siem
-    env_file:
-      manager/.env
-    depends_on:
-      manager_mongodb:
-        condition: service_healthy
-      elasticsearch:
-        condition: service_healthy
-    networks:
-      control:
-        ipv4_address: 10.107.50.250
       target:
-        ipv4_address: 10.107.100.250
-    ports:
-      - "9000:9000"  # Graylog web GUI
-    healthcheck:
-      test: [ "CMD-SHELL", "wget http://localhost:9000"]
-      interval: 10s
-      timeout: 10s
-      retries: 5
+        ipv4_address: 10.107.100.190
+
+networks:
+  target:
+    internal: true
+    ipam:
+      driver: default
+      config:
+        - subnet: 10.107.100.0/24
+          ip_range: 10.107.100.128/25
+          gateway: 10.107.100.1

@@ -11,13 +11,14 @@ Functions:
 import argparse
 import functools
 import glob
-import hashlib
-import json
 import pyshark  # type: ignore
 
 from celery import current_app
 from celery.app import shared_task
 from celery.utils.log import get_task_logger
+from collections import OrderedDict
+from stix2.base import _Extension  # type: ignore
+from stix2.properties import StringProperty  # type: ignore
 from typing import Any
 
 
@@ -41,23 +42,20 @@ def object_try_get(
     try:
         destination_dict[destination_key] = rgetattr(source_obj, source_attr)
     except AttributeError:
-        pass
+        destination_dict[destination_key] = None
 
     return destination_dict
 
 
 @shared_task(name="replay_dnp3_pcap")
-def replay_pcap(pcap_file: str, send_task: bool = True) -> None:
+def replay_dnp3_pcap(pcap_file: str) -> None:
     with pyshark.FileCapture(pcap_file, display_filter="dnp3") as cap:
         for packet in cap:
             packet_dict = parse_dnp3_packet(packet)
-            if send_task:
-                current_app.send_task(
-                    "ma-knowledge_base-record_dnp3",
-                    [packet_dict],
-                )
-            else:
-                print(packet_dict)
+            current_app.send_task(
+                "ma-knowledge_base-record_dnp3",
+                [packet_dict],
+            )
 
 
 @shared_task(name="capture_dnp3")
@@ -82,54 +80,52 @@ def parse_dnp3_packet(packet: pyshark.packet.packet.Packet) -> dict[str, str]:
 
     # Non-DNP3 context
     return_dict["sniff_timestamp"] = packet.sniff_timestamp
-    return_dict["ip_src"] = packet.ip.src_host
-    return_dict["ip_dst"] = packet.ip.dst_host
-    return_dict["tcp_src"] = packet.tcp.srcport
-    return_dict["tcp_dst"] = packet.tcp.dstport
+    return_dict["src_mac"] = packet.eth.src
+    return_dict["dst_mac"] = packet.eth.dst
+    return_dict["src_ip"] = packet.ip.src_host
+    return_dict["dst_ip"] = packet.ip.dst_host
+    return_dict["src_port"] = packet.tcp.srcport
+    return_dict["dst_port"] = packet.tcp.dstport
 
     # DNP3 Datalink Header
-    dnp3_dict = dict()
-    dnp3_dict["dnp3_datalink_from_master"] = packet.dnp3.ctl_dir
-    dnp3_dict["dnp3_datalink_from_primary"] = packet.dnp3.ctl_prm
+    return_dict["dnp3_datalink_from_master"] = packet.dnp3.ctl_dir
+    return_dict["dnp3_datalink_from_primary"] = packet.dnp3.ctl_prm
     if packet.dnp3.ctl_prm:
-        dnp3_dict["dnp3_datalink_function"] = packet.dnp3.ctl_prifunc
+        return_dict["dnp3_datalink_function"] = packet.dnp3.ctl_prifunc
     else:
-        dnp3_dict["dnp3_datalink_function"] = packet.dnp3.ctl_secfunc
+        return_dict["dnp3_datalink_function"] = packet.dnp3.ctl_secfunc
 
-    dnp3_dict["dnp3_datalink_dst"] = (
-        packet.dnp3.dst
-    )  # Note: there may be multiple DNP3 dsts/srcs per IP!
-    dnp3_dict["dnp3_datalink_src"] = packet.dnp3.src
+    # Note: there may be multiple DNP3 dsts/srcs per IP!
+    return_dict["dnp3_datalink_dst"] = packet.dnp3.dst
+    return_dict["dnp3_datalink_src"] = packet.dnp3.src
 
     # DNP3 Application Header
-    dnp3_dict = object_try_get(
-        packet, dnp3_dict, "dnp3.al_uns", "dnp3_application_unsolicited_from_slave"
+    return_dict = object_try_get(
+        packet, return_dict, "dnp3.al_uns", "dnp3_application_unsolicited_from_slave"
     )
-    dnp3_dict = object_try_get(
-        packet, dnp3_dict, "dnp3.al_func", "dnp3_application_function"
+    return_dict = object_try_get(
+        packet, return_dict, "dnp3.al_func", "dnp3_application_function"
     )
-    dnp3_dict = object_try_get(packet, dnp3_dict, "dnp3.al_iin", "dnp3_application_iin")
-    dnp3_dict = object_try_get(packet, dnp3_dict, "dnp3.al_obj", "dnp3_application_obj")
-    dnp3_dict = object_try_get(
-        packet, dnp3_dict, "dnp3.al_objq_code", "dnp3_application_objq_code"
+    return_dict = object_try_get(
+        packet, return_dict, "dnp3.al_iin", "dnp3_application_iin"
     )
-    dnp3_dict = object_try_get(
-        packet, dnp3_dict, "dnp3.al_objq_index", "dnp3_application_objq_index"
+    return_dict = object_try_get(
+        packet, return_dict, "dnp3.al_obj", "dnp3_application_obj"
     )
-    dnp3_dict = object_try_get(
-        packet, dnp3_dict, "dnp3.al_objq_prefix", "dnp3_application_objq_prefix"
+    return_dict = object_try_get(
+        packet, return_dict, "dnp3.al_objq_code", "dnp3_application_objq_code"
     )
-    dnp3_dict = object_try_get(
-        packet, dnp3_dict, "dnp3.al_objq_range", "dnp3_application_objq_range"
+    return_dict = object_try_get(
+        packet, return_dict, "dnp3.al_objq_index", "dnp3_application_objq_index"
+    )
+    return_dict = object_try_get(
+        packet, return_dict, "dnp3.al_objq_prefix", "dnp3_application_objq_prefix"
+    )
+    return_dict = object_try_get(
+        packet, return_dict, "dnp3.al_objq_range", "dnp3_application_objq_range"
     )
 
-    # TODO: Determine the best way to incorporate object values into this without making the fingerprints too volatile
-
-    # Create a global identifier to represent the "type" of this message
-    fingerprint = hashlib.sha1(
-        json.dumps(dnp3_dict).encode("utf-8"), usedforsecurity=False
-    ).hexdigest()
-    return_dict["dnp3_fingerprint"] = fingerprint
+    # TODO: Determine the best way to incorporate object values into this without making the node IDs too volatile
 
     return return_dict
 
@@ -149,4 +145,29 @@ if __name__ == "__main__":
 
     for pcap_file_expr in args.pcap_file:
         for pcap_file in glob.glob(pcap_file_expr):
-            replay_pcap(pcap_file, send_task=False)
+            replay_dnp3_pcap(pcap_file)
+
+
+class DNP3RequestExt(_Extension):  # type: ignore
+    """For more detailed information on this object's properties, see
+    `the STIX 2.0 specification <http://docs.oasis-open.org/cti/stix/v2.0/cs01/part4-cyber-observable-objects/stix-v2.0-cs01-part4-cyber-observable-objects.html#_Toc496716262>`__.
+    """  # noqa
+
+    _type = "dnp3-request-ext"
+    _properties = OrderedDict(
+        [
+            ("dnp3_datalink_src", StringProperty(required=True)),
+            ("dnp3_datalink_dst", StringProperty(required=True)),
+            ("dnp3_application_unsolicited_from_slave", StringProperty(required=True)),
+            ("dnp3_datalink_from_master", StringProperty(required=True)),
+            ("dnp3_datalink_from_primary", StringProperty(required=True)),
+            ("dnp3_datalink_function", StringProperty(required=True)),
+            ("dnp3_application_function", StringProperty(required=False)),
+            ("dnp3_application_iin", StringProperty(required=False)),
+            ("dnp3_application_obj", StringProperty(required=False)),
+            ("dnp3_application_objq_code", StringProperty(required=False)),
+            ("dnp3_application_objq_index", StringProperty(required=False)),
+            ("dnp3_application_objq_prefix", StringProperty(required=False)),
+            ("dnp3_application_objq_range", StringProperty(required=False)),
+        ]
+    )

@@ -1,6 +1,7 @@
 #!/bin/bash
+set -e
 
-cd /usr/src/app || exit 1
+cd /usr/src/app
 
 echo "Starting Celery workers and gunicorn"
 cat <<EOF > /etc/supervisor/conf.d/0_env.conf
@@ -11,7 +12,9 @@ environment=
   MONGO_SERVER_PORT="${MONGO_SERVER_PORT}",
   MONGO_INITDB_DATABASE="${MONGO_INITDB_DATABASE}",
   MONGO_INITDB_USER="${MONGO_INITDB_USER}",
-  MONGO_INITDB_PASS="${MONGO_INITDB_PASS}"
+  MONGO_INITDB_PASS="${MONGO_INITDB_PASS}",
+  TAP_IF="${TAP_IF}",
+  HOME_NET="${HOME_NET}"
 EOF
 
 service supervisor start

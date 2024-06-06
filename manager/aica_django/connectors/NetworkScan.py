@@ -19,7 +19,7 @@ from hashlib import sha256
 from netaddr import IPAddress  # type: ignore
 from celery import shared_task
 from celery.utils.log import get_task_logger
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 from aica_django.connectors.DocumentDatabase import AicaMongo
 from aica_django.microagents.knowledge_base import record_nmap_scan
@@ -29,9 +29,9 @@ logger = get_task_logger(__name__)
 
 @shared_task(name="network-scan")
 def network_scan(
-    nmap_target: str = "",
-    nmap_args: str = "-O -Pn --osscan-limit --host-timeout=7",
+    nmap_args: str = "-O -Pn --osscan-limit --host-timeout=30",
     min_scan_interval: int = 300,
+    nmap_target: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Start a network scan, with defined or default parameters. Uses lockfile and MongoDB record
@@ -49,7 +49,10 @@ def network_scan(
     """
     targets = []
     logger.info(f"Running network_scan on {nmap_target}")
-    if nmap_target == "":
+    if nmap_target:
+        # Scan requested target
+        targets.append(nmap_target)
+    else:
         # Scan apparently local subnet(s)
         for interface in netifaces.interfaces():
             if re.match(r"^(lo|utun|tun|ip6tnl)", interface):
@@ -67,10 +70,6 @@ def network_scan(
                             f"Couldn't add interface {interface}'s ({v}) subnet to initial scans"
                         )
 
-    else:
-        # Scan requested target
-        targets.append(nmap_target)
-
     scan_results = dict()
     aica_mongo = AicaMongo()
     for target in targets:
@@ -78,7 +77,10 @@ def network_scan(
         hasher.update(target.encode("utf-8"))
         host_hash = hasher.hexdigest()
         last_scantime = aica_mongo.get_last_network_scan_timestamp(host_hash)
-        if last_scantime < datetime.datetime.now().timestamp() - min_scan_interval:
+        if (
+            not last_scantime
+            or last_scantime < datetime.datetime.now().timestamp() - min_scan_interval
+        ):
             scan_lock = fasteners.InterProcessLock(
                 f"/var/lock/aica-nmap-scan-{host_hash}"
             )
@@ -104,7 +106,9 @@ def network_scan(
 
 
 @shared_task(name="periodic-network-scan")
-def periodic_network_scan(nmap_target: str = "", nmap_args: str = "") -> None:
+def periodic_network_scan(
+    nmap_target: Optional[str] = None, nmap_args: Optional[str] = None
+) -> None:
     """
     Periodically re-scan the specified target, with the provided arguments. Interval controlled
     by the NETWORK_SCAN_INTERVAL_MINUTES environment variable.
@@ -115,15 +119,12 @@ def periodic_network_scan(nmap_target: str = "", nmap_args: str = "") -> None:
     @type nmap_args: str
     """
 
-    logger.info(f"Running {__name__}: periodic-network-scan")
     while True:
-        if nmap_args != "":
-            logger.info(
-                f"Running {__name__}:{nmap_target} {nmap_args}: periodic-network-scan with args"
-            )
-            results = network_scan(nmap_target, nmap_args)
-        else:
-            logger.info(f"Running {__name__}:{nmap_target} : periodic-network-scan")
-            results = network_scan(nmap_target)
+        logger.info(
+            f"Running {__name__}: periodic-network-scan on {nmap_target} with args: {nmap_args}"
+        )
+        network_scan.apply_async(
+            kwargs={"nmap_target": nmap_target, "nmap_args": nmap_args}
+        )
 
         time.sleep(int(os.getenv("NETWORK_SCAN_INTERVAL_MINUTES") or 0) * 60)

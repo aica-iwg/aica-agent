@@ -1,5 +1,4 @@
 ---
-version: "3.8"
 
 services:
   manager:
@@ -9,8 +8,8 @@ services:
     env_file:
       - manager/.env
     ports:
-      - "8000:8000" # Django frontend
-      - "5555:5555" # Celery Flower
+      - "8000:8000"  # Django frontend
+      - "5555:5555"  # Celery Flower
     depends_on:
       manager_mq:
         condition: service_healthy
@@ -21,14 +20,16 @@ services:
       manager_graphdb:
         condition: service_healthy
     volumes:
+      - graphml_share:/graph_data
       # For testing
       - ./pcaps:/usr/src/app/pcaps
     networks:
       bridge:
       control:
         ipv4_address: 10.107.50.150
-      target:
-        ipv4_address: 10.107.100.150
+    # For PCAPs
+    cap_add:
+      - NET_ADMIN
 
   manager_db:
     image: postgres:13.8-bullseye
@@ -80,19 +81,20 @@ services:
       retries: 5
 
   manager_graphdb:
-    build: manager_graphdb 
+    build: manager_graphdb
     container_name: manager_graphdb
     restart: unless-stopped
     environment:
       # https://neo4j.com/docs/operations-manual/current/docker/ref-settings/
-      - NEO4J_dbms_security_procedures_unrestricted=apoc.*,gds.*
-      - apoc.export.file.enabled=true
-      - apoc.import.file.enabled=true
-      - apoc.import.file.use_neo4j_config=false
+      NEO4J_dbms_security_procedures_unrestricted: "apoc.*,gds.*"
+      apoc.export.file.enabled: true
+      apoc.import.file.enabled: true
+      apoc.import.file.use_neo4j_config: false
     env_file:
       - manager/.env
     volumes:
       - neo_data:/var/lib/neo4j/data
+      - graphml_share:/graph_data
     ports:
       - "7474:7474"  # Neo4j web GUI
       - "7687:7687"  # Neo4j API port (needed for web GUI)
@@ -101,15 +103,72 @@ services:
       control:
         ipv4_address: 10.107.50.230
     healthcheck:
-      test: [ "CMD-SHELL", "wget http://localhost:7474/" ]
+      test: ["CMD-SHELL", "wget http://localhost:7474/"]
       interval: 10s
       timeout: 10s
-      retries: 10 
+      retries: 10
+
+  elasticsearch:
+    build: elasticsearch
+    container_name: elasticsearch
+    # Required so that ES generates an acceptable SAN in its HTTPS Cert
+    hostname: "elasticsearch"
+    env_file:
+      - manager/.env
+    environment:
+      node.name: "elasticsearch"
+      cluster.name: "aica"
+      discovery.type: "single-node"
+      xpack.security.enabled: true
+      ES_JAVA_OPTS: "-Xms512m -Xmx512m"
+    networks:
+      control:
+        ipv4_address: 10.107.50.240
+    volumes:
+      - es_data:/usr/share/elasticsearch/data
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+    healthcheck:
+      test: ["CMD-SHELL",
+             "curl --insecure -u elastic:$${ELASTIC_PASSWORD} -s -X GET 'http://localhost:9200/_cluster/health?pretty'
+             | grep '\"status\" : \"green\"'"]
+      interval: 10s
+      timeout: 30s
+      retries: 20
+
+  siem:
+    build: siem
+    container_name: siem
+    env_file:
+      manager/.env
+    depends_on:
+      manager_mongodb:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
+    networks:
+      control:
+        ipv4_address: 10.107.50.250
+    ports:
+      - "9000:9000"  # Graylog web GUI
+    healthcheck:
+      test: ["CMD-SHELL", "wget http://localhost:9000"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
 
 volumes:
   mongo_data:
   pg_data:
+  es_data:
   neo_data:
+  graphml_share:
 
 networks:
   bridge:
@@ -118,14 +177,6 @@ networks:
     ipam:
       driver: default
       config:
-        - subnet: 10.107.50.0/24 
+        - subnet: 10.107.50.0/24
           ip_range: 10.107.50.128/25
-          gateway: 10.107.50.1 
-  target:
-    internal: true
-    ipam:
-      driver: default
-      config:
-        - subnet: 10.107.100.0/24 
-          ip_range: 10.107.100.128/25
-          gateway: 10.107.100.1
+          gateway: 10.107.50.1

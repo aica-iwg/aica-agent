@@ -30,13 +30,17 @@ from celery.utils.log import get_task_logger
 from collections import defaultdict
 from io import StringIO
 from stix2 import Note, Relationship, Software  # type: ignore
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
-from aica_django.connectors.DNP3 import replay_pcap, capture_dnp3
+from aica_django.connectors.DNP3 import replay_dnp3_pcap, capture_dnp3
 
 from aica_django.converters.AICAStix import AICAAttackPattern
 from aica_django.connectors.DocumentDatabase import AicaMongo
-from aica_django.connectors.GraphDatabase import AicaNeo4j, prune_netflow_data
+from aica_django.connectors.GraphDatabase import (
+    AicaNeo4j,
+    poll_graphml,
+    prune_netflow_data,
+)
 from aica_django.connectors.Netflow import network_flow_capture
 from aica_django.connectors.HTTPServer import poll_nginx_accesslogs
 from aica_django.connectors.CaddyServer import poll_caddy_accesslogs
@@ -48,8 +52,10 @@ from aica_django.converters.Knowledge import knowledge_to_neo, fake_note_root
 
 logger = get_task_logger(__name__)
 
+graph = AicaNeo4j()
 
-def create_malware_categories() -> None:
+
+def create_malware_categories(import_file: Optional[str] = None) -> None:
     """
     Load a static list of ClamAV malware categories into the graph.
 
@@ -57,46 +63,50 @@ def create_malware_categories() -> None:
     @rtype: bool
     """
 
-    # From: https://docs.clamav.net/manual/Signatures/SignatureNames.html
-    clamav_categories = [
-        "Adware",
-        "Backdoor",
-        "Coinminer",
-        "Countermeasure",
-        "Downloader",
-        "Dropper",
-        "Exploit",
-        "File",
-        "Filetype",
-        "Infostealer",
-        "Ircbot",
-        "Joke",
-        "Keylogger",
-        "Loader",
-        "Macro",
-        "Malware",
-        "Packed",
-        "Packer",
-        "Phishing",
-        "Proxy",
-        "Ransomware",
-        "Revoked",
-        "Rootkit",
-        "Spyware",
-        "Test",
-    ]
+    if import_file:
+        graph.import_graphml_data(import_file)
+        logger.info("Imported malware categories from ClamAV data...")
+    else:
+        # From: https://docs.clamav.net/manual/Signatures/SignatureNames.html
+        clamav_categories = [
+            "Adware",
+            "Backdoor",
+            "Coinminer",
+            "Countermeasure",
+            "Downloader",
+            "Dropper",
+            "Exploit",
+            "File",
+            "Filetype",
+            "Infostealer",
+            "Ircbot",
+            "Joke",
+            "Keylogger",
+            "Loader",
+            "Macro",
+            "Malware",
+            "Packed",
+            "Packer",
+            "Phishing",
+            "Proxy",
+            "Ransomware",
+            "Revoked",
+            "Rootkit",
+            "Spyware",
+            "Test",
+        ]
 
-    logger.info("Creating malware categories from ClamAV data...")
+        logger.info("Creating malware categories from ClamAV data...")
 
-    malware_categories = []
-    for category in clamav_categories:
-        attack_pattern_name = f"clamav:{category}"
-        malware_signature = AICAAttackPattern(name=attack_pattern_name)
-        malware_categories.append(malware_signature)
+        malware_categories = []
+        for category in clamav_categories:
+            attack_pattern_name = f"clamav:{category}"
+            malware_signature = AICAAttackPattern(name=attack_pattern_name)
+            malware_categories.append(malware_signature)
 
-    knowledge_to_neo(malware_categories)
+        knowledge_to_neo(malware_categories)
 
-    logger.info("Created malware categories from ClamAV data.")
+        logger.info("Created malware categories from ClamAV data.")
 
 
 port_root = Software(
@@ -123,134 +133,159 @@ top_1000_port_note = Note(
 )
 
 
-def create_port_info() -> None:
+def create_port_info(import_file: Optional[str] = None) -> None:
     """
     Load Nmap's list (from web) of port/service info into the graph.
 
     @return: True once complete.
     @rtype: bool
     """
-    nmap_services_url = (
-        "https://raw.githubusercontent.com/nmap/nmap/master/nmap-services"
-    )
-
-    logger.info("Creating port info from nmap data...")
-
-    resp = requests.get(nmap_services_url)
-    try:
-        resp.raise_for_status()
-    except requests.exceptions.HTTPError:
-        logging.error("Couldn't fetch nmap services data, skipping.")
-    nmap_file = StringIO(resp.text)
-    nmap_df = pd.read_csv(
-        nmap_file,
-        sep="\t",
-        comment="#",
-        header=None,
-        names=["service", "port", "frequency", "comment"],
-        index_col=False,
-    )
-    nmap_df = nmap_df[nmap_df["service"] != "unknown"]
-
-    # We want all parts of service, except the last part in the case of hyphenated
-    nmap_df["software"] = nmap_df["service"].apply(
-        lambda x: "-".join(
-            x.split("-")[
-                : len(x.split("-")) - 1 if len(x.split("-")) > 1 else len(x.split("-"))
-            ]
+    if import_file:
+        graph.import_graphml_data(import_file)
+        logger.info("Imported port info from nmap data.")
+    else:
+        nmap_services_url = (
+            "https://raw.githubusercontent.com/nmap/nmap/master/nmap-services"
         )
-    )
 
-    nmap_df[["port_number", "protocol"]] = nmap_df["port"].str.split("/", expand=True)
-    nmap_df.drop(columns=["comment", "port"], axis=1, inplace=True)
+        logger.info("Creating port info from nmap data...")
 
-    # For performance reasons (startup is slow creating these)
-    nmap_df = nmap_df[nmap_df["frequency"] > 0]
-
-    nmap_df["rank"] = nmap_df["frequency"].rank(ascending=False)
-
-    port_objects = [port_root, top_10_port_note, top_100_port_note, top_1000_port_note]
-
-    port_software_map = defaultdict(list)
-
-    for _, row in nmap_df.iterrows():
-        port_object = Note(
-            abstract=f"{row['port_number']}/{row['protocol']}",
-            content=json.dumps(
-                {
-                    "port": row["port_number"],
-                    "protocol": row["protocol"],
-                    "service": row["service"],
-                    "frequency": row["frequency"],
-                    "rank": row["rank"],
-                }
-            ),
-            object_refs=[port_root.id],
+        resp = requests.get(nmap_services_url)
+        try:
+            resp.raise_for_status()
+        except requests.exceptions.HTTPError:
+            logging.error("Couldn't fetch nmap services data, skipping.")
+        nmap_file = StringIO(resp.text)
+        nmap_df = pd.read_csv(
+            nmap_file,
+            sep="\t",
+            comment="#",
+            header=None,
+            names=["service", "port", "frequency", "comment"],
+            index_col=False,
         )
-        port_objects.append(port_object)
+        nmap_df = nmap_df[nmap_df["service"] != "unknown"]
 
-        if row["rank"] <= 10:
-            port_objects.append(Relationship(top_10_port_note, "object", port_object))
-        if row["rank"] <= 100:
-            port_objects.append(Relationship(top_100_port_note, "object", port_object))
-        if row["rank"] <= 1000:
-            port_objects.append(Relationship(top_1000_port_note, "object", port_object))
-
-        port_software_map[row["software"]].append(port_object)
-
-    for software, port_notes in port_software_map.items():
-        software_obj = Software(name=software)
-        port_objects.append(software_obj)
-        for port_note in port_notes:
-            port_rel = Relationship(
-                relationship_type="object",
-                source_ref=port_note,
-                target_ref=software_obj,
+        # We want all parts of service, except the last part in the case of hyphenated
+        nmap_df["software"] = nmap_df["service"].apply(
+            lambda x: "-".join(
+                x.split("-")[
+                    : (
+                        len(x.split("-")) - 1
+                        if len(x.split("-")) > 1
+                        else len(x.split("-"))
+                    )
+                ]
             )
-            port_objects.append(port_rel)
+        )
 
-    knowledge_to_neo(port_objects)
+        nmap_df[["port_number", "protocol"]] = nmap_df["port"].str.split(
+            "/", expand=True
+        )
+        nmap_df.drop(columns=["comment", "port"], axis=1, inplace=True)
 
-    logger.info("Created port info from nmap data.")
+        # For performance reasons (startup is slow creating these)
+        nmap_df = nmap_df[nmap_df["frequency"] > 0]
+
+        nmap_df["rank"] = nmap_df["frequency"].rank(ascending=False)
+
+        port_objects = [
+            port_root,
+            top_10_port_note,
+            top_100_port_note,
+            top_1000_port_note,
+        ]
+
+        port_software_map = defaultdict(list)
+
+        for _, row in nmap_df.iterrows():
+            port_object = Note(
+                abstract=f"{row['port_number']}/{row['protocol']}",
+                content=json.dumps(
+                    {
+                        "port": row["port_number"],
+                        "protocol": row["protocol"],
+                        "service": row["service"],
+                        "frequency": row["frequency"],
+                        "rank": row["rank"],
+                    }
+                ),
+                object_refs=[port_root.id],
+            )
+            port_objects.append(port_object)
+
+            if row["rank"] <= 10:
+                port_objects.append(
+                    Relationship(top_10_port_note, "object", port_object)
+                )
+            if row["rank"] <= 100:
+                port_objects.append(
+                    Relationship(top_100_port_note, "object", port_object)
+                )
+            if row["rank"] <= 1000:
+                port_objects.append(
+                    Relationship(top_1000_port_note, "object", port_object)
+                )
+
+            port_software_map[row["software"]].append(port_object)
+
+        for software, port_notes in port_software_map.items():
+            software_obj = Software(name=software)
+            port_objects.append(software_obj)
+            for port_note in port_notes:
+                port_rel = Relationship(
+                    relationship_type="object",
+                    source_ref=port_note,
+                    target_ref=software_obj,
+                )
+                port_objects.append(port_rel)
+
+        knowledge_to_neo(port_objects)
+
+        logger.info("Created port info from nmap data.")
 
 
-def create_suricata_categories() -> None:
+def create_suricata_categories(import_file: Optional[str] = None) -> None:
     """
     Load Suricata's list (from web) of alert categories into the graph.
 
     @return: True once complete.
     @rtype: bool
     """
-    suricata_classes_url = "https://rules.emergingthreats.net/open/suricata-5.0/rules/classification.config"
+    if import_file:
+        graph.import_graphml_data(import_file)
+        logger.info("Imported Suricata alert classes.")
+    else:
+        suricata_classes_url = "https://rules.emergingthreats.net/open/suricata-5.0/rules/classification.config"
 
-    logger.info("Creating Suricata alert classes...")
+        logger.info("Creating Suricata alert classes...")
 
-    resp = requests.get(suricata_classes_url)
-    try:
-        resp.raise_for_status()
-    except requests.exceptions.HTTPError:
-        logging.error("Couldn't fetch suricata class data, skipping.")
-    suricata_file = StringIO(resp.text.replace("config classification: ", ""))
-    suricata_df = pd.read_csv(
-        suricata_file,
-        sep=",",
-        comment="#",
-        header=None,
-        names=["name", "description", "priority"],
-    )
-
-    attack_patterns = []
-    for _, row in suricata_df.iterrows():
-        attack_pattern_name = row["name"]
-        attack_pattern = AICAAttackPattern(
-            name=attack_pattern_name,
+        resp = requests.get(suricata_classes_url)
+        try:
+            resp.raise_for_status()
+        except requests.exceptions.HTTPError:
+            logging.error("Couldn't fetch suricata class data, skipping.")
+        suricata_file = StringIO(resp.text.replace("config classification: ", ""))
+        suricata_df = pd.read_csv(
+            suricata_file,
+            sep=",",
+            comment="#",
+            header=None,
+            names=["name", "description", "priority"],
         )
 
-        attack_patterns.append(attack_pattern)
+        attack_patterns = []
+        for _, row in suricata_df.iterrows():
+            attack_pattern_name = row["name"]
+            attack_pattern = AICAAttackPattern(
+                name=attack_pattern_name,
+            )
 
-    knowledge_to_neo(attack_patterns)
+            attack_patterns.append(attack_pattern)
 
-    logger.info("Created Suricata alert classes.")
+        knowledge_to_neo(attack_patterns)
+
+        logger.info("Created Suricata alert classes.")
 
 
 @worker_ready.connect
@@ -277,51 +312,56 @@ def initialize(**kwargs: Dict[Any, Any]) -> None:
     if os.environ.get("SKIP_TASKS"):
         return
 
-    graph = AicaNeo4j()
-
     ### Preload Contextual Data ###
+    # To update this data, run each of these functions without import_file and export with APOC to an updated file, like:
+    #     CALL apoc.export.graphml.all("aica-suricata_categories-20240513.graphml", {format:"gephi", useTypes:true})
+    # Although this is a bit clunky, creating this data from scratch (esp nmap port info) takes a while, so we don't
+    # want to do it on each start of the agent if we can avoid it.
 
     # Load ClamAV Categories into Graph
-    create_malware_categories()
+    create_malware_categories(
+        import_file="/graph_data/aica-malware_categories-20240513.graphml"
+    )
 
     # Get Suricata rule classes and load into Graph
-    create_suricata_categories()
+    create_suricata_categories(
+        import_file="/graph_data/aica-suricata_categories-20240513.graphml"
+    )
 
     # Get nmap-services and load into Graph
-    create_port_info()
+    create_port_info(import_file="/graph_data/aica-nmap_port_info-20240513.graphml")
 
     ### Start Tasks ###
 
     # Start netflow collector
-    network_flow_capture.delay()
+    network_flow_capture.apply_async()
 
     # Start periodic network scans of local subnets in background
-    periodic_network_scan.delay()
+    # If HOME_NET isn't specified, this will fallback to scanning local nets based on interface configs
+    periodic_network_scan.apply_async(kwargs={"nmap_target": os.getenv("HOME_NET")})
 
     # Start polling for Nginx access logs
-    poll_nginx_accesslogs.delay()
+    poll_nginx_accesslogs.apply_async()
 
     # Start polling for Caddy access logs
-    poll_caddy_accesslogs.delay()
+    poll_caddy_accesslogs.apply_async()
 
     # Start polling for IDS alerts in background
-    poll_suricata_alerts.delay()
+    poll_suricata_alerts.apply_async()
 
     # Start polling for AV alerts in background
-    poll_clamav_alerts.delay()
+    poll_clamav_alerts.apply_async()
 
     # Start polling for WAF alerts in background
-    poll_waf_alerts.delay()
+    poll_waf_alerts.apply_async()
+
+    # Start the DNP3 capture in background
+    capture_dnp3.apply_async(kwargs={"interface": os.getenv("TAP_IF")})
+
+    # Start polling for exports of the knowledge graph for processing
+    # We really don't like doing things this way, but Neo4J's inability to understand sparse matrices
+    # (as needed for graph embedding generation from vectorized node IDs) forced us into it.
+    poll_graphml.apply_async()
 
     # Start the Netflow graph pruner in background
-    prune_netflow_data.delay()
-
-    ### TESTING ONLY ###
-
-    # Switch to live capture later
-    # replay_pcap.delay(
-    #     kwargs={
-    #         "pcap_file": "pcaps/20200514_DNP3_Disable_Unsolicited_Messages_Attack/DNP3 PCAP Files/20200514_DNP3_Disable_Unsolicited_Messages_Attack_UOWM_DNP3_Dataset_Master.pcap"
-    #     }
-    # )
-    # capture_dnp3().delay(args=["eth2"])
+    prune_netflow_data.apply_async()
