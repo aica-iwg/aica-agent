@@ -13,6 +13,7 @@ import random
 import re2 as re  # type: ignore
 import stix2  # type: ignore
 import time
+import numpy as np
 
 from celery import current_app
 from celery.app import shared_task
@@ -27,6 +28,12 @@ from typing import Any, Dict, List, Optional, Union
 from urllib.parse import quote_plus
 from watchdog.events import FileSystemEventHandler, FileCreatedEvent, FileModifiedEvent  # type: ignore
 from watchdog.observers import Observer  # type: ignore
+import torch
+from torch_geometric.data import Data
+from torch_geometric.nn import SAGEConv
+import torch.nn.functional as F
+from torch_sparse import SparseTensor
+
 
 logger = get_task_logger(__name__)
 
@@ -58,11 +65,122 @@ def dict_to_cypher(input_dict: dict[str, Any]) -> str:
     return return_string
 
 
-def process_graphml(path: str) -> None:
+class GraphSAGE(torch.nn.Module):
+    def __init__(self, in_dim, hidden_dim, out_dim, aggr='mean', dropout=0.2):
+        super().__init__()
+        self.dropout = dropout
+        self.conv1 = SAGEConv(in_dim, hidden_dim, aggr=aggr)
+        self.conv2 = SAGEConv(hidden_dim, hidden_dim, aggr=aggr)
+        self.conv3 = SAGEConv(hidden_dim, out_dim, aggr=aggr)
+        
+    
+    def forward(self, data):
+        x = self.conv1(data.x, data.adj_t)
+        x = F.tanh(x)
+        x = F.dropout(x, p=self.dropout)
+        
+        x = self.conv2(x, data.adj_t)
+        x = F.tanh(x)
+        x = F.dropout(x, p=self.dropout)
+        
+        x = self.conv3(x, data.adj_t)
+        x = F.tanh(x)
+        x = F.dropout(x, p=self.dropout)
+    
+        return x
+
+
+def process_graphml(path, device=False): #type none for now 
     # TODO: This is where we'd do whatever processing on the GraphML file we want
     # For example, converting the node ID vectors back from a string into a CSR matrix,
     # generating the graph embeddings, and pushing info back onto nodes in the Neo4J graph.
-    logger.error("GraphML function not yet implemented!")
+
+    # Load graphml file
+    # - Gather preembeddings from file
+    # - Load preembeddings from matrix market format into a list, then node vector array
+    # - Generate sparse array matrix from graphml file
+    aica_graph = nx.read_graphml(path)
+    node_vectors = []
+    for node in aica_graph.nodes(data=True):
+        node_vectors.append(node[1]['preembeddings']) 
+    test_arr_list = [ mmread(StringIO(x)).toarray() for x in node_vectors ]
+    node_vec_arr = np.array(test_arr_list)
+    node_arr_shape = node_vec_arr[0].shape
+    ag_matrix = nx.to_scipy_sparse_array(aica_graph, dtype=np.float32, format='csc')
+
+    # Create data tensor for GraphSage
+    x = torch.tensor(node_vec_arr)
+    adj_tensor = SparseTensor.from_scipy(ag_matrix, has_value=True)
+    data_tensor = Data(x=x.to(torch.float32), adj_t= adj_tensor)
+
+    #logger.error("GraphML function not yet implemented!")
+    if device:
+        data = data.to(device=device)
+    
+    return data_tensor
+    
+
+def embedding_generator(data_tensor, hidden_dim=128, in_dim=-1, out_dim=2, device=False):
+    
+    # make hidden_dim size be num_node_types*hidden_dim
+    hidden_dim = hidden_dim
+    in_dim =in_dim
+    out_dim = out_dim
+
+    model = GraphSAGE(in_dim=in_dim, 
+                    hidden_dim=hidden_dim, 
+                    out_dim=out_dim)
+    if device:
+        model.to(device=device)
+    
+    emb = model(data_tensor) 
+
+    if device:
+        emb = emb.cpu().detach().numpy()
+
+    return emb
+
+
+        
+class GraphMLHandler(FileSystemEventHandler):  # type: ignore
+    def __init__(self, quiesce_period: int = 60) -> None:
+        self.quiesce_period = quiesce_period
+        self.last_change = 0.0
+
+    def on_created(self, event: FileCreatedEvent) -> None:
+        self.on_modified(event)
+
+    def on_modified(self, event: FileModifiedEvent) -> None:
+        current_time = time.time()
+
+        # If the file has been modified recently, ignore the event
+        if current_time - self.last_change < self.quiesce_period:
+            logger.debug(
+                f"Not processing GraphML file, last time: {self.last_change}, current time: {current_time}"
+            )
+        else:
+            logger.debug(
+                f"Processing changed GraphML file, last time: {self.last_change}, current time: {current_time}"
+            )
+            process_graphml(graphml_path)
+
+        if current_time > self.last_change:
+            self.last_change = current_time
+
+
+@shared_task(name="poll-graphml")
+def poll_graphml() -> None:
+    logger.info(f"Running {__name__}: poll_graphml")
+
+    if os.path.isfile(graphml_path):
+        process_graphml(graphml_path)
+
+    observer = Observer()
+    observer.schedule(GraphMLHandler(), graphml_path)
+    observer.start()
+
+    # Should never return
+    observer.join()
 
 
 class KnowledgeNode:
