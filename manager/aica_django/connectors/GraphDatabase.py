@@ -13,6 +13,7 @@ import random
 import re2 as re  # type: ignore
 import stix2  # type: ignore
 import time
+import numpy as np
 
 from celery import current_app
 from celery.app import shared_task
@@ -31,6 +32,8 @@ import torch
 from torch_geometric.data import Data
 from torch_geometric.nn import SAGEConv
 import torch.nn.functional as F
+from torch_sparse import SparseTensor
+
 
 logger = get_task_logger(__name__)
 
@@ -87,13 +90,58 @@ class GraphSAGE(torch.nn.Module):
         return x
 
 
-def process_graphml(path: str) -> None:
+def process_graphml(path, device=False): #type none for now 
     # TODO: This is where we'd do whatever processing on the GraphML file we want
     # For example, converting the node ID vectors back from a string into a CSR matrix,
     # generating the graph embeddings, and pushing info back onto nodes in the Neo4J graph.
-    logger.error("GraphML function not yet implemented!")
+
+    # Load graphml file
+    # - Gather preembeddings from file
+    # - Load preembeddings from matrix market format into a list, then node vector array
+    # - Generate sparse array matrix from graphml file
+    aica_graph = nx.read_graphml(path)
+    node_vectors = []
+    for node in aica_graph.nodes(data=True):
+        node_vectors.append(node[1]['preembeddings']) 
+    test_arr_list = [ mmread(StringIO(x)).toarray() for x in node_vectors ]
+    node_vec_arr = np.array(test_arr_list)
+    node_arr_shape = node_vec_arr[0].shape
+    ag_matrix = nx.to_scipy_sparse_array(aica_graph, dtype=np.float32, format='csc')
+
+    # Create data tensor for GraphSage
+    x = torch.tensor(node_vec_arr)
+    adj_tensor = SparseTensor.from_scipy(ag_matrix, has_value=True)
+    data_tensor = Data(x=x.to(torch.float32), adj_t= adj_tensor)
+
+    #logger.error("GraphML function not yet implemented!")
+    if device:
+        data = data.to(device=device)
+    
+    return data_tensor
+    
+
+def embedding_generator(data_tensor, hidden_dim=128, in_dim=-1, out_dim=2, device=False):
+    
+    # make hidden_dim size be num_node_types*hidden_dim
+    hidden_dim = hidden_dim
+    in_dim =in_dim
+    out_dim = out_dim
+
+    model = GraphSAGE(in_dim=in_dim, 
+                    hidden_dim=hidden_dim, 
+                    out_dim=out_dim)
+    if device:
+        model.to(device=device)
+    
+    emb = model(data_tensor) 
+
+    if device:
+        emb = emb.cpu().detach().numpy()
+
+    return emb
 
 
+        
 class GraphMLHandler(FileSystemEventHandler):  # type: ignore
     def __init__(self, quiesce_period: int = 60) -> None:
         self.quiesce_period = quiesce_period
