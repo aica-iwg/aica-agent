@@ -37,8 +37,6 @@ import torch_geometric.utils
 from torch_geometric.nn import CuGraphSAGEConv
 import torch.nn.functional as F
 from torch_sparse import SparseTensor
-from torch_geometric.profile import count_parameters
-
 
 
 logger = get_task_logger(__name__)
@@ -216,7 +214,7 @@ def process_graphml(path: str) -> None:
     update_graph(aica_emb, node_ids)
     
 
-
+        
 class GraphMLHandler(FileSystemEventHandler):  # type: ignore
     def __init__(self, quiesce_period: int = 60) -> None:
         self.quiesce_period = quiesce_period
