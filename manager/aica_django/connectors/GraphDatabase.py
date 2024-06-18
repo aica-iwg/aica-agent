@@ -10,6 +10,7 @@ import inspect
 import networkx as nx
 import os
 import random
+import hashlib
 import re2 as re  # type: ignore
 import stix2  # type: ignore
 import time
@@ -28,11 +29,16 @@ from typing import Any, Dict, List, Optional, Union
 from urllib.parse import quote_plus
 from watchdog.events import FileSystemEventHandler, FileCreatedEvent, FileModifiedEvent  # type: ignore
 from watchdog.observers import Observer  # type: ignore
+
 import torch
 from torch_geometric.data import Data
-from torch_geometric.nn import SAGEConv
+from torch_geometric import EdgeIndex
+import torch_geometric.utils
+from torch_geometric.nn import CuGraphSAGEConv
 import torch.nn.functional as F
 from torch_sparse import SparseTensor
+from torch_geometric.profile import count_parameters
+
 
 
 logger = get_task_logger(__name__)
@@ -64,70 +70,111 @@ def dict_to_cypher(input_dict: dict[str, Any]) -> str:
 
     return return_string
 
+def shvvl(tag: str, bpf: int) -> bytes:
+    '''
+    This is SHVVL. The only important thing is that the "type" of node is the first string in the tag
+    '''
+    sectors = tag.split("\0")
+    typehash = hashlib.md5(bytes(sectors[0], "UTF8"), usedforsecurity=False).digest()
 
-class GraphSAGE(torch.nn.Module):
+    out = bytearray()
+    hashfunc = hashlib.new('shake_256', usedforsecurity=False)
+    for sector in sectors:
+        hashfunc = hashlib.new('shake_256', usedforsecurity=False)
+        
+        blockInput = bytearray(sector, "UTF8")
+        blockInput = blockInput + typehash
+        hashfunc.update(blockInput)
+        out += hashfunc.digest(bpf)
+
+    return out
+
+def shvvl_float(tag: str, bpf: int) -> list[float]:
+    out = list()
+    for bite in shvvl(tag, bpf):
+        for l in range(8):
+            out.append(1.0 if (bite&(1<<l)) != 0 else 0.0)
+        
+    return out
+
+
+class AICASage(torch.nn.Module):
     def __init__(self, in_dim, hidden_dim, out_dim, aggr='mean', dropout=0.2):
         super().__init__()
         self.dropout = dropout
-        self.conv1 = SAGEConv(in_dim, hidden_dim, aggr=aggr)
-        self.conv2 = SAGEConv(hidden_dim, hidden_dim, aggr=aggr)
-        self.conv3 = SAGEConv(hidden_dim, out_dim, aggr=aggr)
-        
-    
-    def forward(self, data):
-        x = self.conv1(data.x, data.adj_t)
+        self.conv1 = CuGraphSAGEConv(in_dim, hidden_dim, aggr=aggr)
+        self.conv2 = CuGraphSAGEConv(hidden_dim, hidden_dim, aggr=aggr)
+        self.conv3 = CuGraphSAGEConv(hidden_dim, out_dim, aggr=aggr)
+          
+    def forward(self, data: Data):
+
+        edge_idx = EdgeIndex(data.edge_index) 
+
+        x = self.conv1(data.x, edge_idx)
         x = F.tanh(x)
         x = F.dropout(x, p=self.dropout)
         
-        x = self.conv2(x, data.adj_t)
+        x = self.conv2(x, edge_idx)
         x = F.tanh(x)
         x = F.dropout(x, p=self.dropout)
         
-        x = self.conv3(x, data.adj_t)
+        x = self.conv3(x, edge_idx)
         x = F.tanh(x)
-        x = F.dropout(x, p=self.dropout)
     
         return x
 
+def load_graphml_data(BASEFILE, SHVVL_MAX_FEATURE_LEN=12, SHVVL_BANDWIDTH=20):
 
-def process_graphml(path, device=False): #type none for now 
-    # TODO: This is where we'd do whatever processing on the GraphML file we want
-    # For example, converting the node ID vectors back from a string into a CSR matrix,
-    # generating the graph embeddings, and pushing info back onto nodes in the Neo4J graph.
+    aica_graph = nx.DiGraph = nx.read_graphml(BASEFILE)
+    a = 0
+    for n in aica_graph.nodes(data=True):
+        typedata = n[1]["TYPE"]
+        del n[1]["identifier_vec"]
 
-    # Load graphml file
-    # - Gather preembeddings from file
-    # - Load preembeddings from matrix market format into a list, then node vector array
-    # - Generate sparse array matrix from graphml file
-    aica_graph = nx.read_graphml(path)
-    node_vectors = []
-    for node in aica_graph.nodes(data=True):
-        node_vectors.append(node[1]['preembeddings']) 
-    test_arr_list = [ mmread(StringIO(x)).toarray() for x in node_vectors ]
-    node_vec_arr = np.array(test_arr_list)
-    node_arr_shape = node_vec_arr[0].shape
-    ag_matrix = nx.to_scipy_sparse_array(aica_graph, dtype=np.float32, format='csc')
+    z = str(typedata) + "\0"
+    keys = sorted(n[1].keys())
+    for k in range(SHVVL_MAX_FEATURE_LEN):
+        z += str(n[1][keys[k]]) + "\0" if k < len(keys) else "\0"
+        
+    z = z[:-1]
 
-    # Create data tensor for GraphSage
-    x = torch.tensor(node_vec_arr)
-    adj_tensor = SparseTensor.from_scipy(ag_matrix, has_value=True)
-    data_tensor = Data(x=x.to(torch.float32), adj_t= adj_tensor)
 
-    #logger.error("GraphML function not yet implemented!")
-    if device:
-        data = data.to(device=device)
-    
+    shoveled_data = shvvl_float(z, SHVVL_BANDWIDTH)
+    shvvlsize = len(shoveled_data)
+    s : dict = {}
+
+    n[1].clear()
+    for x in range(shvvlsize):
+        pass
+        n[1]["SHVVL_ID" + str(x)] = shoveled_data[x]
+        
+    a = max(a, len(n[1]))
+
+    n[1]["TYPE"]=typedata
+    print(f"SHVVL Feature count: {a}")
+    for x in aica_graph.edges(data=True):
+        x[2].clear()
+        x[2]["dummy"]=0
+
+    data_tensor : Data = torch_geometric.utils.convert.from_networkx(aica_graph, ['SHVVL_ID' + str(x) for x in range(a)])
+    print("Checking ordering...")
+    z = 0
+    for original_node in aica_graph.nodes(data=True):
+        if original_node[1]["SHVVL_ID0"] != data_tensor.x[z][0]:
+            raise BaseException("ERROR: Ordering not lined up")
+            z = -1
+            break
+        z += 1
+    if z != -1:
+        print("Likely ordered")
+
     return data_tensor
     
 
 def embedding_generator(data_tensor, hidden_dim=128, in_dim=-1, out_dim=2, device=False):
     
     # make hidden_dim size be num_node_types*hidden_dim
-    hidden_dim = hidden_dim
-    in_dim =in_dim
-    out_dim = out_dim
-
-    model = GraphSAGE(in_dim=in_dim, 
+    model = AICASage(in_dim=in_dim, 
                     hidden_dim=hidden_dim, 
                     out_dim=out_dim)
     if device:
@@ -141,7 +188,6 @@ def embedding_generator(data_tensor, hidden_dim=128, in_dim=-1, out_dim=2, devic
     return emb
 
 
-        
 class GraphMLHandler(FileSystemEventHandler):  # type: ignore
     def __init__(self, quiesce_period: int = 60) -> None:
         self.quiesce_period = quiesce_period
