@@ -90,6 +90,9 @@ def shvvl(tag: str, bpf: int) -> bytes:
     return out
 
 def shvvl_float(tag: str, bpf: int) -> list[float]:
+    '''
+    This is shvvl float. Used in conjunction with SHVVL to create preembeddings.
+    '''
     out = list()
     for bite in shvvl(tag, bpf):
         for l in range(8):
@@ -129,6 +132,7 @@ def load_graphml_data(BASEFILE, SHVVL_MAX_FEATURE_LEN=12, SHVVL_BANDWIDTH=20):
     a = 0
     for n in aica_graph.nodes(data=True):
         typedata = n[1]["TYPE"]
+        node_ids = n[1]['identifier']
         del n[1]["identifier_vec"]
 
     z = str(typedata) + "\0"
@@ -168,24 +172,49 @@ def load_graphml_data(BASEFILE, SHVVL_MAX_FEATURE_LEN=12, SHVVL_BANDWIDTH=20):
     if z != -1:
         print("Likely ordered")
 
-    return data_tensor
+    return data_tensor, node_ids
     
 
-def embedding_generator(data_tensor, hidden_dim=128, in_dim=-1, out_dim=2, device=False):
-    
+def run_graphsage(data_tensor, hidden_dim=128, in_dim=-1, out_dim=128): 
     # make hidden_dim size be num_node_types*hidden_dim
     model = AICASage(in_dim=in_dim, 
                     hidden_dim=hidden_dim, 
                     out_dim=out_dim)
-    if device:
-        model.to(device=device)
     
-    emb = model(data_tensor) 
+    if torch.cuda.is_available():
+        print("Starting in GPU mode...")
+        deviceType =  f'cuda' 
+    else:
+        print("WARNING: NO VALID CUDA DEVICE FOUND! Defaulting to CPU...")
+        deviceType = 'cpu'
 
-    if device:
-        emb = emb.cpu().detach().numpy()
+    device = torch.device(deviceType)
+
+    model.to(device)
+    data_tensor.to(device)
+    emb = model(data_tensor) 
+    emb = emb.cpu().detach().numpy()
 
     return emb
+
+def update_graph(emb, node_ids):
+    graph = AicaNeo4j(initialize_graph=False)
+    for i in range(emb.shape[0]):
+        mm_array = BytesIO()
+        mmwrite(mm_array, emb[i])
+        graph_emb = mm_array.getvalue().decode('latin1')
+        query = f'MATCH (n {{identifier: "{node_ids[i]}"}}) ' + f" SET graph_embedding = '{graph_emb}' "
+        graph.execute_query(query)
+
+
+def process_graphml(path: str) -> None: 
+    ## load graphml file & process file to get preembeddings
+    aica_data_tensor, node_ids = load_graphml_data(path)
+    ## run preembeddings through algorithm
+    aica_emb = run_graphsage(aica_data_tensor)
+    ## get embeddings and write them out to graph
+    update_graph(aica_emb, node_ids)
+    
 
 
 class GraphMLHandler(FileSystemEventHandler):  # type: ignore
@@ -380,7 +409,7 @@ class AicaNeo4j:
                 self.graph.execute_query(id_unique)
 
             # Periodic export of graph to graphML for analysis
-            export_freq = str(int(os.getenv("AICA_GRAPHML_EXPORT_FREQ", default=1800)))
+            export_freq = str(int(os.getenv("AICA_GRAPHML_EXPORT_FREQ", default=900))) #1800 seconds is default
             export_query = 'CALL apoc.export.graphml.all("/graph_data/aica.graphml", {format:"gephi", useTypes:true})'
             schedule_query = f"CALL apoc.periodic.repeat('export-graphml', '{export_query}', {export_freq});"
             self.graph.execute_query(schedule_query)
