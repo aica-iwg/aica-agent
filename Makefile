@@ -76,10 +76,10 @@ start: check-env
 		@docker compose -f docker-compose.yml -f docker-compose-${MODE}.yml up --wait -d
 
 stop: check-env
-		@docker compose -f docker-compose.yml -f docker-compose-${MODE}.yml down --remove-orphans
+		@docker compose -f docker-compose.yml -f docker-compose-${MODE}.yml down 
 
 stop_purge: check-env
-		@docker compose -f docker-compose.yml -f docker-compose-${MODE}.yml down --remove-orphans -v
+		@docker compose -f docker-compose.yml -f docker-compose-${MODE}.yml down -v
 
 rebuild: build stop start
 

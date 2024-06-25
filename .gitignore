@@ -16,3 +16,4 @@ enviroment.yml
 pcaps/
 reqs*
 venv
+/scratchwork
