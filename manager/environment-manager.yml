@@ -44,3 +44,4 @@ dependencies:
       - supervisor-stdout==0.1.1
       - torch-geometric==2.5.3
       - torch==2.3.0
+      - pylibcugraphops-cu12==24.6.0 
