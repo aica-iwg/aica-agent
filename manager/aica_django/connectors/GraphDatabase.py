@@ -22,7 +22,7 @@ from celery.utils.log import get_task_logger
 from io import BytesIO, StringIO
 from neo4j import GraphDatabase  # type: ignore
 from networkx.readwrite import read_graphml
-from scipy.io import mmread, mmwrite  # type: ignore
+from scipy.io import mmwrite  # type: ignore
 from sklearn.feature_extraction.text import HashingVectorizer  # type: ignore
 from stix2.base import _STIXBase  # type: ignore
 from typing import Any, Dict, List, Optional, Union
@@ -34,7 +34,7 @@ import torch
 from torch_geometric.data import Data
 from torch_geometric import EdgeIndex
 import torch_geometric.utils
-from torch_geometric.nn import CuGraphSAGEConv
+from torch_geometric.nn import CuGraphSAGEConv #SAGEConv  
 import torch.nn.functional as F
 
 
@@ -126,41 +126,34 @@ class AICASage(torch.nn.Module):
         return x
 
 def load_graphml_data(BASEFILE, SHVVL_MAX_FEATURE_LEN=12, SHVVL_BANDWIDTH=20):
-
-    aica_graph = nx.DiGraph = nx.read_graphml(BASEFILE)
+    aica_graph = nx.read_graphml(BASEFILE)
+    
     a = 0
     for n in aica_graph.nodes(data=True):
         typedata = n[1]["TYPE"]
         node_ids = n[1]['identifier']
         del n[1]["identifier_vec"]
+        z = str(typedata) + "\0"
+        keys = sorted(n[1].keys())
 
-    z = str(typedata) + "\0"
-    keys = sorted(n[1].keys())
-    for k in range(SHVVL_MAX_FEATURE_LEN):
-        z += str(n[1][keys[k]]) + "\0" if k < len(keys) else "\0"
-        
-    z = z[:-1]
+        for k in range(SHVVL_MAX_FEATURE_LEN):
+            z += str(n[1][keys[k]]) + "\0" if k < len(keys) else "\0"         
+        z = z[:-1]
+        shoveled_data = shvvl_float(z, SHVVL_BANDWIDTH)
+        shvvlsize = len(shoveled_data)
+        s : dict = {}
 
-
-    shoveled_data = shvvl_float(z, SHVVL_BANDWIDTH)
-    shvvlsize = len(shoveled_data)
-    s : dict = {}
-
-    n[1].clear()
-    for x in range(shvvlsize):
-        pass
-        n[1]["SHVVL_ID" + str(x)] = shoveled_data[x]
-        
-    a = max(a, len(n[1]))
-
-    n[1]["TYPE"]=typedata
-    print(f"SHVVL Feature count: {a}")
+        n[1].clear()
+        for x in range(shvvlsize):
+            pass
+            n[1]["SHVVL_ID" + str(x)] = shoveled_data[x]    
+        a = max(a, len(n[1]))
+        n[1]["TYPE"]=typedata
     for x in aica_graph.edges(data=True):
         x[2].clear()
         x[2]["dummy"]=0
 
-    data_tensor : Data = torch_geometric.utils.convert.from_networkx(aica_graph, ['SHVVL_ID' + str(x) for x in range(a)])
-    print("Checking ordering...")
+    data_tensor = torch_geometric.utils.convert.from_networkx(aica_graph, ['SHVVL_ID' + str(x) for x in range(a)])
     z = 0
     for original_node in aica_graph.nodes(data=True):
         if original_node[1]["SHVVL_ID0"] != data_tensor.x[z][0]:
@@ -174,7 +167,7 @@ def load_graphml_data(BASEFILE, SHVVL_MAX_FEATURE_LEN=12, SHVVL_BANDWIDTH=20):
     return data_tensor, node_ids
     
 
-def run_graphsage(data_tensor, hidden_dim=128, in_dim=-1, out_dim=128): 
+def run_graphsage(data_tensor, hidden_dim=128, in_dim=-2080, out_dim=128): 
     # make hidden_dim size be num_node_types*hidden_dim
     model = AICASage(in_dim=in_dim, 
                     hidden_dim=hidden_dim, 
@@ -200,7 +193,7 @@ def update_graph(emb, node_ids):
     graph = AicaNeo4j(initialize_graph=False)
     for i in range(emb.shape[0]):
         mm_array = BytesIO()
-        mmwrite(mm_array, emb[i])
+        mmwrite(mm_array, np.reshape(emb[i], (1, emb.shape[1])))
         graph_emb = mm_array.getvalue().decode('latin1')
         query = f'MATCH (n {{identifier: "{node_ids[i]}"}}) ' + f" SET graph_embedding = '{graph_emb}' "
         graph.execute_query(query)
