@@ -30,7 +30,7 @@ from aica_django.connectors.CaddyServer import poll_caddy_accesslogs
 from aica_django.connectors.DNP3 import capture_dnp3
 from aica_django.connectors.DocumentDatabase import AicaMongo
 from aica_django.connectors.GraphDatabase import (
-    poll_graphml,
+    AicaNeo4j,
     prune_netflow_data,
 )
 from aica_django.connectors.HTTPServer import poll_nginx_accesslogs
@@ -63,6 +63,8 @@ def initialize(**kwargs: Dict[Any, Any]) -> None:
     # Load data from static files into MongoDB
     mongo_client = AicaMongo()
     mongo_db = mongo_client.get_db_handle()
+
+    graph = AicaNeo4j(poll_graph=True)
 
     with open("response_actions.yml", "r") as actions_file:
         alert_actions = yaml.safe_load(actions_file)["responseActions"]["alerts"]
@@ -119,11 +121,6 @@ def initialize(**kwargs: Dict[Any, Any]) -> None:
 
     # Start the DNP3 capture in background
     capture_dnp3.apply_async(kwargs={"interface": os.getenv("TAP_IF")})
-
-    # Start polling for exports of the knowledge graph for processing
-    # We really don't like doing things this way, but Neo4J's inability to understand sparse matrices
-    # (as needed for graph embedding generation from vectorized node IDs) forced us into it.
-    poll_graphml.apply_async()
 
     # Start the Netflow graph pruner in background
     prune_netflow_data.apply_async()
