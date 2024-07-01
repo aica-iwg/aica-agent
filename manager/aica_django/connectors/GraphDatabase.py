@@ -33,7 +33,7 @@ import torch
 from torch_geometric.data import Data
 from torch_geometric import EdgeIndex
 import torch_geometric.utils
-from torch_geometric.nn import CuGraphSAGEConv #SAGEConv  
+from torch_geometric.nn import CuGraphSAGEConv  
 import torch.nn.functional as F
 
 
