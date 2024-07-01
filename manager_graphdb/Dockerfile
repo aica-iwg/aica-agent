@@ -1,4 +1,4 @@
-FROM --platform=linux/amd64 neo4j:5.20-community
+FROM --platform=linux/amd64 neo4j:5.21-community
 
 RUN wget -O /var/lib/neo4j/plugins/gds.jar https://github.com/neo4j/graph-data-science/releases/download/2.6.7/neo4j-graph-data-science-2.6.7.jar && \
     wget -O /var/lib/neo4j/plugins/apoc.jar https://github.com/neo4j/apoc/releases/download/5.20.0/apoc-5.20.0-core.jar
