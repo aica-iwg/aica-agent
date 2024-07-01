@@ -215,10 +215,9 @@ class AicaNeo4j:
                     + f"FOR (n:`{label}`) REQUIRE n.identifier IS UNIQUE"
                 )
                 self.graph.execute_query(id_unique)
-        
+
         if poll_graph:
             self.poll_graphml()
-
 
     def add_node(
         self,
@@ -364,7 +363,7 @@ class AicaNeo4j:
     def import_graphml_data(self, import_file: str) -> None:
         query = f"CALL apoc.import.graphml('{import_file}', {{}})"
         self.graph.execute_query(query)
-    
+
     def poll_graphml(self) -> None:
         logger.info(f"Running {__name__}: poll_graphml")
         export_freq = int(os.getenv("AICA_GRAPHML_EXPORT_FREQ", default=300))
