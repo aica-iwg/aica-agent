@@ -69,48 +69,6 @@ def process_graphml(path: str) -> None:
     update_graph(aica_emb, node_ids)
     
 
-
-class GraphMLHandler(FileSystemEventHandler):  # type: ignore
-    def __init__(self, quiesce_period: int = 60) -> None:
-        self.quiesce_period = quiesce_period
-        self.last_change = 0.0
-
-    def on_created(self, event: FileCreatedEvent) -> None:
-        self.on_modified(event)
-
-    def on_modified(self, event: FileModifiedEvent) -> None:
-        current_time = time.time()
-
-        # If the file has been modified recently, ignore the event
-        if current_time - self.last_change < self.quiesce_period:
-            logger.debug(
-                f"Not processing GraphML file, last time: {self.last_change}, current time: {current_time}"
-            )
-        else:
-            logger.debug(
-                f"Processing changed GraphML file, last time: {self.last_change}, current time: {current_time}"
-            )
-            process_graphml(graphml_path)
-
-        if current_time > self.last_change:
-            self.last_change = current_time
-
-
-@shared_task(name="poll-graphml")
-def poll_graphml() -> None:
-    logger.info(f"Running {__name__}: poll_graphml")
-
-    if os.path.isfile(graphml_path):
-        process_graphml(graphml_path)
-
-    observer = Observer()
-    observer.schedule(GraphMLHandler(), graphml_path)
-    observer.start()
-
-    # Should never return
-    observer.join()
-
-
 class KnowledgeNode:
     def __init__(
         self,
@@ -261,12 +219,9 @@ class AicaNeo4j:
                     + f"FOR (n:`{label}`) REQUIRE n.identifier IS UNIQUE"
                 )
                 self.graph.execute_query(id_unique)
-
-            # Periodic export of graph to graphML for analysis
-            export_freq = str(int(os.getenv("AICA_GRAPHML_EXPORT_FREQ", default=900))) #1800 seconds is default
-            export_query = 'CALL apoc.export.graphml.all("/graph_data/aica.graphml", {format:"gephi", useTypes:true})'
-            schedule_query = f"CALL apoc.periodic.repeat('export-graphml', '{export_query}', {export_freq});"
-            self.graph.execute_query(schedule_query)
+                
+        if poll_graph:
+            self.poll_graphml()
 
     def add_node(
         self,
