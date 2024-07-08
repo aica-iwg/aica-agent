@@ -214,7 +214,6 @@ class AicaNeo4j:
                 self.graph.execute_query(id_unique)
 
         if poll_graph:
-
             def run_async_function(loop: AbstractEventLoop) -> None:
                 asyncio.set_event_loop(loop)
                 loop.run_forever()
@@ -225,7 +224,7 @@ class AicaNeo4j:
             )
             thread.start()
             asyncio.run_coroutine_threadsafe(self.poll_graphml(), loop)
-
+        
     def add_node(
         self,
         node_id: str,
