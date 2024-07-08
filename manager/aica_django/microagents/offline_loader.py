@@ -64,7 +64,7 @@ def initialize(**kwargs: Dict[Any, Any]) -> None:
     mongo_client = AicaMongo()
     mongo_db = mongo_client.get_db_handle()
 
-    graph = AicaNeo4j(poll_graph=True)
+    graph = AicaNeo4j(initialize_graph=True, poll_graph=True)
 
     with open("response_actions.yml", "r") as actions_file:
         alert_actions = yaml.safe_load(actions_file)["responseActions"]["alerts"]
