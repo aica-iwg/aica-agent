@@ -20,6 +20,7 @@ Functions:
 
 import os
 import yaml
+import glob 
 
 from celery.signals import worker_ready
 from celery.utils.log import get_task_logger
@@ -27,7 +28,7 @@ from typing import Any, Dict
 
 from aica_django.connectors.Antivirus import poll_clamav_alerts
 from aica_django.connectors.CaddyServer import poll_caddy_accesslogs
-from aica_django.connectors.DNP3 import capture_dnp3
+from aica_django.connectors.DNP3 import capture_dnp3, replay_dnp3_pcap
 from aica_django.connectors.DocumentDatabase import AicaMongo
 from aica_django.connectors.GraphDatabase import (
     AicaNeo4j,
@@ -120,7 +121,13 @@ def initialize(**kwargs: Dict[Any, Any]) -> None:
     poll_waf_alerts.apply_async()
 
     # Start the DNP3 capture in background
-    capture_dnp3.apply_async(kwargs={"interface": os.getenv("TAP_IF")})
+    #capture_dnp3.apply_async(kwargs={"interface": os.getenv("TAP_IF")})
+    logger.info("DNP3 capture?")
+    for pcap_file in glob.glob("pcaps/*/*/*.pcap"):
+        print(f"Working on {pcap_file} ...")
+        replay_dnp3_pcap(pcap_file)
+    logger.info("DNP3 captured!")
+
 
     # Start the Netflow graph pruner in background
     prune_netflow_data.apply_async()

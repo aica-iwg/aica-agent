@@ -15,6 +15,7 @@ import re2 as re  # type: ignore
 import stix2  # type: ignore
 import time
 import numpy as np
+import asyncio
 
 from celery import current_app
 from celery.app import shared_task
@@ -34,7 +35,7 @@ import torch
 from torch_geometric.data import Data
 from torch_geometric import EdgeIndex
 import torch_geometric.utils
-from torch_geometric.nn import CuGraphSAGEConv  
+from torch_geometric.nn import SAGEConv  
 import torch.nn.functional as F
 
 
@@ -104,9 +105,9 @@ class AICASage(torch.nn.Module):
     def __init__(self, in_dim, hidden_dim, out_dim, aggr='mean', dropout=0.2):
         super().__init__()
         self.dropout = dropout
-        self.conv1 = CuGraphSAGEConv(in_dim, hidden_dim, aggr=aggr)
-        self.conv2 = CuGraphSAGEConv(hidden_dim, hidden_dim, aggr=aggr)
-        self.conv3 = CuGraphSAGEConv(hidden_dim, out_dim, aggr=aggr)
+        self.conv1 = SAGEConv(in_dim, hidden_dim, aggr=aggr)
+        self.conv2 = SAGEConv(hidden_dim, hidden_dim, aggr=aggr)
+        self.conv3 = SAGEConv(hidden_dim, out_dim, aggr=aggr)
           
     def forward(self, data: Data):
 
@@ -127,11 +128,11 @@ class AICASage(torch.nn.Module):
 
 def load_graphml_data(BASEFILE, SHVVL_MAX_FEATURE_LEN=12, SHVVL_BANDWIDTH=20):
     aica_graph = nx.read_graphml(BASEFILE)
-    
+    node_ids = []
     a = 0
     for n in aica_graph.nodes(data=True):
         typedata = n[1]["TYPE"]
-        node_ids = n[1]['identifier']
+        node_ids.append(n[1]['identifier'])
         del n[1]["identifier_vec"]
         z = str(typedata) + "\0"
         keys = sorted(n[1].keys())
@@ -167,7 +168,7 @@ def load_graphml_data(BASEFILE, SHVVL_MAX_FEATURE_LEN=12, SHVVL_BANDWIDTH=20):
     return data_tensor, node_ids
     
 
-def run_graphsage(data_tensor, hidden_dim=128, in_dim=-2080, out_dim=128): 
+def run_graphsage(data_tensor, hidden_dim=128, in_dim=2080, out_dim=128): 
     # make hidden_dim size be num_node_types*hidden_dim
     model = AICASage(in_dim=in_dim, 
                     hidden_dim=hidden_dim, 
@@ -190,13 +191,16 @@ def run_graphsage(data_tensor, hidden_dim=128, in_dim=-2080, out_dim=128):
     return emb
 
 def update_graph(emb, node_ids):
-    graph = AicaNeo4j(initialize_graph=False)
+    print("Updating knowledge graph ...")
+    graph_obj = AicaNeo4j(initialize_graph=False)
     for i in range(emb.shape[0]):
-        mm_array = BytesIO()
-        mmwrite(mm_array, np.reshape(emb[i], (1, emb.shape[1])))
-        graph_emb = mm_array.getvalue().decode('latin1')
-        query = f'MATCH (n {{identifier: "{node_ids[i]}"}}) ' + f" SET graph_embedding = '{graph_emb}' "
-        graph.execute_query(query)
+        if 'network-traffic' in node_ids[i]:
+            mm_array = BytesIO()
+            mmwrite(mm_array, np.reshape(emb[i], (1, emb.shape[1])))
+            graph_emb = mm_array.getvalue().decode('latin1')
+            query = f'MATCH (n {{identifier: "{node_ids[i]}"}}) ' + f" SET n.graph_embedding = '{graph_emb}' "
+            graph_obj.graph.execute_query(query)
+    print("Knowledge graph updated!")
 
 
 def process_graphml(path: str) -> None: 
@@ -359,7 +363,7 @@ class AicaNeo4j:
                 self.graph.execute_query(id_unique)
 
         if poll_graph:
-            self.poll_graphml()
+            asyncio.ensure_future(self.poll_graphml())
 
     def add_node(
         self,
@@ -506,7 +510,7 @@ class AicaNeo4j:
         query = f"CALL apoc.import.graphml('{import_file}', {{}})"
         self.graph.execute_query(query)
 
-    def poll_graphml(self) -> None:
+    async def poll_graphml(self) -> None:
         logger.info(f"Running {__name__}: poll_graphml")
         export_freq = int(os.getenv("AICA_GRAPHML_EXPORT_FREQ", default=300))
 
