@@ -5,9 +5,9 @@ Classes:
     AicaNeo4j: The object to instantiate to create a persistent interface with Neo4j
 """
 
+import asyncio
 import datetime
 import inspect
-import networkx as nx
 import os
 import random
 import hashlib
@@ -16,20 +16,19 @@ import stix2  # type: ignore
 import time
 import numpy as np
 import asyncio
+import threading
 
+from asyncio import AbstractEventLoop
 from celery import current_app
-from celery.app import shared_task
 from celery.utils.log import get_task_logger
-from io import BytesIO, StringIO
+from io import BytesIO
 from neo4j import GraphDatabase  # type: ignore
-from networkx.readwrite import read_graphml
+import networkx as nx
 from scipy.io import mmwrite  # type: ignore
 from sklearn.feature_extraction.text import HashingVectorizer  # type: ignore
 from stix2.base import _STIXBase  # type: ignore
 from typing import Any, Dict, List, Optional, Union
 from urllib.parse import quote_plus
-from watchdog.events import FileSystemEventHandler, FileCreatedEvent, FileModifiedEvent  # type: ignore
-from watchdog.observers import Observer  # type: ignore
 
 import torch
 from torch_geometric.data import Data
@@ -301,7 +300,7 @@ class AicaNeo4j:
         port: int = 0,
         user: str = "",
         password: str = "",
-        initialize_graph: bool = True,
+        initialize_graph: bool = False,
         poll_graph: bool = False,
     ) -> None:
         """
@@ -363,7 +362,17 @@ class AicaNeo4j:
                 self.graph.execute_query(id_unique)
 
         if poll_graph:
-            asyncio.ensure_future(self.poll_graphml())
+
+            def run_async_function(loop: AbstractEventLoop) -> None:
+                asyncio.set_event_loop(loop)
+                loop.run_forever()
+
+            loop = asyncio.new_event_loop()
+            thread = threading.Thread(
+                target=run_async_function, args=(loop,), daemon=True
+            )
+            thread.start()
+            asyncio.run_coroutine_threadsafe(self.poll_graphml(), loop)
 
     def add_node(
         self,
@@ -638,7 +647,7 @@ def prune_netflow_data(
     # This function removes all network traffic items that were created at least
     # _minutes_ ago and are not connected to any observations
 
-    graph = AicaNeo4j(initialize_graph=False)
+    graph = AicaNeo4j()
 
     # Not using f-string here since it gets messy with braces in the query.
     # This might get better with Python 3.12+.

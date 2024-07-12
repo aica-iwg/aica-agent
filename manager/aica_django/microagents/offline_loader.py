@@ -65,7 +65,7 @@ def initialize(**kwargs: Dict[Any, Any]) -> None:
     mongo_client = AicaMongo()
     mongo_db = mongo_client.get_db_handle()
 
-    graph = AicaNeo4j(poll_graph=True)
+    graph = AicaNeo4j(initialize_graph=True, poll_graph=True)
 
     with open("response_actions.yml", "r") as actions_file:
         alert_actions = yaml.safe_load(actions_file)["responseActions"]["alerts"]
@@ -122,12 +122,6 @@ def initialize(**kwargs: Dict[Any, Any]) -> None:
 
     # Start the DNP3 capture in background
     #capture_dnp3.apply_async(kwargs={"interface": os.getenv("TAP_IF")})
-    logger.info("DNP3 capture?")
-    for pcap_file in glob.glob("pcaps/*/*/*.pcap"):
-        print(f"Working on {pcap_file} ...")
-        replay_dnp3_pcap(pcap_file)
-    logger.info("DNP3 captured!")
-
-
+    
     # Start the Netflow graph pruner in background
     prune_netflow_data.apply_async()
