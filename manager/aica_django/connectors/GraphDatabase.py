@@ -6,36 +6,32 @@ Classes:
 """
 
 import asyncio
-import datetime
-import inspect
-import os
-import random
-import hashlib
-import re2 as re  # type: ignore
-import stix2  # type: ignore
-import time
-import numpy as np
-import asyncio
-import threading
-
 from asyncio import AbstractEventLoop
 from celery import current_app
 from celery.utils.log import get_task_logger
+import datetime
+import hashlib
+import inspect
 from io import BytesIO
 from neo4j import GraphDatabase  # type: ignore
 import networkx as nx
+import numpy as np
+import os
+import re2 as re  # type: ignore
 from scipy.io import mmwrite  # type: ignore
 from sklearn.feature_extraction.text import HashingVectorizer  # type: ignore
 from stix2.base import _STIXBase  # type: ignore
-from typing import Any, Dict, List, Optional, Union
-from urllib.parse import quote_plus
-
+import stix2  # type: ignore
+import threading
+import time
 import torch
 from torch_geometric.data import Data
 from torch_geometric import EdgeIndex
 import torch_geometric.utils
 from torch_geometric.nn import SAGEConv  
 import torch.nn.functional as F
+from typing import Any, Dict, List, Optional, Union
+from urllib.parse import quote_plus
 
 
 
