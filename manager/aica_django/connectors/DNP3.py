@@ -16,7 +16,7 @@ import pyshark  # type: ignore
 from celery import current_app
 from celery.app import shared_task
 from celery.utils.log import get_task_logger
-from typing import Any
+from typing import Any, Optional
 
 from aica_django.microagents.knowledge_base import record_dnp3
 
@@ -68,7 +68,8 @@ def capture_dnp3(interface: str) -> None:
 
 
 def parse_dnp3_packet(
-    packet: pyshark.packet.packet.Packet, filename=None
+    packet: pyshark.packet.packet.Packet,
+    filename: Optional[str] = None,
 ) -> dict[str, str]:
     # See also:
     # https://www.wireshark.org/docs/dfref/d/dnp3.html
