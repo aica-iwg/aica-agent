@@ -196,3 +196,5 @@ LOGGING = {
         }
     },
 }
+
+REPLAY_PCAP = True

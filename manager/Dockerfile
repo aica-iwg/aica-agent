@@ -63,7 +63,7 @@ COPY supervisor.conf /etc/supervisor/conf.d/
 
 RUN mkdir -p /root/.ssh
 COPY manager_key.priv /root/.ssh/id_rsa
-RUN chown -R root:root /root
+RUN chown -R root:root /root/.ssh
 RUN chmod 700 /root/.ssh
 RUN chmod 600 /root/.ssh/id_rsa
 

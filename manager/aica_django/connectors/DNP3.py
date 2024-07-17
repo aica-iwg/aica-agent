@@ -18,6 +18,8 @@ from celery.app import shared_task
 from celery.utils.log import get_task_logger
 from typing import Any
 
+from aica_django.microagents.knowledge_base import record_dnp3
+
 
 logger = get_task_logger(__name__)
 
@@ -48,10 +50,9 @@ def object_try_get(
 def replay_dnp3_pcap(pcap_file: str) -> None:
     with pyshark.FileCapture(pcap_file, display_filter="dnp3") as cap:
         for packet in cap:
-            packet_dict = parse_dnp3_packet(packet)
-            current_app.send_task(
-                "ma-knowledge_base-record_dnp3",
-                [packet_dict],
+            packet_dict = parse_dnp3_packet(packet, filename=pcap_file)
+            record_dnp3.apply_async(
+                kwargs={"log_entry": [packet_dict]}, queue="worker-pcap-record"
             )
 
 
@@ -61,13 +62,14 @@ def capture_dnp3(interface: str) -> None:
     cap.sniff(timeout=50)
     for packet in cap.sniff_continuously(packet_count=5):
         packet_dict = parse_dnp3_packet(packet)
-        current_app.send_task(
-            "ma-knowledge_base-record_dnp3",
-            [packet_dict],
+        record_dnp3.apply_async(
+            kwargs={"log_entry": [packet_dict]}, queue="worker-pcap-record"
         )
 
 
-def parse_dnp3_packet(packet: pyshark.packet.packet.Packet) -> dict[str, str]:
+def parse_dnp3_packet(
+    packet: pyshark.packet.packet.Packet, filename=None
+) -> dict[str, str]:
     # See also:
     # https://www.wireshark.org/docs/dfref/d/dnp3.html
     # https://cdn.chipkin.com/assets/uploads/imports/resources/DNP3QuickReference.pdf
@@ -76,25 +78,29 @@ def parse_dnp3_packet(packet: pyshark.packet.packet.Packet) -> dict[str, str]:
     return_dict = dict()
 
     # Non-DNP3 context
-    return_dict["sniff_timestamp"] = packet.sniff_timestamp
-    return_dict["src_mac"] = packet.eth.src
-    return_dict["dst_mac"] = packet.eth.dst
-    return_dict["src_ip"] = packet.ip.src_host
-    return_dict["dst_ip"] = packet.ip.dst_host
-    return_dict["src_port"] = packet.tcp.srcport
-    return_dict["dst_port"] = packet.tcp.dstport
+    return_dict["sniff_timestamp"] = getattr(packet, "sniff_timestamp", None)
+    return_dict["src_mac"] = getattr(packet.eth, "src", None)
+    return_dict["dst_mac"] = getattr(packet.eth, "dst", None)
+    return_dict["src_ip"] = getattr(packet.ip, "src_host", None)
+    return_dict["dst_ip"] = getattr(packet.ip, "dst_host", None)
+    return_dict["src_port"] = getattr(packet.tcp, "srcport", None)
+    return_dict["dst_port"] = getattr(packet.tcp, "dstport", None)
 
     # DNP3 Datalink Header
-    return_dict["dnp3_datalink_from_master"] = packet.dnp3.ctl_dir
-    return_dict["dnp3_datalink_from_primary"] = packet.dnp3.ctl_prm
+    return_dict["dnp3_datalink_from_master"] = getattr(packet.dnp3, "ctl_dir", None)
+    return_dict["dnp3_datalink_from_primary"] = getattr(packet.dnp3, "ctl_prm", None)
     if packet.dnp3.ctl_prm:
-        return_dict["dnp3_datalink_function"] = packet.dnp3.ctl_prifunc
+        return_dict["dnp3_datalink_function"] = getattr(
+            packet.dnp3, "ctl_prifunc", None
+        )
     else:
-        return_dict["dnp3_datalink_function"] = packet.dnp3.ctl_secfunc
+        return_dict["dnp3_datalink_function"] = getattr(
+            packet.dnp3, "ctl_secfunc", None
+        )
 
     # Note: there may be multiple DNP3 dsts/srcs per IP!
-    return_dict["dnp3_datalink_dst"] = packet.dnp3.dst
-    return_dict["dnp3_datalink_src"] = packet.dnp3.src
+    return_dict["dnp3_datalink_dst"] = getattr(packet.dnp3, "dst", None)
+    return_dict["dnp3_datalink_src"] = getattr(packet.dnp3, "src", None)
 
     # DNP3 Application Header
     return_dict = object_try_get(
@@ -121,6 +127,9 @@ def parse_dnp3_packet(packet: pyshark.packet.packet.Packet) -> dict[str, str]:
     return_dict = object_try_get(
         packet, return_dict, "dnp3.al_objq_range", "dnp3_application_objq_range"
     )
+
+    if filename:
+        return_dict["pcap_file"] = filename
 
     # TODO: Determine the best way to incorporate object values into this without making the node IDs too volatile
 
