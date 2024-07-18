@@ -52,7 +52,8 @@ def replay_dnp3_pcap(pcap_file: str) -> None:
         for packet in cap:
             packet_dict = parse_dnp3_packet(packet, filename=pcap_file)
             record_dnp3.apply_async(
-                kwargs={"log_entry": [packet_dict]}, queue="worker-pcap-record"
+                kwargs={"log_entry": [packet_dict]},
+                queue="pcap-record",
             )
 
 
@@ -63,7 +64,8 @@ def capture_dnp3(interface: str) -> None:
     for packet in cap.sniff_continuously(packet_count=5):
         packet_dict = parse_dnp3_packet(packet)
         record_dnp3.apply_async(
-            kwargs={"log_entry": [packet_dict]}, queue="worker-pcap-record"
+            kwargs={"log_entry": [packet_dict]},
+            queue="pcap-record",
         )
 
 

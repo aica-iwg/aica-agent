@@ -1,3 +1,3 @@
-from aica_django.aica_celery import app as celery_app
+from aica_django.celery import app as celery_app
 
 __all__ = ("celery_app",)

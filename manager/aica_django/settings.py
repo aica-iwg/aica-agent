@@ -44,6 +44,9 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "django_extensions",
+]
+
+CUSTOM_TASK_MODULES = [
     "aica_django.microagents.offline_loader",
     "aica_django.microagents.knowledge_base",
     "aica_django.microagents.decision_making_engine",

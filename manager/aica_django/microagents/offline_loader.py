@@ -22,7 +22,7 @@ import os
 import glob
 import yaml
 
-from celery.signals import worker_ready
+from celery.signals import worker_ready, celeryd_after_setup
 from celery.utils.log import get_task_logger
 from typing import Any, Dict
 
@@ -49,6 +49,11 @@ from django.conf import settings
 logger = get_task_logger(__name__)
 
 
+@celeryd_after_setup.connect
+def capture_worker_name(sender: str, instance: Any, **kwargs: Any) -> None:
+    os.environ["WORKER_NAME"] = f"{sender}"
+
+
 @worker_ready.connect
 def initialize(**kwargs: Dict[Any, Any]) -> None:
     """
@@ -60,7 +65,12 @@ def initialize(**kwargs: Dict[Any, Any]) -> None:
     @return: True once completed.
     @rtype: bool
     """
-    logger.info(f"Running {__name__}: initialize")
+
+    # Only run this for the default queue worker (because it only needs to run once)
+    if not os.environ["WORKER_NAME"].endswith("@default"):
+        return
+
+    logger.error(f"Running {__name__}: initialize in {os.environ['WORKER_NAME']}")
 
     # Load data from static files into MongoDB
     mongo_client = AicaMongo()
@@ -129,7 +139,7 @@ def initialize(**kwargs: Dict[Any, Any]) -> None:
 
     # Replay DNP3 files if requested
     if getattr(settings, "REPLAY_PCAP", None):
-        pcap_files = list(glob.glob("pcaps/*/*/*.pcap"))[0:5]
+        pcap_files = list(glob.glob("pcaps/*/*/*.pcap"))
         if len(pcap_files) == 0:
             logger.error("Requested to replay PCAPs, but none found.")
         else:

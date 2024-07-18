@@ -26,8 +26,6 @@ service supervisor start
 # Tell Celery to not run tasks on the following manage.py invocations
 export SKIP_TASKS=true
 
-
-
 # Apply database migrations
 echo "Creating Django Database"
 python3 manage.py sqlcreate -D \
