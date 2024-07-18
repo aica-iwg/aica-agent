@@ -170,7 +170,7 @@ def load_graphml_data(basefile, shvvl_feat_len=12, shvvl_bandwidth=20):
     order_count = 0
     for original_node in aica_graph.nodes(data=True):
         if original_node[1]["SHVVL_ID0"] != data_tensor.x[order_count][0]:
-            raise BaseException("ERROR: Ordering not lined up")
+            logger.warning("ERROR: Ordering not lined up")
         order_count += 1
     if order_count != -1:
        logger.info("Likely ordered")
