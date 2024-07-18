@@ -282,3 +282,12 @@ class DNP3RequestExt(_Extension):  # type: ignore
             ("dnp3_application_objq_range", StringProperty(required=False)),
         ]
     )
+
+
+class PcapRequestExt(_Extension):  # type: ignore
+    _type = "pcap-request-ext"
+    _properties = OrderedDict(
+        [
+            ("pcap_filename", StringProperty(required=True)),
+        ]
+    )

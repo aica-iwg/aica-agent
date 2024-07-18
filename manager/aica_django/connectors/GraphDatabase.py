@@ -6,6 +6,15 @@ Classes:
 """
 
 import asyncio
+import datetime
+import inspect
+import os
+import re2 as re  # type: ignore
+import stix2  # type: ignore
+import time
+import threading
+
+
 from asyncio import AbstractEventLoop
 from celery import current_app
 from celery.utils.log import get_task_logger
@@ -21,6 +30,7 @@ import re2 as re  # type: ignore
 from scipy.io import mmwrite  # type: ignore
 from sklearn.feature_extraction.text import HashingVectorizer  # type: ignore
 from stix2.base import _STIXBase  # type: ignore
+from typing import Any, Dict, List, Optional, Tuple, Union
 import stix2  # type: ignore
 import threading
 import time
@@ -65,152 +75,148 @@ def dict_to_cypher(input_dict: dict[str, Any]) -> str:
 
     return return_string
 
-def shvvl(tag: str, bpf: int) -> bytes:
-    '''
+def shvvl(input_data: str, hash_len: int) -> bytes:
+    """
     This is SHVVL. The only important thing is that the "type" of node is the first string in the tag
-    '''
-    sectors = tag.split("\0")
-    typehash = hashlib.md5(bytes(sectors[0], "UTF8"), usedforsecurity=False).digest()
+    """
+    sectors = input_data.split("\0")
+    type_hash = hashlib.md5(bytes(sectors[0], "UTF8"), usedforsecurity=False).digest()
 
     out = bytearray()
-    hashfunc = hashlib.new('shake_256', usedforsecurity=False)
     for sector in sectors:
-        hashfunc = hashlib.new('shake_256', usedforsecurity=False)
-        
-        blockInput = bytearray(sector, "UTF8")
-        blockInput = blockInput + typehash
-        hashfunc.update(blockInput)
-        out += hashfunc.digest(bpf)
+        sector_value = bytearray(sector, "UTF8") + type_hash
+        sector_hash = hashlib.shake_256(sector_value)
+        out += sector_hash.digest(hash_len)
 
     return out
 
-def shvvl_float(tag: str, bpf: int) -> list[float]:
-    '''
+
+def shvvl_float(input_data: str, hash_len: int) -> list[float]:
+    """
     This is shvvl float. Used in conjunction with SHVVL to create preembeddings.
-    '''
-    out = list()
-    for bite in shvvl(tag, bpf):
-        for l in range(8):
-            out.append(1.0 if (bite&(1<<l)) != 0 else 0.0)
-        
-    return out
+    """
+    shvvl_hash_vec = list()
+    for shvvl_byte in shvvl(input_data, hash_len):
+        for bitshift in range(8):
+            shvvl_hash_vec.append(1.0 if (shvvl_byte & (1 << bitshift)) != 0 else 0.0)
+
+    return shvvl_hash_vec
 
 
-class AICASage(torch.nn.Module):
-    def __init__(self, in_dim, hidden_dim, out_dim, aggr='mean', dropout=0.2):
+class AICASage(torch.nn.Module):  # type:ignore
+    def __init__(
+        self,
+        in_dim: int,
+        hidden_dim: int,
+        out_dim: int,
+        aggr: str = "mean",
+        dropout: float = 0.2,
+    ) -> None:
         super().__init__()
         self.dropout = dropout
         self.conv1 = SAGEConv(in_dim, hidden_dim, aggr=aggr)
         self.conv2 = SAGEConv(hidden_dim, hidden_dim, aggr=aggr)
         self.conv3 = SAGEConv(hidden_dim, out_dim, aggr=aggr)
-          
-    def forward(self, data: Data):
 
-        edge_idx = EdgeIndex(data.edge_index) 
+    def forward(self, data: Data) -> torch.Tensor:
+
+        edge_idx = EdgeIndex(data.edge_index)
 
         x = self.conv1(data.x, edge_idx)
         x = F.tanh(x)
         x = F.dropout(x, p=self.dropout)
-        
+
         x = self.conv2(x, edge_idx)
         x = F.tanh(x)
         x = F.dropout(x, p=self.dropout)
-        
+
         x = self.conv3(x, edge_idx)
         x = F.tanh(x)
-    
+
         return x
 
-def load_graphml_data(basefile, shvvl_feat_len=12, shvvl_bandwidth=20):
-    """
-    Implements shvvl algorithm on the node identifier property of knowledge graph.
-    Outputs 'pre-embeddings' into a data tensor type to use Pytorch GNN algorithm.
-    """
 
-    # - Load graphml file
-    # - Initialize node list and shvvl id vector length
-    # - Iterate through node data to extract node identifiers
-    # - Delete identifier vec property for each node
-    # - Build put typedata_str for pre-embedding and store key values from nodes
-    aica_graph = nx.read_graphml(basefile)
+def load_graphml_data(
+    graphml_file: str, shvvl_max_feature_len: int = 12, shvvl_hash_len: int = 20
+) -> Tuple[torch_geometric.data.Data, List[str]]:
+    aica_graph = nx.read_graphml(graphml_file)
+
     node_ids = []
-    shvvl_id_len = 0
+    longest_hash_len = 0
     for node in aica_graph.nodes(data=True):
-        typedata = node[1]["TYPE"]
-        node_ids.append(node[1]['identifier'])
+        node_type = node[1]["TYPE"]
+        node_ids.append(node[1]["identifier"])
         del node[1]["identifier_vec"]
-        typedata_str = str(typedata) + "\0"
+
+        plaintext_prefix = str(node_type) + "\0"
         keys = sorted(node[1].keys())
 
-        
-        for k in range(shvvl_feat_len):
-            typedata_str += str(node[1][keys[k]]) + "\0" if k < len(keys) else "\0"  
+        for k in range(shvvl_max_feature_len):
+            plaintext_prefix += f"{node[1][keys[k]]}\0" if k < len(keys) else "\0"
 
-        # - Use typedata_str to build pre-embeddings
-        # - Clear node information to build it up again
-        typedata_str = typedata_str[:-1]
-        shoveled_data = shvvl_float(typedata_str, shvvl_bandwidth)
-        shvvlsize = len(shoveled_data)
+        plaintext_prefix = plaintext_prefix[:-1]
+
+        shoveled_data = shvvl_float(plaintext_prefix, shvvl_hash_len)
+        shvvl_size = len(shoveled_data)
+
         node[1].clear()
+        for edge_index in range(shvvl_size):
+            node[1][f"SHVVL_ID{edge_index}"] = shoveled_data[edge_index]
 
-        
-        for i in range(shvvlsize):
-            node[1]["SHVVL_ID" + str(i)] = shoveled_data[i]    
-
-        shvvl_id_len = max(shvvl_id_len, len(node[1]))
-        node[1]["TYPE"]=typedata
+        longest_hash_len = max(longest_hash_len, len(node[1]))
+        node[1]["TYPE"] = node_type
 
     for edge in aica_graph.edges(data=True):
         edge[2].clear()
-        edge[2]["dummy"]=0
+        edge[2]["dummy"] = 0
 
-    # - Pre-embedding is stored as data tensor
-    # - Order of embeddings is done and counted to verify it's correct
-    data_tensor = torch_geometric.utils.convert.from_networkx(aica_graph, ['SHVVL_ID' + str(x) for x in range(shvvl_id_len)])
-    order_count = 0
-    for original_node in aica_graph.nodes(data=True):
-        if original_node[1]["SHVVL_ID0"] != data_tensor.x[order_count][0]:
-            logger.warning("ERROR: Ordering not lined up")
-        order_count += 1
-    if order_count != -1:
-       logger.info("Likely ordered")
+    data_tensor = torch_geometric.utils.convert.from_networkx(
+        aica_graph, [f"SHVVL_ID{x}" for x in range(longest_hash_len)]
+    )
 
     return data_tensor, node_ids
-    
 
-def run_graphsage(data_tensor, hidden_dim=128, in_dim=2080, out_dim=128): 
+
+def run_graphsage(
+    data_tensor: torch.Tensor,
+    hidden_dim: int = 128,
+    in_dim: int = 2080,
+    out_dim: int = 128,
+) -> np.typing.NDArray[np.float64]:
     # make hidden_dim size be num_node_types*hidden_dim
-    model = AICASage(in_dim=in_dim, 
-                    hidden_dim=hidden_dim, 
-                    out_dim=out_dim)
-    
+    model = AICASage(in_dim=in_dim, hidden_dim=hidden_dim, out_dim=out_dim)
+
     if torch.cuda.is_available():
-        logger.info("Starting in GPU mode...")
-        deviceType =  f'cuda' 
+        logger.info("Starting in GPU mode.")
+        deviceType = f"cuda"
     else:
-        logger.warning("NO VALID CUDA DEVICE FOUND! Defaulting to CPU...")
-        deviceType = 'cpu'
+        logger.warning("No valid CUDA device found, falling back to CPU.")
+        deviceType = "cpu"
 
     device = torch.device(deviceType)
 
     model.to(device)
     data_tensor.to(device)
-    emb = model(data_tensor) 
-    emb = emb.cpu().detach().numpy()
+    emb = model(data_tensor)
+    emb_np: np.typing.NDArray[np.float64] = emb.cpu().detach().numpy()
 
-    return emb
+    return emb_np
 
-def update_graph(emb, node_ids):
-    logger.info("Updating knowledge graph ...")
-    graph_obj = AicaNeo4j(initialize_graph=False)
+
+def update_graph(emb: np.typing.NDArray[np.float64], node_ids: List[str]) -> None:
+    logger.info(f"Updating knowledge graph")
+    graph_obj = AicaNeo4j()
     for i in range(emb.shape[0]):
-        if 'network-traffic--' in node_ids[i]:
+        if "network-traffic" in node_ids[i]:
             mm_array = BytesIO()
             mmwrite(mm_array, np.reshape(emb[i], (1, emb.shape[1])))
-            graph_emb = mm_array.getvalue().decode('latin1')
-            query = f'MATCH (n {{identifier: "{node_ids[i]}"}}) ' + f" SET n.graph_embedding = '{graph_emb}' "
+            graph_emb = mm_array.getvalue().decode("latin1")
+            query = (
+                f'MATCH (n {{identifier: "{node_ids[i]}"}}) '
+                + f" SET n.graph_embedding = '{graph_emb}' "
+            )
             graph_obj.graph.execute_query(query)
-    logger.info("Knowledge graph updated!")
+    logger.info("Knowledge graph updated.")
 
 
 def process_graphml(path: str) -> None: 
