@@ -66,32 +66,33 @@ def dict_to_cypher(input_dict: dict[str, Any]) -> str:
     return return_string
 
 
-def shvvl(tag: str, hash_length: int) -> bytes:
-    '''
+def shvvl(tag: str, hash_len: int) -> bytes:
+    """
     This is SHVVL. The only important thing is that the "type" of node is the first string in the tag
-    '''
+    """
     sectors = tag.split("\0")
-    label_hash = hashlib.md5(bytes(sectors[0], "UTF8"), usedforsecurity=False).digest()
+    label_bytes = bytes(sectors[0], "UTF8")
+    label_hash_bytes = hashlib.md5(label_bytes, usedforsecurity=False).digest()
 
-    out = bytearray()
+    shvvl_hash_bytes = bytearray()
     for sector in sectors[1:]:
         sector_bytes = bytearray(sector, "UTF8")
-        hashfunc = hashlib.shake_256(sector_bytes + label_hash, usedforsecurity=False)
-        out += hashfunc.digest(hash_length)
+        sector_hash = hashlib.shake_256(sector_bytes + label_hash_bytes, usedforsecurity=False)
+        shvvl_hash_bytes += sector_hash.digest(hash_len)
+    
+    return shvvl_hash_bytes
 
-    return out
 
-
-def shvvl_float(tag: str, bpf: int) -> list[float]:
+def shvvl_float(tag: str, hash_len: int) -> list[float]:
     """
     This is shvvl float. Used in conjunction with SHVVL to create preembeddings.
     """
-    out = list()
-    for shvvl_byte in shvvl(tag, bpf):
-        for l in range(8):
-            out.append(1.0 if (shvvl_byte & (1 << l)) != 0 else 0.0)
+    shvvl_hash_vec = list()
+    for shvvl_byte in shvvl(tag, hash_len):
+        for bitshift in range(8):
+            shvvl_hash_vec.append(1.0 if (shvvl_byte & (1 << bitshift)) != 0 else 0.0)
 
-    return out
+    return shvvl_hash_vec
 
 
 class AICASage(torch.nn.Module):  # type:ignore

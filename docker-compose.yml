@@ -92,6 +92,7 @@ services:
     environment:
       # https://neo4j.com/docs/operations-manual/current/docker/ref-settings/
       NEO4J_dbms_security_procedures_unrestricted: "apoc.*,gds.*"
+      NEO4J_dbms.usage_report.enabled: false
       apoc.export.file.enabled: true
       apoc.import.file.enabled: true
       apoc.import.file.use_neo4j_config: false
