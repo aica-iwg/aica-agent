@@ -121,44 +121,59 @@ class AICASage(torch.nn.Module):
     
         return x
 
-def load_graphml_data(BASEFILE, SHVVL_MAX_FEATURE_LEN=12, SHVVL_BANDWIDTH=20):
-    aica_graph = nx.read_graphml(BASEFILE)
+def load_graphml_data(basefile, shvvl_feat_len=12, shvvl_bandwidth=20):
+    """
+    Implements shvvl algorithm on the node identifier property of knowledge graph.
+    Outputs 'pre-embeddings' into a data tensor type to use Pytorch GNN algorithm.
+    """
+
+    # - Load graphml file
+    # - Initialize node list and shvvl id vector length
+    # - Iterate through node data to extract node identifiers
+    # - Delete identifier vec property for each node
+    # - Build put typedata_str for pre-embedding and store key values from nodes
+    aica_graph = nx.read_graphml(basefile)
     node_ids = []
-    a = 0
-    for n in aica_graph.nodes(data=True):
-        typedata = n[1]["TYPE"]
-        node_ids.append(n[1]['identifier'])
-        del n[1]["identifier_vec"]
-        z = str(typedata) + "\0"
-        keys = sorted(n[1].keys())
+    shvvl_id_len = 0
+    for node in aica_graph.nodes(data=True):
+        typedata = node[1]["TYPE"]
+        node_ids.append(node[1]['identifier'])
+        del node[1]["identifier_vec"]
+        typedata_str = str(typedata) + "\0"
+        keys = sorted(node[1].keys())
 
-        for k in range(SHVVL_MAX_FEATURE_LEN):
-            z += str(n[1][keys[k]]) + "\0" if k < len(keys) else "\0"         
-        z = z[:-1]
-        shoveled_data = shvvl_float(z, SHVVL_BANDWIDTH)
+        
+        for k in range(shvvl_feat_len):
+            typedata_str += str(node[1][keys[k]]) + "\0" if k < len(keys) else "\0"  
+
+        # - Use typedata_str to build pre-embeddings
+        # - Clear node information to build it up again
+        typedata_str = typedata_str[:-1]
+        shoveled_data = shvvl_float(typedata_str, shvvl_bandwidth)
         shvvlsize = len(shoveled_data)
-        s : dict = {}
+        node[1].clear()
 
-        n[1].clear()
-        for x in range(shvvlsize):
-            pass
-            n[1]["SHVVL_ID" + str(x)] = shoveled_data[x]    
-        a = max(a, len(n[1]))
-        n[1]["TYPE"]=typedata
-    for x in aica_graph.edges(data=True):
-        x[2].clear()
-        x[2]["dummy"]=0
+        
+        for i in range(shvvlsize):
+            node[1]["SHVVL_ID" + str(i)] = shoveled_data[i]    
 
-    data_tensor = torch_geometric.utils.convert.from_networkx(aica_graph, ['SHVVL_ID' + str(x) for x in range(a)])
-    z = 0
+        shvvl_id_len = max(shvvl_id_len, len(node[1]))
+        node[1]["TYPE"]=typedata
+
+    for edge in aica_graph.edges(data=True):
+        edge[2].clear()
+        edge[2]["dummy"]=0
+
+    # - Pre-embedding is stored as data tensor
+    # - Order of embeddings is done and counted to verify it's correct
+    data_tensor = torch_geometric.utils.convert.from_networkx(aica_graph, ['SHVVL_ID' + str(x) for x in range(shvvl_id_len)])
+    order_count = 0
     for original_node in aica_graph.nodes(data=True):
-        if original_node[1]["SHVVL_ID0"] != data_tensor.x[z][0]:
+        if original_node[1]["SHVVL_ID0"] != data_tensor.x[order_count][0]:
             raise BaseException("ERROR: Ordering not lined up")
-            z = -1
-            break
-        z += 1
-    if z != -1:
-        print("Likely ordered")
+        order_count += 1
+    if order_count != -1:
+       logger.info("Likely ordered")
 
     return data_tensor, node_ids
     
@@ -170,10 +185,10 @@ def run_graphsage(data_tensor, hidden_dim=128, in_dim=2080, out_dim=128):
                     out_dim=out_dim)
     
     if torch.cuda.is_available():
-        print("Starting in GPU mode...")
+        logger.info("Starting in GPU mode...")
         deviceType =  f'cuda' 
     else:
-        print("WARNING: NO VALID CUDA DEVICE FOUND! Defaulting to CPU...")
+        logger.warning("NO VALID CUDA DEVICE FOUND! Defaulting to CPU...")
         deviceType = 'cpu'
 
     device = torch.device(deviceType)
@@ -186,16 +201,16 @@ def run_graphsage(data_tensor, hidden_dim=128, in_dim=2080, out_dim=128):
     return emb
 
 def update_graph(emb, node_ids):
-    print("Updating knowledge graph ...")
+    logger.info("Updating knowledge graph ...")
     graph_obj = AicaNeo4j(initialize_graph=False)
     for i in range(emb.shape[0]):
-        if 'network-traffic' in node_ids[i]:
+        if 'network-traffic--' in node_ids[i]:
             mm_array = BytesIO()
             mmwrite(mm_array, np.reshape(emb[i], (1, emb.shape[1])))
             graph_emb = mm_array.getvalue().decode('latin1')
             query = f'MATCH (n {{identifier: "{node_ids[i]}"}}) ' + f" SET n.graph_embedding = '{graph_emb}' "
             graph_obj.graph.execute_query(query)
-    print("Knowledge graph updated!")
+    logger.info("Knowledge graph updated!")
 
 
 def process_graphml(path: str) -> None: 

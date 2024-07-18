@@ -28,7 +28,6 @@ from typing import Any, Dict
 
 from aica_django.connectors.Antivirus import poll_clamav_alerts
 from aica_django.connectors.CaddyServer import poll_caddy_accesslogs
-from aica_django.connectors.DNP3 import capture_dnp3, replay_dnp3_pcap
 from aica_django.connectors.DocumentDatabase import AicaMongo
 from aica_django.connectors.GraphDatabase import (
     AicaNeo4j,
@@ -121,7 +120,6 @@ def initialize(**kwargs: Dict[Any, Any]) -> None:
     poll_waf_alerts.apply_async()
 
     # Start the DNP3 capture in background
-    #capture_dnp3.apply_async(kwargs={"interface": os.getenv("TAP_IF")})
     
     # Start the Netflow graph pruner in background
     prune_netflow_data.apply_async()
