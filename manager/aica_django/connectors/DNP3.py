@@ -13,7 +13,6 @@ import functools
 import glob
 import pyshark  # type: ignore
 
-from celery import current_app
 from celery.app import shared_task
 from celery.utils.log import get_task_logger
 from typing import Any, Optional
