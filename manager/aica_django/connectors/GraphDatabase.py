@@ -66,25 +66,19 @@ def dict_to_cypher(input_dict: dict[str, Any]) -> str:
     return return_string
 
 
-def shvvl(tag: str, bpf: int) -> bytes:
-    """
+def shvvl(tag: str, hash_length: int) -> bytes:
+    '''
     This is SHVVL. The only important thing is that the "type" of node is the first string in the tag
-    """
+    '''
     sectors = tag.split("\0")
     typehash = hashlib.md5(bytes(sectors[0], "UTF8"), usedforsecurity=False).digest()
 
     out = bytearray()
-    bpf_hash = hashlib.new("shake_256", usedforsecurity=False)
-    bpf_hash.update(bpf)
-
-    for sector in sectors:
-        block_hash = hashlib.new("shake_256", usedforsecurity=False)
-
+    for sector in sectors[1:]:
         blockInput = bytearray(sector, "UTF8")
         blockInput = blockInput + typehash
-        block_hash.update(blockInput)
-
-        out += block_hash.digest() + bpf_hash.digest()
+        hashfunc = hashlib.shake_256(blockInput, usedforsecurity=False)
+        out += hashfunc.digest(hash_length)
 
     return out
 
@@ -135,7 +129,7 @@ class AICASage(torch.nn.Module):  # type:ignore
 
 
 def load_graphml_data(
-    graphml_file: str, shvvl_max_feature_len: int = 12, shvvl_bandwidth: int = 20
+    graphml_file: str, shvvl_max_feature_len: int = 12, shvvl_hash_len: int = 20
 ) -> Tuple[torch_geometric.data.Data, List[str]]:
     aica_graph = nx.read_graphml(graphml_file)
 
@@ -154,7 +148,7 @@ def load_graphml_data(
 
         plaintext_prefix = plaintext_prefix[:-1]
 
-        shoveled_data = shvvl_float(plaintext_prefix, shvvl_bandwidth)
+        shoveled_data = shvvl_float(plaintext_prefix, shvvl_hash_len)
         shvvl_size = len(shoveled_data)
 
         node[1].clear()
