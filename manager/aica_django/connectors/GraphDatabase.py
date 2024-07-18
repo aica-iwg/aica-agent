@@ -219,7 +219,7 @@ def update_graph(emb: np.typing.NDArray[np.float64], node_ids: List[str]) -> Non
                 + f" SET n.graph_embedding = '{graph_emb}' "
             )
             graph_obj.graph.execute_query(query)
-    logger.info("Knowledge graph updated!")
+    logger.info("Knowledge graph updated.")
 
 
 def process_graphml(path: str) -> None:
