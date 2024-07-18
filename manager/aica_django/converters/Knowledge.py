@@ -54,6 +54,7 @@ from aica_django.converters.AICAStix import (
     AICANetworkTraffic,
     AICANote,
     DNP3RequestExt,
+    PcapRequestExt,
 )
 
 
@@ -990,6 +991,7 @@ def waf_alert_to_knowledge(alert: Dict[str, Any]) -> List[_STIXBase]:
 
 
 _register_extension(DNP3RequestExt)
+_register_extension(PcapRequestExt)
 
 
 def dnp3_to_knowledge(log_dict: dict[str, str]) -> List[_STIXBase]:
@@ -1075,6 +1077,11 @@ def dnp3_to_knowledge(log_dict: dict[str, str]) -> List[_STIXBase]:
         dnp3_datalink_function=log_dict["dnp3_datalink_function"],
         dnp3_datalink_src=log_dict["dnp3_datalink_src"],
     )
+    extensions = {"dnp3-request-ext": dnp3_req_ext}
+
+    if log_dict["pcap_file"]:
+        pcap_ext = PcapRequestExt(pcap_filename=log_dict["pcap_file"])
+        extensions["pcap-request-ext"] = pcap_ext
 
     traffic = AICANetworkTraffic(
         protocols=protocols,
@@ -1083,7 +1090,7 @@ def dnp3_to_knowledge(log_dict: dict[str, str]) -> List[_STIXBase]:
         dst_ref=dest_addr,
         src_port=int(log_dict["src_port"]),
         dst_port=int(log_dict["dst_port"]),
-        extensions={"dnp3-request-ext": dnp3_req_ext},
+        extensions=extensions,
     )
     knowledge_nodes.append(traffic)
 

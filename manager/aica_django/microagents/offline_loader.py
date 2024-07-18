@@ -19,6 +19,7 @@ Functions:
 """
 
 import os
+import glob
 import yaml
 
 from celery.signals import worker_ready
@@ -27,7 +28,7 @@ from typing import Any, Dict
 
 from aica_django.connectors.Antivirus import poll_clamav_alerts
 from aica_django.connectors.CaddyServer import poll_caddy_accesslogs
-from aica_django.connectors.DNP3 import capture_dnp3
+from aica_django.connectors.DNP3 import capture_dnp3, replay_dnp3_pcap
 from aica_django.connectors.DocumentDatabase import AicaMongo
 from aica_django.connectors.GraphDatabase import (
     AicaNeo4j,
@@ -43,6 +44,7 @@ from aica_django.microagents.util import (
     create_port_info,
     create_suricata_categories,
 )
+from django.conf import settings
 
 logger = get_task_logger(__name__)
 
@@ -124,3 +126,15 @@ def initialize(**kwargs: Dict[Any, Any]) -> None:
 
     # Start the Netflow graph pruner in background
     prune_netflow_data.apply_async()
+
+    # Replay DNP3 files if requested
+    if getattr(settings, "REPLAY_PCAP", None):
+        pcap_files = list(glob.glob("pcaps/*/*/*.pcap"))[0:5]
+        if len(pcap_files) == 0:
+            logger.error("Requested to replay PCAPs, but none found.")
+        else:
+            for pcap_file in pcap_files:
+                logger.info(f"Replaying DNP3 PCAP file: {pcap_file}")
+                replay_dnp3_pcap.apply_async(
+                    kwargs={"pcap_file": pcap_file}, queue="pcap_replay"
+                )
