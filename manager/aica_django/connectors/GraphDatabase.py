@@ -71,13 +71,12 @@ def shvvl(tag: str, hash_length: int) -> bytes:
     This is SHVVL. The only important thing is that the "type" of node is the first string in the tag
     '''
     sectors = tag.split("\0")
-    typehash = hashlib.md5(bytes(sectors[0], "UTF8"), usedforsecurity=False).digest()
+    label_hash = hashlib.md5(bytes(sectors[0], "UTF8"), usedforsecurity=False).digest()
 
     out = bytearray()
     for sector in sectors[1:]:
-        blockInput = bytearray(sector, "UTF8")
-        blockInput = blockInput + typehash
-        hashfunc = hashlib.shake_256(blockInput, usedforsecurity=False)
+        sector_bytes = bytearray(sector, "UTF8")
+        hashfunc = hashlib.shake_256(sector_bytes + label_hash, usedforsecurity=False)
         out += hashfunc.digest(hash_length)
 
     return out
