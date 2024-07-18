@@ -50,8 +50,9 @@ logger = get_task_logger(__name__)
 
 
 @celeryd_after_setup.connect
-def capture_worker_name(sender, instance, **kwargs):
+def capture_worker_name(sender: str, instance: Any, **kwargs: Any) -> None:
     os.environ["WORKER_NAME"] = f"{sender}"
+
 
 @worker_ready.connect
 def initialize(**kwargs: Dict[Any, Any]) -> None:
@@ -64,7 +65,7 @@ def initialize(**kwargs: Dict[Any, Any]) -> None:
     @return: True once completed.
     @rtype: bool
     """
-    
+
     # Only run this for the default queue worker (because it only needs to run once)
     if not os.environ["WORKER_NAME"].endswith("@default"):
         return
