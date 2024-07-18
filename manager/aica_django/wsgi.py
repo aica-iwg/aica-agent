@@ -11,6 +11,8 @@ import os
 
 from django.core.wsgi import get_wsgi_application
 
+from aica_django.microagents.offline_loader import initialize
+
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "aica_django.settings")
 
 application = get_wsgi_application()
