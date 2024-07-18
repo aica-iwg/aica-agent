@@ -66,29 +66,28 @@ def dict_to_cypher(input_dict: dict[str, Any]) -> str:
     return return_string
 
 
-def shvvl(tag: str, hash_len: int) -> bytes:
+def shvvl(input_data: str, hash_len: int) -> bytes:
     """
     This is SHVVL. The only important thing is that the "type" of node is the first string in the tag
     """
-    sectors = tag.split("\0")
-    label_bytes = bytes(sectors[0], "UTF8")
-    label_hash_bytes = hashlib.md5(label_bytes, usedforsecurity=False).digest()
+    sectors = input_data.split("\0")
+    type_hash = hashlib.md5(bytes(sectors[0], "UTF8"), usedforsecurity=False).digest()
 
-    shvvl_hash_bytes = bytearray()
-    for sector in sectors[1:]:
-        sector_bytes = bytearray(sector, "UTF8")
-        sector_hash = hashlib.shake_256(sector_bytes + label_hash_bytes, usedforsecurity=False)
-        shvvl_hash_bytes += sector_hash.digest(hash_len)
-    
-    return shvvl_hash_bytes
+    out = bytearray()
+    for sector in sectors:
+        sector_value = bytearray(sector, "UTF8") + type_hash
+        sector_hash = hashlib.shake_256(sector_value)
+        out += sector_hash.digest(hash_len)
+
+    return out
 
 
-def shvvl_float(tag: str, hash_len: int) -> list[float]:
+def shvvl_float(input_data: str, hash_len: int) -> list[float]:
     """
     This is shvvl float. Used in conjunction with SHVVL to create preembeddings.
     """
     shvvl_hash_vec = list()
-    for shvvl_byte in shvvl(tag, hash_len):
+    for shvvl_byte in shvvl(input_data, hash_len):
         for bitshift in range(8):
             shvvl_hash_vec.append(1.0 if (shvvl_byte & (1 << bitshift)) != 0 else 0.0)
 
@@ -165,11 +164,6 @@ def load_graphml_data(
     data_tensor = torch_geometric.utils.convert.from_networkx(
         aica_graph, [f"SHVVL_ID{x}" for x in range(longest_hash_len)]
     )
-    node_index = 0
-    for original_node in aica_graph.nodes(data=True):
-        if original_node[1]["SHVVL_ID0"] != data_tensor.x[node_index][0]:
-            raise BaseException("Ordering not lined up")
-        node_index += 1
 
     return data_tensor, node_ids
 
@@ -201,7 +195,7 @@ def run_graphsage(
 
 
 def update_graph(emb: np.typing.NDArray[np.float64], node_ids: List[str]) -> None:
-    logger.info(f"Updating knowledge graph: {type(emb)}")
+    logger.info(f"Updating knowledge graph")
     graph_obj = AicaNeo4j()
     for i in range(emb.shape[0]):
         if "network-traffic" in node_ids[i]:
@@ -217,13 +211,13 @@ def update_graph(emb: np.typing.NDArray[np.float64], node_ids: List[str]) -> Non
 
 
 def process_graphml(path: str) -> None:
-    ## load graphml file & process file to get preembeddings
+    # Load graphml file & process file to get pre-embeddings
     aica_data_tensor, node_ids = load_graphml_data(path)
 
-    ## run preembeddings through algorithm
+    # Run preembeddings through algorithm
     aica_emb = run_graphsage(aica_data_tensor)
 
-    ## get embeddings and write them out to graph
+    # Get embeddings and write them out to graph
     update_graph(aica_emb, node_ids)
 
 
