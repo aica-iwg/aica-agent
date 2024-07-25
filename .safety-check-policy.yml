@@ -5,6 +5,6 @@ security:
   ignore-cvss-severity-below: 0
   ignore-cvss-unknown-severity: false
   ignore-vulnerabilities:
-    65052:
-      reason: Disputed + not impacted accd to vendor
-      expires: '2024-06-17'
+    71670:
+      reason: No newer version available
+      expires: '2024-09-30'
