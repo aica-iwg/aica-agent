@@ -21,7 +21,7 @@ Functions:
 import os
 import glob
 import yaml
-import glob 
+import glob
 
 from celery.signals import worker_ready, celeryd_after_setup
 from celery.utils.log import get_task_logger
@@ -133,7 +133,7 @@ def initialize(**kwargs: Dict[Any, Any]) -> None:
     poll_waf_alerts.apply_async()
 
     # Start the DNP3 capture in background
-    
+
     # Start the Netflow graph pruner in background
     prune_netflow_data.apply_async()
 

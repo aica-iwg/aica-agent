@@ -26,24 +26,22 @@ from neo4j import GraphDatabase  # type: ignore
 import networkx as nx
 import numpy as np
 import os
-import re2 as re  # type: ignore
+import re2 as re
 from scipy.io import mmwrite  # type: ignore
 from sklearn.feature_extraction.text import HashingVectorizer  # type: ignore
 from stix2.base import _STIXBase  # type: ignore
 from typing import Any, Dict, List, Optional, Tuple, Union
-import stix2  # type: ignore
+import stix2
 import threading
 import time
-import torch
-from torch_geometric.data import Data
-from torch_geometric import EdgeIndex
-import torch_geometric.utils
-from torch_geometric.nn import SAGEConv  
-import torch.nn.functional as F
+import torch  # type: ignore
+from torch_geometric.data import Data  # type: ignore
+from torch_geometric import EdgeIndex  # type: ignore
+import torch_geometric.utils  # type: ignore
+from torch_geometric.nn import SAGEConv  # type: ignore
+import torch.nn.functional as F  # type: ignore
 from typing import Any, Dict, List, Optional, Union
 from urllib.parse import quote_plus
-
-
 
 
 logger = get_task_logger(__name__)
@@ -74,6 +72,7 @@ def dict_to_cypher(input_dict: dict[str, Any]) -> str:
     return_string = "{" + ", ".join(values) + "}"
 
     return return_string
+
 
 def shvvl(input_data: str, hash_len: int) -> bytes:
     """
@@ -219,14 +218,15 @@ def update_graph(emb: np.typing.NDArray[np.float64], node_ids: List[str]) -> Non
     logger.info("Knowledge graph updated.")
 
 
-def process_graphml(path: str) -> None: 
+def process_graphml(path: str) -> None:
     ## load graphml file & process file to get preembeddings
     aica_data_tensor, node_ids = load_graphml_data(path)
     ## run preembeddings through algorithm
     aica_emb = run_graphsage(aica_data_tensor)
     ## get embeddings and write them out to graph
     update_graph(aica_emb, node_ids)
-    
+
+
 class KnowledgeNode:
     def __init__(
         self,
@@ -683,5 +683,3 @@ def prune_netflow_data(
         graph.graph.execute_query(query)
         if post_sleep:
             time.sleep(seconds)
-
-
