@@ -56,7 +56,8 @@ def replay_dnp3_pcap(
         packets = [packet for packet in cap]
 
         # If sample would be fewer than our minimum specified
-        override_sample = sample_min and len(packets) * sample < sample_min
+        if sample and sample_min:
+            override_sample = sample_min and len(packets) * sample < sample_min
 
         for packet in cap:
             if sample is None or override_sample or random.random() <= sample:
