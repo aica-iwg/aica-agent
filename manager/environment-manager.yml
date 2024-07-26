@@ -3,7 +3,7 @@ name: base
 channels:
   - conda-forge
 dependencies:
-  - python=3.12.3
+  - python=3.12.4
   - Django=5.0.6
   - amqp=5.2.0
   - backoff=2.2.1

@@ -3,7 +3,7 @@ name: base
 channels:
   - conda-forge
 dependencies:
-  - python=3.12.3
+  - python=3.12.4
   - PyJWT=2.8.0
   - python-dotenv=1.0.1
   - requests=2.32.3
