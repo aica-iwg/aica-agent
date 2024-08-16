@@ -87,24 +87,26 @@ def initialize(**kwargs: Dict[Any, Any]) -> None:
 
     ### Preload Contextual Data ###
     # To update this data, run each of these functions without import_file and export with APOC to an updated file, like:
-    #     CALL apoc.export.graphml.all("aica-suricata_categories-20240513.graphml", {format:"gephi", useTypes:true})
+    #     CALL apoc.export.json.all("aica-suricata_categories-20240815.json", {useTypes:true})
     # Although this is a bit clunky, creating this data from scratch (esp nmap port info) takes a while, so we don't
     # want to do it on each start of the agent if we can avoid it.
 
     # Load ClamAV Categories into Graph
     create_malware_categories(
-        import_file="/graph_data/aica-malware_categories-20240513.graphml"
+        import_file="/graph_data/aica-malware_categories-20240815.json"
     )
     logger.info("Loaded ClamAV Categories.")
 
     # Get Suricata rule classes and load into Graph
     create_suricata_categories(
-        import_file="/graph_data/aica-suricata_categories-20240513.graphml"
+        import_file="/graph_data/aica-suricata_categories-20240815.json"
     )
     logger.info("Loaded Suricata Categories.")
 
     # Get nmap-services and load into Graph
-    create_port_info(import_file="/graph_data/aica-nmap_port_info-20240513.graphml")
+    create_port_info(
+        import_file="/graph_data/aica-nmap_port_info-20240815.json",
+    )
     logger.info("Loaded Port Info.")
 
     ### Start Tasks ###

@@ -43,7 +43,7 @@ def create_malware_categories(import_file: Optional[str] = None) -> None:
     """
 
     if import_file:
-        graph.import_graphml_data(import_file)
+        graph.merge_json_data(import_file)
     else:
         # From: https://docs.clamav.net/manual/Signatures/SignatureNames.html
         clamav_categories = [
@@ -96,7 +96,7 @@ def create_port_info(import_file: Optional[str] = None) -> None:
     @rtype: bool
     """
     if import_file:
-        graph.import_graphml_data(import_file)
+        graph.merge_json_data(import_file)
     else:
         nmap_services_url = (
             "https://raw.githubusercontent.com/nmap/nmap/master/nmap-services"
@@ -203,7 +203,7 @@ def create_suricata_categories(import_file: Optional[str] = None) -> None:
     @rtype: bool
     """
     if import_file:
-        graph.import_graphml_data(import_file)
+        graph.merge_json_data(import_file)
     else:
         suricata_classes_url = "https://rules.emergingthreats.net/open/suricata-5.0/rules/classification.config"
 
@@ -218,7 +218,7 @@ def create_suricata_categories(import_file: Optional[str] = None) -> None:
             sep=",",
             comment="#",
             header=None,
-            names=["name", "description", "priority"],
+            names=["shortname", "name", "priority"],
         )
 
         attack_patterns = []

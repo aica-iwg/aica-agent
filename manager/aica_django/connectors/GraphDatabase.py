@@ -526,8 +526,12 @@ class AicaNeo4j:
         for query in queries:
             self.graph.execute_query(query)
 
-    def import_graphml_data(self, import_file: str) -> None:
-        query = f"CALL apoc.import.graphml('{import_file}', {{}})"
+    def merge_json_data(self, import_file: str) -> None:
+        query = f"""
+            CALL apoc.load.json('file://{import_file}') YIELD value 
+            CALL apoc.merge.node(value.labels, value.properties) YIELD node
+            return node 
+            """
         self.graph.execute_query(query)
 
     async def poll_graphml(self) -> None:
