@@ -16,7 +16,7 @@ init-core-env:
 init-dev-envs:
 		@${MAMBA_EXE} create -f attacker/environment.yml -y
 		@${MAMBA_EXE} create -f honeypot/environment.yml -y
-		@${MAMBA_EXE} create -f manager/environment.yml -y
+		@${MAMBA_EXE} create -f manager/environment.yml -y   
 
 security-precheck-init:
 		@${MAMBA_EXE} create -f environment-security.yml -y

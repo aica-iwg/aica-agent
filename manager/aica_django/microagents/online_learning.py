@@ -9,12 +9,12 @@ This should eventually include:
 * Purpose
 * Behavior
 """
-
 import argparse
 import warnings
 from celery.utils.log import get_task_logger
 from collections import OrderedDict
 
+from connectors import GraphDatabase
 from flwr.client import NumPyClient, ClientApp
 import torch
 import torch.nn as nn
@@ -97,18 +97,21 @@ def test(model, testloader):
     return loss, accuracy
 
 
-def load_model(model, model_path='/.'):
+def load_model_params(model, model_path: str):
     """
     Pytorch model parameters will be called here!
     """
     model.load_state_dict(torch.load(model_path))
     print("Model pre-loaded!")
+    return model
 
-def load_data():
+def load_data() -> None:
     """
     Load cypher queries and get data from neo4j to run the model!
     """
-
+    graph_obj = GraphDatabase.AicaNeo4j()
+    query = ""
+    neo4j_data = graph_obj.graph.execute_query(query)
 
 # #############################################################################
 # 2. Federation of the pipeline with Flower
@@ -126,8 +129,8 @@ parser.add_argument(
 partition_id = parser.parse_known_args()[0].partition_id
 
 # Load model and data (simple CNN, CIFAR-10)
-aica_mlp = AICAMLP().to(device=device)
-load_model(model=aica_mlp)
+aica_model = AICAMLP().to(device=device)
+aica_model = load_model_params(model=aica_model)
 trainloader, testloader = load_data(partition_id=partition_id)
 
 
