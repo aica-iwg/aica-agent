@@ -130,40 +130,51 @@ class AICASage(torch.nn.Module):  # type:ignore
 def load_graphml_data(
     graphml_file: str, shvvl_max_feature_len: int = 12, shvvl_hash_len: int = 20
 ) -> Tuple[torch_geometric.data.Data, List[str]]:
-    aica_graph = nx.read_graphml(graphml_file)
+    logger.info(f"Loading GraphML Data from {graphml_file}")
+
+    if os.path.exists(graphml_file):
+        aica_graph = nx.read_graphml(graphml_file)
+    else:
+        raise FileNotFoundError("GraphML File Doesn't Exist")
 
     node_ids = []
     longest_hash_len = 0
     for node in aica_graph.nodes(data=True):
-        node_type = node[1]["TYPE"]
-        node_ids.append(node[1]["identifier"])
-        del node[1]["identifier_vec"]
+        try:
+            node_type = node[1]["TYPE"]
+            node_ids.append(node[1]["identifier"])
+            del node[1]["identifier_vec"]
 
-        plaintext_prefix = str(node_type) + "\0"
-        keys = sorted(node[1].keys())
+            plaintext_prefix = str(node_type) + "\0"
+            keys = sorted(node[1].keys())
 
-        for k in range(shvvl_max_feature_len):
-            plaintext_prefix += f"{node[1][keys[k]]}\0" if k < len(keys) else "\0"
+            for k in range(shvvl_max_feature_len):
+                plaintext_prefix += f"{node[1][keys[k]]}\0" if k < len(keys) else "\0"
 
-        plaintext_prefix = plaintext_prefix[:-1]
+            plaintext_prefix = plaintext_prefix[:-1]
 
-        shoveled_data = shvvl_float(plaintext_prefix, shvvl_hash_len)
-        shvvl_size = len(shoveled_data)
+            shoveled_data = shvvl_float(plaintext_prefix, shvvl_hash_len)
+            shvvl_size = len(shoveled_data)
 
-        node[1].clear()
-        for edge_index in range(shvvl_size):
-            node[1][f"SHVVL_ID{edge_index}"] = shoveled_data[edge_index]
+            node[1].clear()
+            for edge_index in range(shvvl_size):
+                node[1][f"SHVVL_ID{edge_index}"] = shoveled_data[edge_index]
 
-        longest_hash_len = max(longest_hash_len, len(node[1]))
-        node[1]["TYPE"] = node_type
+            longest_hash_len = max(longest_hash_len, len(node[1]))
+            node[1]["TYPE"] = node_type
 
-    for edge in aica_graph.edges(data=True):
-        edge[2].clear()
-        edge[2]["dummy"] = 0
+            for edge in aica_graph.edges(data=True):
+                edge[2].clear()
+                edge[2]["dummy"] = 0
+
+        except Exception as e:
+            logger.error(f"{e}: {node}")
 
     data_tensor = torch_geometric.utils.convert.from_networkx(
         aica_graph, [f"SHVVL_ID{x}" for x in range(longest_hash_len)]
     )
+
+    logger.info("Processed GraphML File")
 
     return data_tensor, node_ids
 
@@ -174,6 +185,8 @@ def run_graphsage(
     in_dim: int = 2080,
     out_dim: int = 128,
 ) -> np.typing.NDArray[np.float64]:
+    logger.info("Running GraphSAGE")
+
     # make hidden_dim size be num_node_types*hidden_dim
     model = AICASage(in_dim=in_dim, hidden_dim=hidden_dim, out_dim=out_dim)
 
@@ -196,6 +209,7 @@ def run_graphsage(
 
 def update_graph(emb: np.typing.NDArray[np.float64], node_ids: List[str]) -> None:
     logger.info(f"Updating knowledge graph")
+
     graph_obj = AicaNeo4j()
     for i in range(emb.shape[0]):
         if "network-traffic" in node_ids[i]:
@@ -207,12 +221,17 @@ def update_graph(emb: np.typing.NDArray[np.float64], node_ids: List[str]) -> Non
                 + f" SET n.graph_embedding = '{graph_emb}' "
             )
             graph_obj.graph.execute_query(query)
+
     logger.info("Knowledge graph updated.")
 
 
 def process_graphml(path: str) -> None:
     # Load graphml file & process file to get pre-embeddings
-    aica_data_tensor, node_ids = load_graphml_data(path)
+    try:
+        aica_data_tensor, node_ids = load_graphml_data(path)
+    except FileNotFoundError:
+        logger.warning("No GraphML File Present, skipping load cycle")
+        return
 
     # Run preembeddings through algorithm
     aica_emb = run_graphsage(aica_data_tensor)
@@ -529,23 +548,45 @@ class AicaNeo4j:
     def merge_json_data(self, import_file: str) -> None:
         query = f"""
             CALL apoc.load.json('file://{import_file}') YIELD value 
+            WHERE value.type = 'node'
             CALL apoc.merge.node(value.labels, value.properties) YIELD node
             return node 
             """
         self.graph.execute_query(query)
 
-    async def poll_graphml(self) -> None:
+        query = f"""
+            CALL apoc.load.json('file://{import_file}') YIELD value 
+            WHERE value.type = 'relationship'
+            WITH 
+                value.start.properties.identifier AS start,
+                value.end.properties.identifier AS end,
+                value.properties AS props,
+                value.label AS label
+            MATCH (s {{identifier: start}})
+            MATCH (t {{identifier: end}})
+            CALL apoc.merge.relationship(s, label, props, {{}}, t, {{}}) YIELD rel 
+            RETURN rel
+            """
+        self.graph.execute_query(query)
+
+    async def poll_graphml(
+        self, pre_sleep: bool = True, post_sleep: bool = False
+    ) -> None:
         logger.info(f"Running {__name__}: poll_graphml")
         export_freq = int(os.getenv("AICA_GRAPHML_EXPORT_FREQ", default=300))
 
+        # Periodic export of graph to graphML for analysis
         while True:
-            # Periodic export of graph to graphML for analysis
+            if pre_sleep:
+                time.sleep(export_freq)
+
             export_query = 'CALL apoc.export.graphml.all("/graph_data/aica.graphml", {format:"gephi", useTypes:true})'
             self.graph.execute_query(export_query)
             time.sleep(5)  # Wait for file to settle (just in case)
             process_graphml(graphml_path)
 
-            time.sleep(export_freq)
+            if post_sleep:
+                time.sleep(export_freq)
 
     def get_node_ids_by_label(self, label: str) -> List[str]:
         """
