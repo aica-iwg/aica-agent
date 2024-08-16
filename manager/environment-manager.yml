@@ -3,8 +3,8 @@ name: base
 channels:
   - conda-forge
 dependencies:
-  - python=3.12.3
-  - Django=5.0.6
+  - python=3.12.4
+  - Django=5.0.8
   - amqp=5.2.0
   - backoff=2.2.1
   - celery=5.3.6
@@ -13,7 +13,7 @@ dependencies:
   - django-extensions=3.2.3
   - flower=2.0.1
   - google-re2=1.1
-  - gunicorn=22.0.0
+  - gunicorn=23.0.0
   - joblib=1.4.0
   - kombu=5.3.7
   - networkx=3.3
@@ -25,7 +25,7 @@ dependencies:
   - python-dotenv=1.0.1
   - pyyaml=6.0.1
   - requests=2.32.3
-  - scikit-learn=1.4.2
+  - scikit-learn=1.5.1
   - sqlalchemy=2.0.29
   - watchdog=4.0.0
   - vt-py=0.18.0
@@ -43,4 +43,4 @@ dependencies:
       - stix2==3.0.1
       - supervisor-stdout==0.1.1
       - torch-geometric==2.5.3
-      - torch==2.3.0
+      - torch==2.4.0

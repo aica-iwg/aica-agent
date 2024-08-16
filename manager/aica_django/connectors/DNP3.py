@@ -12,6 +12,7 @@ import argparse
 import functools
 import glob
 import pyshark  # type: ignore
+import random
 
 from celery.app import shared_task
 from celery.utils.log import get_task_logger
@@ -46,14 +47,25 @@ def object_try_get(
 
 
 @shared_task(name="replay_dnp3_pcap")
-def replay_dnp3_pcap(pcap_file: str) -> None:
-    with pyshark.FileCapture(pcap_file, display_filter="dnp3") as cap:
+def replay_dnp3_pcap(
+    pcap_file: str, sample: Optional[float] = None, sample_min: Optional[int] = None
+) -> None:
+    with pyshark.FileCapture(
+        input_file=pcap_file, display_filter="dnp3", keep_packets=False
+    ) as cap:
+        packets = [packet for packet in cap]
+
+        # If sample would be fewer than our minimum specified
+        if sample and sample_min:
+            override_sample = len(packets) * sample < sample_min
+
         for packet in cap:
-            packet_dict = parse_dnp3_packet(packet, filename=pcap_file)
-            record_dnp3.apply_async(
-                kwargs={"log_entry": packet_dict},
-                queue="pcap_record",
-            )
+            if sample is None or override_sample or random.random() <= sample:
+                packet_dict = parse_dnp3_packet(packet, filename=pcap_file)
+                record_dnp3.apply_async(
+                    kwargs={"log_entry": packet_dict},
+                    queue="pcap_record",
+                )
 
 
 @shared_task(name="capture_dnp3")
