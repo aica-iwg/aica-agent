@@ -110,8 +110,12 @@ def load_data() -> None:
     Load cypher queries and get data from neo4j to run the model!
     """
     graph_obj = GraphDatabase.AicaNeo4j()
-    query = ""
-    neo4j_data = graph_obj.graph.execute_query(query)
+    bad_traff_query = "MATCH (n:`network-traffic`)<-[:object]-(:`observed-data`)-[:sighting_of]->(:indicator)-[:indicates]->(m:`attack-pattern`) WHERE n.graph_embedding IS NOT NULL RETURN n.graph_embedding AS embedding, m.name AS category"
+    non_attacks_query = "MATCH (n:`network-traffic`)<-[:object]-(:`observed-data`)-[:sighting_of]->(:indicator)-[:indicates]->(m:`attack-pattern`) WHERE n.graph_embedding IS NOT NULL WITH COLLECT(DISTINCT n) AS all_connected_to_m MATCH (n2:`network-traffic`) WHERE NOT n2 IN all_connected_to_m RETURN n2.graph_embedding AS embedding, 'Not Attack' AS category"
+    
+    
+    bad_traff_data, _, _ = graph_obj.graph.execute_query(bad_traff_query)
+    non_attack_data, _, _ = graph_obj.graph.execute_query(non_attacks_query)
 
 # #############################################################################
 # 2. Federation of the pipeline with Flower
