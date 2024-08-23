@@ -9,19 +9,25 @@ This should eventually include:
 * Purpose
 * Behavior
 """
+
 import argparse
-import warnings
+from io import StringIO
+
+import numpy as np
 from celery.utils.log import get_task_logger
 from collections import OrderedDict
-
 from connectors import GraphDatabase
 from flwr.client import NumPyClient, ClientApp
+from scipy.io import mmread
+from sklearn import preprocessing, model_selection
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
 from torchvision.transforms import Compose, Normalize, ToTensor
 from tqdm import tqdm
+import warnings
 
 logger = get_task_logger(__name__)
 
@@ -45,16 +51,16 @@ class AICAMLP(torch.nn.Module):
         self.dense1 = nn.Linear(in_dim, hidden_dim[0])
         self.dense2 = nn.Linear(hidden_dim[0], hidden_dim[1])
         self.dense3 = nn.Linear(hidden_dim[1], out_dim)
-    
+
     def forward(self, data):
         x = self.dense1(data)
         x = F.relu(x)
         x = self.dense2(x)
-        x = F.relu(x)  
+        x = F.relu(x)
         x = self.dense3(x)
         x = F.relu(x)
         return x
-    
+
 
 def train(model, trainloader, epochs, verbose=False):
     """Train the model on the training set."""
@@ -74,12 +80,16 @@ def train(model, trainloader, epochs, verbose=False):
             # Metrics
             epoch_loss += loss
             total += train_labels.size(0)
-            correct += (torch.max(outputs.data, 1)[1] == torch.max(train_labels, 1)[1]).sum().item()
+            correct += (
+                (torch.max(outputs.data, 1)[1] == torch.max(train_labels, 1)[1])
+                .sum()
+                .item()
+            )
         epoch_loss /= len(trainloader.dataset)
         epoch_acc = correct / total
         if verbose:
             print(f"Epoch {epoch+1}: train loss {epoch_loss}, accuracy {epoch_acc}")
-    
+
 
 def test(model, testloader):
     """Validate the model on the test set."""
@@ -92,7 +102,9 @@ def test(model, testloader):
             labels = y_batch.to(device)
             outputs = model(emb)
             loss += criterion(outputs, labels.type(torch.FloatTensor)).item()
-            correct += (torch.max(outputs.data, 1)[1] == torch.max(labels, 1)[1]).sum().item()
+            correct += (
+                (torch.max(outputs.data, 1)[1] == torch.max(labels, 1)[1]).sum().item()
+            )
     accuracy = correct / len(testloader.dataset)
     return loss, accuracy
 
@@ -105,17 +117,39 @@ def load_model_params(model, model_path: str):
     print("Model pre-loaded!")
     return model
 
-def load_data() -> None:
+
+def load_data(batch_size=32) -> torch.Tensor:
     """
     Load cypher queries and get data from neo4j to run the model!
     """
     graph_obj = GraphDatabase.AicaNeo4j()
     bad_traff_query = "MATCH (n:`network-traffic`)<-[:object]-(:`observed-data`)-[:sighting_of]->(:indicator)-[:indicates]->(m:`attack-pattern`) WHERE n.graph_embedding IS NOT NULL RETURN n.graph_embedding AS embedding, m.name AS category"
     non_attacks_query = "MATCH (n:`network-traffic`)<-[:object]-(:`observed-data`)-[:sighting_of]->(:indicator)-[:indicates]->(m:`attack-pattern`) WHERE n.graph_embedding IS NOT NULL WITH COLLECT(DISTINCT n) AS all_connected_to_m MATCH (n2:`network-traffic`) WHERE NOT n2 IN all_connected_to_m RETURN n2.graph_embedding AS embedding, 'Not Attack' AS category"
-    
-    
-    bad_traff_data, _, _ = graph_obj.graph.execute_query(bad_traff_query)
+
+    attack_data, _, _ = graph_obj.graph.execute_query(bad_traff_query)
     non_attack_data, _, _ = graph_obj.graph.execute_query(non_attacks_query)
+
+    # Combine lists to form single dataset of features and labels
+    # Iterate through single list to get embeddings and labels
+    data_list = attack_data + non_attack_data
+    embeds = []
+    labels = []
+    for node in data_list:
+        embeds.append(mmread(StringIO(node[0])))
+        labels.append(node[1])
+    X_train, X_test, y_train, y_test = model_selection.train_test_split(np.array(embeds), labels,
+    test_size=0.25, random_state=42)
+    target_encoding = preprocessing.LabelBinarizer()
+    train_targets = target_encoding.fit_transform(y_train)
+    test_targets = target_encoding.transform(y_test)
+
+
+    # Create DataLoader object which loads in training and testing data for pytorch
+    trainloader = DataLoader(list(zip(np.float32(X_train), train_targets)), batch_size=batch_size)
+    testloader = DataLoader(list(zip(np.float32(X_test), test_targets)), batch_size=batch_size)
+
+    return trainloader, testloader
+    
 
 # #############################################################################
 # 2. Federation of the pipeline with Flower
@@ -132,7 +166,7 @@ parser.add_argument(
 )
 partition_id = parser.parse_known_args()[0].partition_id
 
-# Load model and data (simple CNN, CIFAR-10)
+# Load model and data 
 aica_model = AICAMLP().to(device=device)
 aica_model = load_model_params(model=aica_model)
 trainloader, testloader = load_data(partition_id=partition_id)
@@ -141,21 +175,21 @@ trainloader, testloader = load_data(partition_id=partition_id)
 # Define Flower client
 class FlowerClient(NumPyClient):
     def get_parameters(self, config):
-        return [val.cpu().numpy() for _, val in aica_mlp.state_dict().items()]
+        return [val.cpu().numpy() for _, val in aica_model.state_dict().items()]
 
     def set_parameters(self, parameters):
-        params_dict = zip(aica_mlp.state_dict().keys(), parameters)
+        params_dict = zip(aica_model.state_dict().keys(), parameters)
         state_dict = OrderedDict({k: torch.tensor(v) for k, v in params_dict})
-        aica_mlp.load_state_dict(state_dict, strict=True)
+        aica_model.load_state_dict(state_dict, strict=True)
 
     def fit(self, parameters, config):
         self.set_parameters(parameters)
-        train(aica_mlp, trainloader, epochs=1)
+        train(aica_model, trainloader, epochs=1)
         return self.get_parameters(config={}), len(trainloader.dataset), {}
 
     def evaluate(self, parameters, config):
         self.set_parameters(parameters)
-        loss, accuracy = test(aica_mlp, testloader)
+        loss, accuracy = test(aica_model, testloader)
         return loss, len(testloader.dataset), {"accuracy": accuracy}
 
 
