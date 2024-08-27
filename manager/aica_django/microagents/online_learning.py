@@ -123,11 +123,11 @@ def load_data(batch_size=32) -> torch.Tensor:
     Load cypher queries and get data from neo4j to run the model!
     """
     graph_obj = GraphDatabase.AicaNeo4j()
-    bad_traff_query = "MATCH (n:`network-traffic`)<-[:object]-(:`observed-data`)-[:sighting_of]->(:indicator)-[:indicates]->(m:`attack-pattern`) WHERE n.graph_embedding IS NOT NULL RETURN n.graph_embedding AS embedding, m.name AS category"
-    non_attacks_query = "MATCH (n:`network-traffic`)<-[:object]-(:`observed-data`)-[:sighting_of]->(:indicator)-[:indicates]->(m:`attack-pattern`) WHERE n.graph_embedding IS NOT NULL WITH COLLECT(DISTINCT n) AS all_connected_to_m MATCH (n2:`network-traffic`) WHERE NOT n2 IN all_connected_to_m RETURN n2.graph_embedding AS embedding, 'Not Attack' AS category"
+    attack_data_query = "MATCH (n:`network-traffic`)<-[:object]-(:`observed-data`)-[:sighting_of]->(:indicator)-[:indicates]->(m:`attack-pattern`) WHERE n.graph_embedding IS NOT NULL RETURN n.graph_embedding AS embedding, m.name AS category"
+    non_attack_query = "MATCH (n:`network-traffic`)<-[:object]-(:`observed-data`)-[:sighting_of]->(:indicator)-[:indicates]->(m:`attack-pattern`) WHERE n.graph_embedding IS NOT NULL WITH COLLECT(DISTINCT n) AS all_connected_to_m MATCH (n2:`network-traffic`) WHERE NOT n2 IN all_connected_to_m RETURN n2.graph_embedding AS embedding, 'Not Attack' AS category"
 
-    attack_data, _, _ = graph_obj.graph.execute_query(bad_traff_query)
-    non_attack_data, _, _ = graph_obj.graph.execute_query(non_attacks_query)
+    attack_data, _, _ = graph_obj.graph.execute_query(attack_data_query)
+    non_attack_data, _, _ = graph_obj.graph.execute_query(non_attack_query)
 
     # Combine lists to form single dataset of features and labels
     # Iterate through single list to get embeddings and labels
@@ -156,7 +156,7 @@ def load_data(batch_size=32) -> torch.Tensor:
 # #############################################################################
 
 # Get partition id
-parser = argparse.ArgumentParser(description="Flower")
+parser = argparse.ArgumentParser(description="AICA")
 parser.add_argument(
     "--partition-id",
     choices=[0, 1],
