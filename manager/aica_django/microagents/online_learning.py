@@ -109,12 +109,13 @@ def test(model, testloader):
     return loss, accuracy
 
 
-def load_model_params(model, model_path: str):
+def load_model_params(model, model_path = None):
     """
     Pytorch model parameters will be called here!
     """
-    model.load_state_dict(torch.load(model_path))
-    print("Model pre-loaded!")
+    if model_path != None:
+        model.load_state_dict(torch.load(model_path))
+        print("Model pre-loaded!")
     return model
 
 
@@ -169,7 +170,7 @@ partition_id = parser.parse_known_args()[0].partition_id
 # Load model and data 
 aica_model = AICAMLP().to(device=device)
 aica_model = load_model_params(model=aica_model)
-trainloader, testloader = load_data(partition_id=partition_id)
+trainloader, testloader = load_data()
 
 
 # Define Flower client
