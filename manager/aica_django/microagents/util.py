@@ -205,7 +205,7 @@ def create_suricata_categories(import_file: Optional[str] = None) -> None:
     if import_file:
         graph.merge_json_data(import_file)
     else:
-        suricata_classes_url = "https://rules.emergingthreats.net/open/suricata-5.0/rules/classification.config"
+        suricata_classes_url = "https://rules.emergingthreats.net/open/suricata-7.0/rules/classification.config"
 
         resp = requests.get(suricata_classes_url)
         try:
