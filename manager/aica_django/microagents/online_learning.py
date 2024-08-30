@@ -20,6 +20,7 @@ from connectors import GraphDatabase
 from flwr.client import NumPyClient, ClientApp
 from scipy.io import mmread
 from sklearn import preprocessing, model_selection
+from sklearn.preprocessing import label_binarize
 
 import torch
 import torch.nn as nn
@@ -30,6 +31,35 @@ from tqdm import tqdm
 import warnings
 
 logger = get_task_logger(__name__)
+
+# Static list of suricata attacks have to be in place in order to create label binarizer for training the model!
+total_suricata_categories = ['Attempted Information Leak', 'Detection of a Network Scan',  'Detection of a Denial of Service Attack', 
+                'Targeted Malicious Activity was Detected','Not Suspicious Traffic', 'Unknown Traffic', 'Potentially Bad Traffic',
+                'Information Leak',
+'Large Scale Information Leak', 'Attempted Denial of Service',
+'Denial of Service', 'Attempted User Privilege Gain',
+'Unsuccessful User Privilege Gain', 'Successful User Privilege Gain',
+'Attempted Administrator Privilege Gain',
+'Successful Administrator Privilege Gain', 'Decode of an RPC Query',
+'Executable code was detected', 'A suspicious string was detected',
+'A suspicious filename was detected',
+'An attempted login using a suspicious username was detected',
+'A system call was detected', 'A TCP connection was detected',
+'A Network Trojan was detected', 'A client was using an unusual port',
+'Detection of a non-standard protocol or event',
+'Generic Protocol Command Decode',
+'access to a potentially vulnerable web application',
+'Web Application Attack', 'Misc activity', 'Misc Attack',
+'Generic ICMP event', 'Potential Corporate Privacy Violation',
+'Attempt to login by a default username and password',
+'Exploit Kit Activity Detected',
+'Device Retrieving External IP Address Detected',
+'Domain Observed Used for C2 Detected',
+'Possibly Unwanted Program Detected',
+'Successful Credential Theft Detected',
+'Possible Social Engineering Attempted',
+'Crypto Currency Mining Activity Detected',
+'Malware Command and Control Activity Detected']
 
 
 # #############################################################################
@@ -119,7 +149,7 @@ def load_model_params(model, model_path = None):
     return model
 
 
-def load_data(batch_size=32) -> torch.Tensor:
+def load_data(batch_size=32, labels_list = total_suricata_categories) -> torch.Tensor:
     """
     Load cypher queries and get data from neo4j to run the model!
     """
@@ -138,16 +168,14 @@ def load_data(batch_size=32) -> torch.Tensor:
     for node in data_list:
         embeds.append(mmread(StringIO(node[0])))
         labels.append(node[1])
-    X_train, X_test, y_train, y_test = model_selection.train_test_split(np.array(embeds), labels,
-    test_size=0.25, random_state=42)
-    target_encoding = preprocessing.LabelBinarizer()
-    train_targets = target_encoding.fit_transform(y_train)
-    test_targets = target_encoding.transform(y_test)
 
+    total_labels = label_binarize(labels, classes=labels_list)
+    X_train, X_test, y_train, y_test = model_selection.train_test_split(np.array(embeds), total_labels,
+    test_size=0.25, random_state=42)
 
     # Create DataLoader object which loads in training and testing data for pytorch
-    trainloader = DataLoader(list(zip(np.float32(X_train), train_targets)), batch_size=batch_size)
-    testloader = DataLoader(list(zip(np.float32(X_test), test_targets)), batch_size=batch_size)
+    trainloader = DataLoader(list(zip(np.float32(X_train), y_train)), batch_size=batch_size)
+    testloader = DataLoader(list(zip(np.float32(X_test), y_test)), batch_size=batch_size)
 
     return trainloader, testloader
     
@@ -168,7 +196,7 @@ parser.add_argument(
 partition_id = parser.parse_known_args()[0].partition_id
 
 # Load model and data 
-aica_model = AICAMLP().to(device=device)
+aica_model = AICAMLP(in_dim=128, hidden_dim=[128, 128], out_dim=len(total_suricata_categories)).to(device=device)
 aica_model = load_model_params(model=aica_model)
 trainloader, testloader = load_data()
 
