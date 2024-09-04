@@ -67,7 +67,7 @@ total_suricata_categories = ['Attempted Information Leak', 'Detection of a Netwo
 # #############################################################################
 
 warnings.filterwarnings("ignore", category=UserWarning)
-if torch.backends.cuda.is_available():
+if torch.cuda.is_available():
     device = torch.device("cuda")
 else:
     device = torch.device("cpu")
