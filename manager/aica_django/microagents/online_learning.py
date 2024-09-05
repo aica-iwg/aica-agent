@@ -9,26 +9,25 @@ This should eventually include:
 * Purpose
 * Behavior
 """
-
+from aica_django.connectors.GraphDatabase import AicaNeo4j
 import argparse
-from io import StringIO
-
-import numpy as np
 from celery.utils.log import get_task_logger
 from collections import OrderedDict
-from connectors import GraphDatabase
 from flwr.client import NumPyClient, ClientApp
+from io import StringIO
+import numpy as np
+
 from scipy.io import mmread
-from sklearn import preprocessing, model_selection
+from sklearn import model_selection
 from sklearn.preprocessing import label_binarize
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
-from torchvision.transforms import Compose, Normalize, ToTensor
 from tqdm import tqdm
 import warnings
+
 
 logger = get_task_logger(__name__)
 
@@ -153,7 +152,7 @@ def load_data(batch_size=32, labels_list = total_suricata_categories) -> torch.T
     """
     Load cypher queries and get data from neo4j to run the model!
     """
-    graph_obj = GraphDatabase.AicaNeo4j()
+    graph_obj = AicaNeo4j(initialize_graph=True, poll_graph=True)
     attack_data_query = "MATCH (n:`network-traffic`)<-[:object]-(:`observed-data`)-[:sighting_of]->(:indicator)-[:indicates]->(m:`attack-pattern`) WHERE n.graph_embedding IS NOT NULL RETURN n.graph_embedding AS embedding, m.name AS category"
     non_attack_query = "MATCH (n:`network-traffic`)<-[:object]-(:`observed-data`)-[:sighting_of]->(:indicator)-[:indicates]->(m:`attack-pattern`) WHERE n.graph_embedding IS NOT NULL WITH COLLECT(DISTINCT n) AS all_connected_to_m MATCH (n2:`network-traffic`) WHERE NOT n2 IN all_connected_to_m RETURN n2.graph_embedding AS embedding, 'Not Attack' AS category"
 
@@ -197,7 +196,7 @@ partition_id = parser.parse_known_args()[0].partition_id
 
 # Load model and data 
 aica_model = AICAMLP(in_dim=128, hidden_dim=[128, 128], out_dim=len(total_suricata_categories)).to(device=device)
-aica_model = load_model_params(model=aica_model)
+#aica_model = load_model_params(model=aica_model)
 trainloader, testloader = load_data()
 
 
