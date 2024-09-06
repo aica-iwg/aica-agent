@@ -106,6 +106,7 @@ outputs:
         - ssh
         - mqtt:
             # passwords: true           # enable output of passwords
+
         # HTTP2 logging. HTTP2 support is currently experimental and
         # disabled by default. To enable, uncomment the following line
         # and be sure to enable http2 in the app-layer section.
@@ -250,7 +251,7 @@ outputs:
       # identity: "suricata"
       facility: local5
       # level: Info ## possible levels: Emergency, Alert, Critical,
-                   ## Error, Warning, Notice, Info, Debug
+                    ## Error, Warning, Notice, Info, Debug
 
   # Output module for storing files on disk. Files are stored in
   # directory names consisting of the first 2 characters of the

@@ -7,7 +7,7 @@ services:
       TAP_IF: "eth1"
       # This has to go here pending resolution of https://github.com/docker/compose/issues/11404
       HOME_NET: "146.137.56.0/24"
-      AICA_MODEL_SEVER: "127.0.0.1:8080"
+      AICA_MODEL_SERVER: "127.0.0.1:8080"
     networks:
       # Docker brings interfaces up in alphabetical order (except internal, which are last)
       # but this or "target" (in emu mode) should both come up as eth1
