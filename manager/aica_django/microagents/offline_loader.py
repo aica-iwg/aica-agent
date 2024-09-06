@@ -158,4 +158,3 @@ def initialize(**kwargs: Dict[Any, Any]) -> None:
                     kwargs={"pcap_file": pcap_file, "sample": 0.1, "sample_min": 1000},
                     queue="pcap_replay",
                 )
-

@@ -1,19 +1,21 @@
-"""
-This microagent is responsible for pulling in any external data relevant to decision-
-making by the agent and loading/sending it to the knowledge base microagent during
-runtime.
-"""
-
 import os
 import time
+import warnings
 
 from celery import shared_task
 from celery.utils.log import get_task_logger
+from flwr.client import start_client  # type: ignore
 from typing import NoReturn
 
 from aica_django.connectors.GraphDatabase import AicaNeo4j
+from aica_django.microagents.AICAFlowerClient import AICAFlowerClient
+
+
+warnings.filterwarnings("ignore", category=UserWarning)
 
 logger = get_task_logger(__name__)
+
+client = AICAFlowerClient()
 
 
 @shared_task(name="online-learning-trainer")
@@ -38,18 +40,18 @@ def periodic_trainer(period_seconds: int = 300) -> NoReturn:
         RETURN n2.graph_embedding AS embedding, "Not Suspicious Traffic" AS category"""
 
     while True:
-        # Fetch data from Neo4j
         bad_traffic, _, _ = graph_db.graph.execute_query(bad_traffic_query)
         good_traffic, _, _ = graph_db.graph.execute_query(good_traffic_query)
 
-        # Update local model
-        logger.info("Local model updating not yet implemented")
-        # TODO
+        client.load_data(good_traffic, bad_traffic, test_size=0.0)
 
-        # Exchange parameters with global model server
+        client.train()
+
         if global_model_server:
-            logger.info("Federation not yet implemented")
-            # TODO
+            start_client(
+                server_address=global_model_server,
+                client=client,
+            )
         else:
             logger.warning("No global model server IP provided")
 
