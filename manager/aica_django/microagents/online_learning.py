@@ -2,12 +2,6 @@
 This microagent is responsible for pulling in any external data relevant to decision-
 making by the agent and loading/sending it to the knowledge base microagent during
 runtime.
-
-This should eventually include:
-* World Description
-* Competence
-* Purpose
-* Behavior
 """
 from celery.utils.log import get_task_logger
 import argparse
@@ -224,8 +218,90 @@ app = ClientApp(
 # Legacy mode
 if __name__ == "__main__":
     from flwr.client import start_client
+    client=FlowerClient().to_client()
 
     start_client(
         server_address="127.0.0.1:8080",
-        client=FlowerClient().to_client(),
+        client=client,
     )
+
+import os
+import time
+
+from celery import shared_task
+from celery.utils.log import get_task_logger
+import argparse
+from aica_django.connectors.GraphDatabase import AicaNeo4j
+
+from collections import OrderedDict
+from flwr.client import NumPyClient, ClientApp
+from io import StringIO
+import numpy as np
+
+from scipy.io import mmread
+from sklearn import model_selection
+from sklearn.preprocessing import label_binarize
+
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+from torch.utils.data import DataLoader
+from tqdm import tqdm
+import warnings
+
+from typing import NoReturn
+
+from aica_django.connectors.GraphDatabase import AicaNeo4j
+
+logger = get_task_logger(__name__)
+
+
+@shared_task(name="online-learning-trainer")
+def periodic_trainer(period_seconds: int = 300) -> NoReturn:
+    global_model_server = os.environ.get("AICA_MODEL_SERVER", None)
+    graph_db = AicaNeo4j()
+
+    bad_traffic_query = f"""
+    MATCH (n:`network-traffic`)<-[:object]-(:`observed-data`)-[:sighting_of]->(:indicator)-[:indicates]->(m:`attack-pattern`)
+        WHERE n.graph_embedding IS NOT NULL 
+            AND n.last_merge >= (timestamp() / 1000) - {period_seconds}
+        RETURN n.graph_embedding AS embedding, m.name AS category"""
+
+    good_traffic_query = f"""
+    MATCH (n:`network-traffic`)<-[:object]-(:`observed-data`)-[:sighting_of]->(:indicator)-[:indicates]->(m:`attack-pattern`)
+        WHERE n.graph_embedding IS NOT NULL 
+            AND n.last_merge >= (timestamp() / 1000) - {period_seconds}
+        WITH COLLECT(DISTINCT n) AS all_connected_to_m
+        MATCH (n2:`network-traffic`)
+            WHERE NOT n2 IN all_connected_to_m
+                AND n2.graph_embedding IS NOT NULL
+        RETURN n2.graph_embedding AS embedding, "Not Suspicious Traffic" AS category"""
+
+    while True:
+        # Fetch data from Neo4j
+        bad_traffic, _, _ = graph_db.graph.execute_query(bad_traffic_query)
+        good_traffic, _, _ = graph_db.graph.execute_query(good_traffic_query)
+        trainloader, testloader = load_data()
+
+        # Update local model
+        logger.info("Local model updating not yet implemented")
+        # TODO
+        # client.fit(trainloader) training local and not communicating with the server right now
+        # Exchange parameters with global model server
+        if global_model_server:
+            logger.info("Federation not yet implemented")
+            # TODO
+            #start_client()
+        else:
+            logger.warning("No global model server IP provided")
+
+        time.sleep(period_seconds)
+
+
+@shared_task(name="online-learning-predictor")
+def periodic_predictor(period_seconds: int = 300) -> NoReturn:
+    while True:
+        logger.info("Predictor not yet implemented")
+        # TODO
+
+        time.sleep(period_seconds)

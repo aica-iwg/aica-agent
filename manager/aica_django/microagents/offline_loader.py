@@ -40,6 +40,7 @@ from aica_django.connectors.IntrusionDetection import poll_suricata_alerts
 from aica_django.connectors.Netflow import network_flow_capture
 from aica_django.connectors.NetworkScan import periodic_network_scan
 from aica_django.connectors.WAF import poll_waf_alerts
+from aica_django.microagents.online_learning import periodic_predictor, periodic_trainer
 from aica_django.microagents.util import (
     create_malware_categories,
     create_port_info,
@@ -139,6 +140,12 @@ def initialize(**kwargs: Dict[Any, Any]) -> None:
     # Start the Netflow graph pruner in background
     prune_netflow_data.apply_async()
 
+    # Start periodic training task
+    periodic_trainer.apply_async(kwargs={"period_seconds": 300})
+
+    # Start periodic prediction task
+    periodic_predictor.apply_async(kwargs={"period_seconds": 300})
+
     # Replay DNP3 files if requested
     if getattr(settings, "REPLAY_PCAP", None):
         pcap_files = list(glob.glob("pcaps/*/DNP3 PCAP Files/*.pcap"))
@@ -151,3 +158,4 @@ def initialize(**kwargs: Dict[Any, Any]) -> None:
                     kwargs={"pcap_file": pcap_file, "sample": 0.1, "sample_min": 1000},
                     queue="pcap_replay",
                 )
+
