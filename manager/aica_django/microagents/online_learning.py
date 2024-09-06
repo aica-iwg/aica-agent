@@ -34,12 +34,13 @@ def periodic_trainer(period_seconds: int = 300) -> NoReturn:
         WITH COLLECT(DISTINCT n) AS all_connected_to_m
         MATCH (n2:`network-traffic`)
             WHERE NOT n2 IN all_connected_to_m
+                AND n2.graph_embedding IS NOT NULL
         RETURN n2.graph_embedding AS embedding, "Not Suspicious Traffic" AS category"""
 
     while True:
         # Fetch data from Neo4j
-        bad_traffic, _, _ = graph_db.graph.execute_query(bad_traffic_query) 
-        good_traffic, _, _ = graph_db.graph.execute_query(good_traffic_query) 
+        bad_traffic, _, _ = graph_db.graph.execute_query(bad_traffic_query)
+        good_traffic, _, _ = graph_db.graph.execute_query(good_traffic_query)
 
         # Update local model
         logger.info("Local model updating not yet implemented")
