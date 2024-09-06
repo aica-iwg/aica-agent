@@ -9,9 +9,10 @@ This should eventually include:
 * Purpose
 * Behavior
 """
-from aica_django.connectors.GraphDatabase import AicaNeo4j
-import argparse
 from celery.utils.log import get_task_logger
+import argparse
+from aica_django.connectors.GraphDatabase import AicaNeo4j
+
 from collections import OrderedDict
 from flwr.client import NumPyClient, ClientApp
 from io import StringIO
@@ -138,16 +139,6 @@ def test(model, testloader):
     return loss, accuracy
 
 
-def load_model_params(model, model_path = None):
-    """
-    Pytorch model parameters will be called here!
-    """
-    if model_path != None:
-        model.load_state_dict(torch.load(model_path))
-        print("Model pre-loaded!")
-    return model
-
-
 def load_data(batch_size=32, labels_list = total_suricata_categories) -> torch.Tensor:
     """
     Load cypher queries and get data from neo4j to run the model!
@@ -196,9 +187,7 @@ partition_id = parser.parse_known_args()[0].partition_id
 
 # Load model and data 
 aica_model = AICAMLP(in_dim=128, hidden_dim=[128, 128], out_dim=len(total_suricata_categories)).to(device=device)
-#aica_model = load_model_params(model=aica_model)
 trainloader, testloader = load_data()
-
 
 # Define Flower client
 class FlowerClient(NumPyClient):
