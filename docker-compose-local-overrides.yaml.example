@@ -11,10 +11,3 @@
 #      environment:
 #        # Change this to your local network 
 #        HOME_NET: "10.0.0.0/24"
-
-networks:
-  tap_net:
-    driver: macvlan
-    driver_opts:
-      # Change this to the interface you want to capture traffic from (e.g., IDS, Netflow, DNP3)
-      parent: eth0
