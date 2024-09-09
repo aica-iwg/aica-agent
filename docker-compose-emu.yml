@@ -10,11 +10,6 @@ services:
     depends_on:
       siem:
         condition: service_healthy
-    networks:
-      # Docker brings interfaces up in alphabetical order (except internal, which are last)
-      # but this or "tap_net" (in virt mode) should both come up as eth1
-      target:
-        ipv4_address: 10.107.100.150
 
   siem:
     networks:
