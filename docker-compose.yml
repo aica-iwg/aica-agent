@@ -36,11 +36,7 @@ services:
       - manager/.env
     volumes:
       - pg_data:/var/lib/postgresql/data
-    ports:
-      - 5432:5432
-    networks:
-      control:
-        ipv4_address: 10.107.50.200
+    network_mode: "host"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 10s
@@ -54,11 +50,7 @@ services:
     restart: unless-stopped
     volumes:
       - ./manager_mq/enabled_plugins:/etc/rabbitmq/enabled_plugins
-    ports:
-      - 5672:5672
-    networks:
-      control:
-        ipv4_address: 10.107.50.210
+    network_mode: "host"
     healthcheck:
       test: ["CMD-SHELL", "rabbitmq-diagnostics -q ping"]
       interval: 10s
@@ -76,9 +68,7 @@ services:
       - mongo_data:/data/db
     ports:
       - 27017:27017
-    networks:
-      control:
-        ipv4_address: 10.107.50.220
+    network_mode: "host"
     healthcheck:
       test: ["CMD-SHELL", "mongosh --quiet --eval 'db.runCommand({ping: 1})'"]
       interval: 10s
@@ -102,13 +92,7 @@ services:
     volumes:
       - neo_data:/var/lib/neo4j/data
       - graphml_share:/graph_data
-    ports:
-      - "7474:7474"  # Neo4j web GUI
-      - "7687:7687"  # Neo4j API port (needed for web GUI)
-    networks:
-      bridge:
-      control:
-        ipv4_address: 10.107.50.230
+    network_mode: "host"
     healthcheck:
       test: ["CMD-SHELL", "wget http://localhost:7474/"]
       interval: 10s
@@ -129,11 +113,7 @@ services:
       discovery.type: "single-node"
       xpack.security.enabled: true
       ES_JAVA_OPTS: "-Xms512m -Xmx512m"
-    ports:
-      - 9200:9200
-    networks:
-      control:
-        ipv4_address: 10.107.50.240
+    network_mode: "host"
     volumes:
       - es_data:/usr/share/elasticsearch/data
     ulimits:
@@ -163,11 +143,7 @@ services:
         condition: service_healthy
       elasticsearch:
         condition: service_healthy
-    ports:
-      - 9000:9000
-    networks:
-      control:
-        ipv4_address: 10.107.50.250
+    network_mode: "host"
     healthcheck:
       test: ["CMD-SHELL", "wget http://localhost:9000"]
       interval: 10s
@@ -180,14 +156,3 @@ volumes:
   es_data:
   neo_data:
   graphml_share:
-
-networks:
-  bridge:
-  control:
-    internal: true
-    ipam:
-      driver: default
-      config:
-        - subnet: 10.107.50.0/24
-          ip_range: 10.107.50.128/25
-          gateway: 10.107.50.1
