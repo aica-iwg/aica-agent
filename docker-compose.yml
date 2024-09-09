@@ -168,8 +168,6 @@ services:
     networks:
       control:
         ipv4_address: 10.107.50.250
-    ports:
-      - "9000:9000"  # Graylog web GUI
     healthcheck:
       test: ["CMD-SHELL", "wget http://localhost:9000"]
       interval: 10s
