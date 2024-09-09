@@ -11,7 +11,7 @@ from sklearn import model_selection  # type: ignore
 from sklearn.preprocessing import label_binarize  # type: ignore
 from torch.utils.data import DataLoader  # type: ignore
 from tqdm import tqdm
-from typing import Any, List, Dict, Optional, Tuple
+from typing import Any, List, Dict, Optional, Sized, Tuple
 
 from aica_django.connectors.GraphDatabase import AicaNeo4j
 from aica_django.microagents.AICANet import AICANet
@@ -67,8 +67,24 @@ total_suricata_categories = [
 logger = get_task_logger(__name__)
 
 
+class AICADataset(torch.utils.data.Dataset[Any], Sized):  # type: ignore
+    def __init__(
+        self, data_list: List[Tuple[npt.NDArray[np.float32], npt.NDArray[Any]]]
+    ) -> None:
+        super().__init__()
+        self.data_list = data_list
+
+    def __len__(self) -> int:
+        return len(self.data_list)
+
+    def __getitem__(self, idx: int) -> Tuple[npt.NDArray[Any], npt.NDArray[Any]]:
+        return self.data_list[idx]
+
+
 class AICAFlowerClient(NumPyClient):  # type: ignore
     def __init__(self, in_dim: int = 128, hidden_dim: int = 128) -> None:
+        super().__init__()
+
         if torch.cuda.is_available():
             self.device = torch.device("cuda")
         else:
@@ -80,7 +96,6 @@ class AICAFlowerClient(NumPyClient):  # type: ignore
             out_dim=len(total_suricata_categories),
         ).to(device=self.device)
         self.graph_obj = AicaNeo4j()
-        super().__init__()
 
     def get_parameters(
         self, config: Optional[Dict[str, Any]] = None
@@ -99,7 +114,7 @@ class AICAFlowerClient(NumPyClient):  # type: ignore
     ) -> tuple[List[npt.NDArray[np.float64]], int, dict[Any, Any]]:
         self.set_parameters(parameters)
         self.train(epochs=1)
-        return self.get_parameters(), len(self.training_data_loader.dataset), {}
+        return self.get_parameters(), len(self.training_dataset), {}
 
     def evaluate(
         self,
@@ -108,13 +123,18 @@ class AICAFlowerClient(NumPyClient):  # type: ignore
     ) -> Tuple[float, int, Dict[str, float]]:
         self.set_parameters(parameters)
         loss, accuracy = self.test()
-        return loss, len(self.validation_data_loader.dataset), {"accuracy": accuracy}
+        return loss, len(self.validation_dataset), {"accuracy": accuracy}
 
     def train(self, epochs: int = 10, lr: float = 0.001, verbose: bool = False) -> None:
+        if not self.training_data_loader:
+            logger.warning("No training data, cannot train")
+            return
+
         """Train the model on the training set."""
         criterion = torch.nn.CrossEntropyLoss()
         optimizer = torch.optim.SGD(self.aica_model.parameters(), lr=lr)
         self.aica_model.train()
+
         for epoch in range(epochs):
             correct = 0
             total = 0
@@ -148,11 +168,16 @@ class AICAFlowerClient(NumPyClient):  # type: ignore
                 )
 
     def test(self) -> Tuple[float, float]:
+        if not self.validation_data_loader:
+            logger.warning("No validation data, cannot test")
+            return np.nan, np.nan
+
         """Validate the model on the test set."""
         criterion = torch.nn.CrossEntropyLoss()
         self.aica_model.eval()
         correct = 0
         loss = 0.0
+
         with torch.no_grad():
             for X_batch, y_batch in tqdm(self.validation_data_loader, "Testing"):
                 emb = X_batch.to(self.device)
@@ -174,9 +199,15 @@ class AICAFlowerClient(NumPyClient):  # type: ignore
         batch_size: int = 32,
         labels_list: List[str] = total_suricata_categories,
         test_size: float = 0.2,
-    ) -> torch.Tensor:
+    ) -> None:
         # Combine lists to form single dataset of features and labels
         data_list = good_data + bad_data
+
+        if len(data_list) == 0:
+            logger.warning("Returning without any data to train on")
+            self.training_data_loader = None
+            self.validation_data_loader = None
+            raise ValueError("Not training data")
 
         # Iterate through single list to get embeddings and labels
         embeds = []
@@ -192,12 +223,17 @@ class AICAFlowerClient(NumPyClient):  # type: ignore
             test_size=test_size,
         )
 
-        # Create DataLoader object which loads in training and testing data for pytorch
+        self.training_dataset = AICADataset(
+            list(zip(X_train.astype(np.float32).tolist(), y_train))
+        )
         self.training_data_loader = DataLoader(
-            list(zip(X_train.astype(np.float32).tolist(), y_train)),
+            self.training_dataset,
             batch_size=batch_size,
         )
+        self.validation_dataset = AICADataset(
+            [x for x in zip(X_test.astype(np.float32).tolist(), y_test)]
+        )
         self.validation_data_loader = DataLoader(
-            list(zip(X_test.astype(np.float32).tolist(), y_test)),
+            self.validation_dataset,
             batch_size=batch_size,
         )

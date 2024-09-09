@@ -20,6 +20,7 @@ services:
     command: sh /usr/local/bin/docker_entrypoint.sh
     cap_add:
       - NET_ADMIN
+      - NET_RAW
     environment:
       SURICATA_IF: "eth0"
       # This has to go here pending resolution of https://github.com/docker/compose/issues/11404
