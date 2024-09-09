@@ -43,17 +43,20 @@ def periodic_trainer(period_seconds: int = 300) -> NoReturn:
         bad_traffic, _, _ = graph_db.graph.execute_query(bad_traffic_query)
         good_traffic, _, _ = graph_db.graph.execute_query(good_traffic_query)
 
-        client.load_data(good_traffic, bad_traffic, test_size=0.0)
+        try:
+            client.load_data(good_traffic, bad_traffic, test_size=0.0)
 
-        client.train()
+            client.train()
 
-        if global_model_server:
-            start_client(
-                server_address=global_model_server,
-                client=client,
-            )
-        else:
-            logger.warning("No global model server IP provided")
+            if global_model_server:
+                start_client(
+                    server_address=global_model_server,
+                    client=client,
+                )
+            else:
+                logger.warning("No global model server IP provided")
+        except ValueError as e:
+            logger.warning(e)
 
         time.sleep(period_seconds)
 
