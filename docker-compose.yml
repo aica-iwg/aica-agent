@@ -5,12 +5,9 @@ services:
     build: manager
     platform: linux/amd64
     container_name: manager
-    restart: on-failure:2  # unless-stopped
+    restart: unless-stopped 
     env_file:
       - manager/.env
-    ports:
-      - "8000:8000"  # Django frontend
-      - "5555:5555"  # Celery Flower
     depends_on:
       manager_mq:
         condition: service_healthy
@@ -24,11 +21,8 @@ services:
       - graphml_share:/graph_data
       # For testing
       - ./pcaps:/usr/src/app/pcaps
-    networks:
-      bridge:
-      control:
-        ipv4_address: 10.107.50.150
     # For PCAPs
+    network_mode: "host"
     cap_add:
       - NET_ADMIN
       - NET_RAW
@@ -42,6 +36,8 @@ services:
       - manager/.env
     volumes:
       - pg_data:/var/lib/postgresql/data
+    ports:
+      - 5432:5432
     networks:
       control:
         ipv4_address: 10.107.50.200
@@ -58,6 +54,8 @@ services:
     restart: unless-stopped
     volumes:
       - ./manager_mq/enabled_plugins:/etc/rabbitmq/enabled_plugins
+    ports:
+      - 5672:5672
     networks:
       control:
         ipv4_address: 10.107.50.210
@@ -76,6 +74,8 @@ services:
       - manager/.env
     volumes:
       - mongo_data:/data/db
+    ports:
+      - 27017:27017
     networks:
       control:
         ipv4_address: 10.107.50.220
@@ -129,6 +129,8 @@ services:
       discovery.type: "single-node"
       xpack.security.enabled: true
       ES_JAVA_OPTS: "-Xms512m -Xmx512m"
+    ports:
+      - 9200:9200
     networks:
       control:
         ipv4_address: 10.107.50.240
@@ -161,6 +163,8 @@ services:
         condition: service_healthy
       elasticsearch:
         condition: service_healthy
+    ports:
+      - 9000:9000
     networks:
       control:
         ipv4_address: 10.107.50.250
