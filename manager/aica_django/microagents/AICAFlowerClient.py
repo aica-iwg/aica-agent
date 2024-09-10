@@ -224,14 +224,14 @@ class AICAFlowerClient(NumPyClient):  # type: ignore
         )
 
         self.training_dataset = AICADataset(
-            list(zip(X_train.astype(np.float32), y_train.astype(np.long)))
+            list(zip(X_train.astype(np.float32), y_train.astype(np.int32)))
         )
         self.training_data_loader = DataLoader(
             self.training_dataset,
             batch_size=batch_size,
         )
         self.validation_dataset = AICADataset(
-            list(zip(X_test.astype(np.float32), y_test.astype(np.long)))
+            list(zip(X_test.astype(np.float32), y_test.astype(np.int32)))
         )
         self.validation_data_loader = DataLoader(
             self.validation_dataset,
