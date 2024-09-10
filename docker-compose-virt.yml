@@ -7,7 +7,7 @@ services:
       TAP_IF: "ens160"
       # This has to go here pending resolution of https://github.com/docker/compose/issues/11404
       HOME_NET: "10.1.200.0/24"
-      AICA_MODEL_SERVER: "127.0.0.1:8080"
+      AICA_MODEL_SERVER: "10.1.200.104:8080"
 
   ids:
     build: ./ids
