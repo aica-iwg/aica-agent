@@ -148,7 +148,7 @@ class AICAFlowerClient(NumPyClient):  # type: ignore
                 )
                 optimizer.zero_grad()
                 outputs = self.aica_model(train_data)
-                loss = criterion(outputs, train_labels.type(torch.FloatTensor))
+                loss = criterion(outputs, train_labels.type(torch.LongTensor))
                 loss.backward()
                 optimizer.step()
 
@@ -160,7 +160,7 @@ class AICAFlowerClient(NumPyClient):  # type: ignore
                     .sum()
                     .item()
                 )
-            epoch_loss /= len(self.training_data_loader.dataset)
+            epoch_loss /= len(self.training_dataset)
             epoch_acc = correct / total
             if verbose:
                 logger.info(
@@ -183,13 +183,13 @@ class AICAFlowerClient(NumPyClient):  # type: ignore
                 emb = X_batch.to(self.device)
                 labels = y_batch.to(self.device)
                 outputs = self.aica_model(emb)
-                loss += criterion(outputs, labels.type(torch.FloatTensor)).item()
+                loss += criterion(outputs, labels.type(torch.LongTensor)).item()
                 correct += (
                     (torch.max(outputs.data, 1)[1] == torch.max(labels, 1)[1])
                     .sum()
                     .item()
                 )
-        accuracy = correct / len(self.validation_data_loader.dataset)
+        accuracy = correct / len(self.validation_dataset)
         return loss, accuracy
 
     def load_data(
@@ -207,7 +207,7 @@ class AICAFlowerClient(NumPyClient):  # type: ignore
             logger.warning("Returning without any data to train on")
             self.training_data_loader = None
             self.validation_data_loader = None
-            raise ValueError("Not training data")
+            raise ValueError("No training data")
 
         # Iterate through single list to get embeddings and labels
         embeds = []
@@ -217,6 +217,7 @@ class AICAFlowerClient(NumPyClient):  # type: ignore
             labels.append(node[1])
 
         total_labels = label_binarize(labels, classes=labels_list)
+        total_labels = np.argmax(total_labels, axis=1)
         X_train, X_test, y_train, y_test = model_selection.train_test_split(
             np.array(embeds),
             total_labels,
@@ -224,14 +225,14 @@ class AICAFlowerClient(NumPyClient):  # type: ignore
         )
 
         self.training_dataset = AICADataset(
-            list(zip(X_train.astype(np.float32).tolist(), y_train))
+            list(zip(X_train.astype(np.float32), y_train.astype(np.int32)))
         )
         self.training_data_loader = DataLoader(
             self.training_dataset,
             batch_size=batch_size,
         )
         self.validation_dataset = AICADataset(
-            [x for x in zip(X_test.astype(np.float32).tolist(), y_test)]
+            list(zip(X_test.astype(np.float32), y_test.astype(np.int32)))
         )
         self.validation_data_loader = DataLoader(
             self.validation_dataset,
