@@ -66,8 +66,6 @@ services:
       - manager/.env
     volumes:
       - mongo_data:/data/db
-    ports:
-      - 27017:27017
     network_mode: "host"
     healthcheck:
       test: ["CMD-SHELL", "mongosh --quiet --eval 'db.runCommand({ping: 1})'"]
