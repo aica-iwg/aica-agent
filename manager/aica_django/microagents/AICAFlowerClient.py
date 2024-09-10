@@ -207,7 +207,7 @@ class AICAFlowerClient(NumPyClient):  # type: ignore
             logger.warning("Returning without any data to train on")
             self.training_data_loader = None
             self.validation_data_loader = None
-            raise ValueError("Not training data")
+            raise ValueError("No training data")
 
         # Iterate through single list to get embeddings and labels
         embeds = []
