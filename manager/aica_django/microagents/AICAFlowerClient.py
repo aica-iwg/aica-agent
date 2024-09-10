@@ -148,7 +148,6 @@ class AICAFlowerClient(NumPyClient):  # type: ignore
                 )
                 optimizer.zero_grad()
                 outputs = self.aica_model(train_data)
-                outputs = np.argmax(outputs, axis=1)
                 loss = criterion(outputs, train_labels.type(torch.LongTensor))
                 loss.backward()
                 optimizer.step()
@@ -218,7 +217,6 @@ class AICAFlowerClient(NumPyClient):  # type: ignore
             labels.append(node[1])
 
         total_labels = label_binarize(labels, classes=labels_list)
-        total_labels = np.argmax(total_labels, axis=1)
         X_train, X_test, y_train, y_test = model_selection.train_test_split(
             np.array(embeds),
             total_labels,
