@@ -10,16 +10,6 @@ services:
     depends_on:
       siem:
         condition: service_healthy
-    networks:
-      # Docker brings interfaces up in alphabetical order (except internal, which are last)
-      # but this or "tap_net" (in virt mode) should both come up as eth1
-      target:
-        ipv4_address: 10.107.100.150
-
-  siem:
-    networks:
-      target:
-        ipv4_address: 10.107.100.250
 
   ids:
     build: ./ids
@@ -31,8 +21,7 @@ services:
     environment:
       # Manager/Target host IP only
       SURICATA_IF: "eth0"
-      HOME_NET: "10.107.100.150/32,10.107.100.170/32"
-    network_mode: service:target
+      HOME_NET: "127.0.0.0/8"
 
   attacker:
     build: attacker
@@ -43,9 +32,7 @@ services:
     command: /usr/local/bin/docker_entrypoint.sh
     cap_add:
       - NET_ADMIN  # For nmap, etc
-    networks:
-      target:
-        ipv4_address: 10.107.100.180
+    network_mode: "host"
     depends_on:
       - target
 
@@ -59,9 +46,7 @@ services:
     cap_add:
       - NET_ADMIN  # For iptables/ipset
       - SYS_ADMIN  # For ClamAV on-access scanning (fanotify)
-    networks:
-      target:
-        ipv4_address: 10.107.100.170
+    network_mode: "host"
     healthcheck:
       test: ["CMD-SHELL", "ls /tmp | grep eicar"]
       interval: 10s
@@ -80,16 +65,4 @@ services:
     command: bash -c "/usr/local/bin/_entrypoint.sh && /opt/conda/bin/opencanaryd --dev"
     volumes:
       - ./honeypot/opencanary.conf:/etc/opencanaryd/opencanary.conf
-    networks:
-      target:
-        ipv4_address: 10.107.100.190
-
-networks:
-  target:
-    internal: true
-    ipam:
-      driver: default
-      config:
-        - subnet: 10.107.100.0/24
-          ip_range: 10.107.100.128/25
-          gateway: 10.107.100.1
+    network_mode: "host"
