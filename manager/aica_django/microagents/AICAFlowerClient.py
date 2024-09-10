@@ -148,7 +148,7 @@ class AICAFlowerClient(NumPyClient):  # type: ignore
                 )
                 optimizer.zero_grad()
                 outputs = self.aica_model(train_data)
-                loss = criterion(outputs, train_labels.type(torch.FloatTensor))
+                loss = criterion(outputs, train_labels.type(torch.LongTensor))
                 loss.backward()
                 optimizer.step()
 
@@ -183,7 +183,7 @@ class AICAFlowerClient(NumPyClient):  # type: ignore
                 emb = X_batch.to(self.device)
                 labels = y_batch.to(self.device)
                 outputs = self.aica_model(emb)
-                loss += criterion(outputs, labels.type(torch.FloatTensor)).item()
+                loss += criterion(outputs, labels.type(torch.LongTensor)).item()
                 correct += (
                     (torch.max(outputs.data, 1)[1] == torch.max(labels, 1)[1])
                     .sum()
