@@ -160,7 +160,7 @@ class AICAFlowerClient(NumPyClient):  # type: ignore
                     .sum()
                     .item()
                 )
-            epoch_loss /= len(self.training_data_loader.dataset)
+            epoch_loss /= len(self.training_dataset)
             epoch_acc = correct / total
             if verbose:
                 logger.info(
@@ -189,7 +189,7 @@ class AICAFlowerClient(NumPyClient):  # type: ignore
                     .sum()
                     .item()
                 )
-        accuracy = correct / len(self.validation_data_loader.dataset)
+        accuracy = correct / len(self.validation_dataset)
         return loss, accuracy
 
     def load_data(
@@ -223,16 +223,12 @@ class AICAFlowerClient(NumPyClient):  # type: ignore
             test_size=test_size,
         )
 
-        self.training_dataset = AICADataset(
-            list(zip(X_train.astype(np.float32).tolist(), y_train))
-        )
+        self.training_dataset = AICADataset(list(zip(X_train, y_train)))
         self.training_data_loader = DataLoader(
             self.training_dataset,
             batch_size=batch_size,
         )
-        self.validation_dataset = AICADataset(
-            [x for x in zip(X_test.astype(np.float32).tolist(), y_test)]
-        )
+        self.validation_dataset = AICADataset(list(zip(X_test, y_test)))
         self.validation_data_loader = DataLoader(
             self.validation_dataset,
             batch_size=batch_size,

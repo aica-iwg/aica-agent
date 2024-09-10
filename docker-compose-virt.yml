@@ -4,9 +4,9 @@ services:
   manager:
     environment:
       MODE: "virt"
-      TAP_IF: "eth1"
+      TAP_IF: "ens160"
       # This has to go here pending resolution of https://github.com/docker/compose/issues/11404
-      HOME_NET: "146.137.56.0/24"
+      HOME_NET: "10.1.200.0/24"
       AICA_MODEL_SERVER: "127.0.0.1:8080"
 
   ids:
@@ -18,9 +18,9 @@ services:
       - NET_ADMIN
       - NET_RAW
     environment:
-      SURICATA_IF: "eth0"
+      SURICATA_IF: "ens160"
       # This has to go here pending resolution of https://github.com/docker/compose/issues/11404
-      HOME_NET: "146.137.56.0/24"
+      HOME_NET: "10.1.200.0/24"
     network_mode: "host"
 
 include:
