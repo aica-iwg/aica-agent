@@ -8,7 +8,7 @@ from flwr.client import NumPyClient  # type: ignore
 from io import StringIO
 from scipy.io import mmread  # type: ignore
 from sklearn import model_selection  # type: ignore
-from sklearn.preprocessing import label_binarize  # type: ignore
+from sklearn.preprocessing import LabelEncoder # type: ignore
 from torch.utils.data import DataLoader  # type: ignore
 from tqdm import tqdm
 from typing import Any, List, Dict, Optional, Sized, Tuple
@@ -216,7 +216,10 @@ class AICAFlowerClient(NumPyClient):  # type: ignore
             embeds.append(mmread(StringIO(node[0])))
             labels.append(node[1])
 
-        total_labels = label_binarize(labels, classes=labels_list)
+        label_encoder = LabelEncoder()
+        label_encoder.fit(total_suricata_categories)
+        total_labels = label_encoder.transform(labels)
+
         X_train, X_test, y_train, y_test = model_selection.train_test_split(
             np.array(embeds),
             total_labels,
