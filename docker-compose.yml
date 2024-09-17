@@ -99,8 +99,6 @@ services:
       timeout: 10s
       retries: 10
 
-<<<<<<< Updated upstream
-=======
   ids:
     build: ./ids
     platform: linux/amd64
@@ -113,7 +111,6 @@ services:
       - NET_RAW
     network_mode: "host"
   
->>>>>>> Stashed changes
   elasticsearch:
     build: elasticsearch
     platform: linux/amd64
