@@ -89,11 +89,6 @@ services:
       apoc.export.file.enabled: true
       apoc.import.file.enabled: true
       apoc.import.file.use_neo4j_config: false
-<<<<<<< Updated upstream
-    env_file:
-      - manager/.env
-=======
->>>>>>> Stashed changes
     volumes:
       - neo_data:/var/lib/neo4j/data
       - graphml_share:/graph_data
