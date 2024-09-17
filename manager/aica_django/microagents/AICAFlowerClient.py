@@ -8,7 +8,7 @@ from flwr.client import NumPyClient  # type: ignore
 from io import StringIO
 from scipy.io import mmread  # type: ignore
 from sklearn import model_selection  # type: ignore
-from sklearn.preprocessing import LabelEncoder # type: ignore
+from sklearn.preprocessing import LabelEncoder  # type: ignore
 from torch.utils.data import DataLoader  # type: ignore
 from tqdm import tqdm
 from typing import Any, List, Dict, Optional, Sized, Tuple
