@@ -144,7 +144,7 @@ services:
     network_mode: "host"
     healthcheck:
       test: ["CMD-SHELL", "wget http://localhost:9000"]
-      interval: 10s
+      interval: 20s
       timeout: 10s
       retries: 5
 
