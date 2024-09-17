@@ -5,7 +5,7 @@ services:
     environment:
       MODE: "emu"
       TAP_IF: "eth1"
-      HOME_NET: "10.107.100.0/24"
+      HOME_NET: "127.0.0.0/8"
     # For Testing, ensure these containers start with manager
     depends_on:
       siem:
@@ -41,8 +41,6 @@ services:
     platform: linux/amd64
     container_name: target
     command: /usr/local/bin/docker_entrypoint.sh
-    sysctls:
-      - net.ipv4.conf.all.forwarding=1
     cap_add:
       - NET_ADMIN  # For iptables/ipset
       - SYS_ADMIN  # For ClamAV on-access scanning (fanotify)
@@ -52,9 +50,6 @@ services:
       interval: 10s
       timeout: 10s
       retries: 5
-    ports:
-      - "80:80"
-      - "81:81"
     depends_on:
       - honeypot
 
