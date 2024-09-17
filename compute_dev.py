@@ -23,7 +23,7 @@ def dev_corrections(pipDict: dict) -> None:
                 
 
 def main() -> None:
-    for reqLoc in ["attacker", "honeypot", "manager"]:
+    for reqLoc in ["manager"]:
         with open(reqLoc + "/environment-"+ reqLoc + ".yml", "r") as baseEnvFp:
             handle : dict = yaml.load(baseEnvFp, yaml.Loader)
             handle["name"] = reqLoc + "-dev"
