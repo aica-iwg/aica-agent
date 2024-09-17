@@ -135,7 +135,7 @@ def initialize(**kwargs: Dict[Any, Any]) -> None:
     poll_waf_alerts.apply_async()
 
     # Start the DNP3 capture in background
-    capture_dnp3.apply_async(kwargs={"interface": os.getenv("TAP_IF")})
+    capture_dnp3.apply_async(kwargs={"interface": os.getenv("SURICATA_IF")})
 
     # Start the Netflow graph pruner in background
     prune_netflow_data.apply_async()

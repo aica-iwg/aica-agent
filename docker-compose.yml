@@ -7,7 +7,7 @@ services:
     container_name: manager
     restart: unless-stopped
     env_file:
-      - manager/.env
+      - .env
     depends_on:
       manager_mq:
         condition: service_healthy
@@ -33,7 +33,7 @@ services:
     container_name: manager_db
     restart: unless-stopped
     env_file:
-      - manager/.env
+      - .env
     volumes:
       - pg_data:/var/lib/postgresql/data
     network_mode: "host"
@@ -63,13 +63,13 @@ services:
     container_name: manager_mongodb
     restart: unless-stopped
     env_file:
-      - manager/.env
+      - .env
     volumes:
       - mongo_data:/data/db
     network_mode: "host"
     healthcheck:
       test: ["CMD-SHELL", "mongosh --quiet --eval 'db.runCommand({ping: 1})'"]
-      interval: 10s
+      interval: 20s
       timeout: 10s
       retries: 5
 
@@ -86,7 +86,7 @@ services:
       apoc.import.file.enabled: true
       apoc.import.file.use_neo4j_config: false
     env_file:
-      - manager/.env
+      - .env
     volumes:
       - neo_data:/var/lib/neo4j/data
       - graphml_share:/graph_data
@@ -97,6 +97,18 @@ services:
       timeout: 10s
       retries: 10
 
+  ids:
+    build: ./ids
+    platform: linux/amd64
+    container_name: ids
+    command: sh /usr/local/bin/docker_entrypoint.sh
+    env_file:
+      - .env
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    network_mode: "host"
+  
   elasticsearch:
     build: elasticsearch
     platform: linux/amd64
@@ -104,7 +116,7 @@ services:
     # Required so that ES generates an acceptable SAN in its HTTPS Cert
     hostname: "elasticsearch"
     env_file:
-      - manager/.env
+      - .env
     environment:
       node.name: "elasticsearch"
       cluster.name: "aica"
@@ -124,8 +136,8 @@ services:
           memory: 1g
     healthcheck:
       test: ["CMD-SHELL",
-             "curl --insecure -u elastic:$${ELASTIC_PASSWORD} -s -X GET 'http://localhost:9200/_cluster/health?pretty'
-             | grep '\"status\" : \"green\"'"]
+              "curl --insecure -u elastic:$${ELASTIC_PASSWORD} -s -X GET 'http://localhost:9200/_cluster/health?pretty'
+              | grep '\"status\" : \"green\"'"]
       interval: 10s
       timeout: 30s
       retries: 20
@@ -135,7 +147,7 @@ services:
     platform: linux/amd64
     container_name: siem
     env_file:
-      manager/.env
+      - .env
     depends_on:
       manager_mongodb:
         condition: service_healthy
@@ -147,6 +159,9 @@ services:
       interval: 20s
       timeout: 10s
       retries: 5
+
+networks:
+  frontend:
 
 volumes:
   mongo_data:
