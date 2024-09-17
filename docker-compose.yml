@@ -5,7 +5,7 @@ services:
     build: manager
     platform: linux/amd64
     container_name: manager
-    restart: unless-stopped 
+    restart: unless-stopped
     env_file:
       - manager/.env
     depends_on:
