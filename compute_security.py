@@ -43,7 +43,7 @@ def transcribe(envLoc: str, envName: str):
                     computedDevReqs.write(line + "\n")
 
 def main() -> None:
-    envList = [[a+"/",a] for a in ["attacker", "honeypot", "manager"]]
+    envList = [[a+"/",a] for a in ["manager"]]
     envList.append(["","core"])
 
     for r in envList:

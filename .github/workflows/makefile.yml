@@ -21,7 +21,7 @@ jobs:
       - uses: mamba-org/setup-micromamba@v1.9.0
 
       - name: Set up environment
-        run: echo $ENV_FILE | base64 --decode > manager/.env
+        run: echo $ENV_FILE | base64 -i --decode > .env
 
       - name: Build and check base environment
         run: make init-core-env && make lint && make security-precheck
