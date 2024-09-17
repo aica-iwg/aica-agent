@@ -11,22 +11,8 @@ This project will build on the ideas of the AICA framework as outlined in [Thero
 3. Install micromamba from [https://mamba.readthedocs.io/en/latest/installation/micromamba-installation.html](), and let it update your PATH. You may need to relog after this step. 
 4. Ensure `make` is installed, for example in Ubuntu this is part of the `build-essentials` package you can install with apt.
 5. Clone this repo, and open in IDE of your choice (ensure .gitignore is updated as necessary)
-6. Copy `manager/.env.sample` to `manager/.env` and make any necessary changes. Notably, all of the "<FILLME>" passwords should be set to something unique. The GRAYLOG_ROOT_PASSWORD_SHA2 value should be generated like `echo 'SOMEPASSWORD' | sha256sum`, or an equivalent generate of SHA256 hashes. Make sure this is done before you run `make start` for the first time. If these are changed, a `make rebuild_purge` or `make stop_purge; make start` will be required.
-7. Set the MODE variable like `export MODE=emu` (for Bash, other shells may vary).
+6. Copy `.env.sample` to `.env` and make any necessary changes. Notably, all of the "<FILLME>" passwords should be set to something unique. The GRAYLOG_ROOT_PASSWORD_SHA2 value should be generated like `echo 'SOMEPASSWORD' | sha256sum`, or an equivalent generate of SHA256 hashes. Make sure this is done before you run `make start` for the first time. If these are changed, a `make rebuild_purge` or `make stop_purge; make start` will be required.
 8. You can now run `make deps` to build your development environment, then `make build` to build the Docker containers, and `make start` to launch AICA. See more below.
-
-## Setting up Host Environment (Windows)
-
-1. Install git from [https://git-scm.com/download/win](); use Unix-style line endings.
-2. Install Docker from [https://www.docker.com/products/docker-desktop](); a reboot will be required. 
-3. Add Docker to System Path ([instructions](https://learn.microsoft.com/en-us/previous-versions/office/developer/sharepoint-2010/ee537574(v=office.14))): `C:\Program Files\Docker\Docker\resources\bin`
-4. Install micromamba from [https://mamba.readthedocs.io/en/latest/installation/micromamba-installation.html](), and let it update your PATH. You may need to relog after this step. 
-5. Install Make from [https://gnuwin32.sourceforge.net/packages/make.htm](); yes this is from 2006
-6. Add Make to System Path: `C:\Program Files (x86)\GnuWin32\bin`
-7. Clone this repo, and open in IDE of your choice (ensure .gitignore is updated as necessary)
-8. Copy `manager/.env.sample` to `manager/.env` and make any necessary changes
-9. In Powershell, set the MODE variable like: `$env:MODE = 'emu'`
-10. You can now run `make deps` to build your development environment, `make build` to build the Docker containers, and `make start` to launch AICA. See more below.
 
 ## Building, Testing, and Sharing Changes
 
@@ -40,11 +26,7 @@ Once you have a passing build, you should commit your changes to a branch with a
 
 ## Running
 
-This code should be run via the Makefile. You will need to specify whether you want to start this in emulation mode or virtualized mode with the MODE environment variable (i.e., MODE should be either `emu` or `virt`). If using "virt" mode, which is intended for live usage capturing from a real network outside the Docker environment, you much copy the docker-compose-local-overrides.yaml.example file to docker-compose-local-overrides.yaml and modify as appropriate. 
-
-When starting from scratch, run the following: `make build && make start`. Subsequently, use `make stop` and `make start` (or `make restart`) to stop/start the containers and `make build` to build them again (`make rebuild` is a handy alias for stop/build/start). You can use `make clean` to clean up all container- and code-related files. 
-
-Once you have started the agent, you can use the various `make <system>-shell` commands (e.g., `make attacker-shell`) to open shells on various containers. You might wish, for example, to start a shell on the attacker and nmap the `target` host. 
+This code should be run via the Makefile. When starting from scratch, run the following: `make build && make start`. Subsequently, use `make stop` and `make start` (or `make restart`) to stop/start the containers and `make build` to build them again (`make rebuild` is a handy alias for stop/build/start). You can use `make clean` to clean up all container- and code-related files. 
 
 You can view logs from the Dockerized containers with `make logs`. This will show all containers, so you might wish to pipe this to `grep`/`egrep` to include/exclude containers by name as desired. For example: `make logs | egrep ^(manager\b|manager_graphdb)`.
 
@@ -62,10 +44,10 @@ The AICA agent is built as a Django project, and so the normal Django convention
 
 * `Makefile` is the primary entry point for this code. It should include test entrypoints as well as entrypoints.
 * `.dockerignore` tells Docker what <em>not</em> to copy into container contexts
-* `environment.yml` contains Conda environment specification for build/test. 
 * `.gitignore` tells git which files to never check into the repository.
 * `.yamllint` configures the YAML lint that runs at build/test time
-* `docker-compose.yml`  is the YAML file instructing docker-compose how to create the necessary containers and networks for the agent. The additional `docker-compose-emu.yml` and `docker-compose-virt.yml` have addition definitions intended for those modes only and are additionally invoked in the `Makefile` based on the MODE environmental variable.
+* `docker-compose.yml`  is the YAML file instructing docker-compose how to create the necessary containers and networks for the agent.
+* `environment-core.yml` contains Conda environment specification for build/test. 
 
 ## Maintainers
 
