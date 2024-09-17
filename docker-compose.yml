@@ -108,7 +108,7 @@ services:
       - NET_ADMIN
       - NET_RAW
     network_mode: "host"
-  
+
   elasticsearch:
     build: elasticsearch
     platform: linux/amd64
@@ -136,8 +136,8 @@ services:
           memory: 1g
     healthcheck:
       test: ["CMD-SHELL",
-              "curl --insecure -u elastic:$${ELASTIC_PASSWORD} -s -X GET 'http://localhost:9200/_cluster/health?pretty'
-              | grep '\"status\" : \"green\"'"]
+             "curl --insecure -u elastic:$${ELASTIC_PASSWORD} -s -X GET 'http://localhost:9200/_cluster/health?pretty'
+             | grep '\"status\" : \"green\"'"]
       interval: 10s
       timeout: 30s
       retries: 20
