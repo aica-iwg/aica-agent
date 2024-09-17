@@ -59,7 +59,7 @@ RUN apt-get -y remove \
     apt-get -y autoremove && \
     apt-get -y clean
 
-COPY supervisor.conf /etc/supervisor/conf.d/
+COPY supervisor-aica.conf /etc/supervisor/conf.d/
 
 RUN mkdir -p /root/.ssh
 COPY manager_key.priv /root/.ssh/id_rsa

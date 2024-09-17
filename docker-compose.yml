@@ -48,6 +48,8 @@ services:
     platform: linux/amd64
     container_name: manager_mq
     restart: unless-stopped
+    env_file:
+      - .env
     volumes:
       - ./manager_mq/enabled_plugins:/etc/rabbitmq/enabled_plugins
     network_mode: "host"
@@ -78,6 +80,8 @@ services:
     platform: linux/amd64
     container_name: manager_graphdb
     restart: unless-stopped
+    env_file:
+      - .env
     environment:
       # https://neo4j.com/docs/operations-manual/current/docker/ref-settings/
       NEO4J_dbms_security_procedures_unrestricted: "apoc.*,gds.*"
@@ -85,8 +89,11 @@ services:
       apoc.export.file.enabled: true
       apoc.import.file.enabled: true
       apoc.import.file.use_neo4j_config: false
+<<<<<<< Updated upstream
     env_file:
       - manager/.env
+=======
+>>>>>>> Stashed changes
     volumes:
       - neo_data:/var/lib/neo4j/data
       - graphml_share:/graph_data
@@ -97,6 +104,21 @@ services:
       timeout: 10s
       retries: 10
 
+<<<<<<< Updated upstream
+=======
+  ids:
+    build: ./ids
+    platform: linux/amd64
+    container_name: ids
+    command: sh /usr/local/bin/docker_entrypoint.sh
+    env_file:
+      - .env
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    network_mode: "host"
+  
+>>>>>>> Stashed changes
   elasticsearch:
     build: elasticsearch
     platform: linux/amd64
@@ -124,8 +146,8 @@ services:
           memory: 1g
     healthcheck:
       test: ["CMD-SHELL",
-             "curl --insecure -u elastic:$${ELASTIC_PASSWORD} -s -X GET 'http://localhost:9200/_cluster/health?pretty'
-             | grep '\"status\" : \"green\"'"]
+              "curl --insecure -u elastic:$${ELASTIC_PASSWORD} -s -X GET 'http://localhost:9200/_cluster/health?pretty'
+              | grep '\"status\" : \"green\"'"]
       interval: 10s
       timeout: 30s
       retries: 20
