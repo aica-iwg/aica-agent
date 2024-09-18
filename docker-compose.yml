@@ -2,7 +2,10 @@
 
 services:
   manager:
-    build: manager
+    build:
+      context: manager
+      additional_contexts:
+        common: common
     platform: linux/amd64
     container_name: manager
     restart: unless-stopped
@@ -111,56 +114,42 @@ services:
       - NET_RAW
     network_mode: "host"
 
-  elasticsearch:
-    build: elasticsearch
+  opensearch:
+    build:
+      context: opensearch
+      additional_contexts:
+        common: common
     platform: linux/amd64
-    container_name: elasticsearch
+    container_name: opensearch
     # Required so that ES generates an acceptable SAN in its HTTPS Cert
-    hostname: "elasticsearch"
+    hostname: "opensearch"
     env_file:
       - .env
     environment:
-      node.name: "elasticsearch"
+      node.name: "opensearch"
       cluster.name: "aica"
       discovery.type: "single-node"
-      xpack.security.enabled: true
-      ES_JAVA_OPTS: "-Xms512m -Xmx512m"
+      OPENSEARCH_JAVA_OPTS: "-Xms512m -Xmx512m"
+      DISABLE_INSTALL_DEMO_CONFIG: true
     network_mode: "host"
     volumes:
-      - es_data:/usr/share/elasticsearch/data
-    ulimits:
-      memlock:
-        soft: -1
-        hard: -1
-    deploy:
-      resources:
-        limits:
-          memory: 1g
-    healthcheck:
-      test: ["CMD-SHELL",
-             "curl --insecure -u elastic:$${ELASTIC_PASSWORD} -s -X GET 'http://localhost:9200/_cluster/health?pretty'
-             | grep '\"status\" : \"green\"'"]
-      interval: 10s
-      timeout: 30s
-      retries: 20
+      - opensearch_data:/usr/share/opensearch/data
 
-  siem:
-    build: siem
+  opensearch_dashboards:
+    build:
+      context: opensearch_dashboards
+      additional_contexts:
+        common: common
     platform: linux/amd64
-    container_name: siem
+    hostname: "opensearch_dashboards"
+    depends_on:
+      - opensearch
+    restart: unless-stopped
     env_file:
       - .env
-    depends_on:
-      manager_mongodb:
-        condition: service_healthy
-      elasticsearch:
-        condition: service_healthy
+    volumes:
+      - opensearch_dashboards_data:/usr/share/opensearch-dashboards/data
     network_mode: "host"
-    healthcheck:
-      test: ["CMD-SHELL", "wget http://localhost:9000"]
-      interval: 20s
-      timeout: 10s
-      retries: 5
 
 networks:
   frontend:
@@ -168,6 +157,7 @@ networks:
 volumes:
   mongo_data:
   pg_data:
-  es_data:
+  opensearch_data:
+  opensearch_dashboards_data:
   neo_data:
   graphml_share:

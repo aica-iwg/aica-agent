@@ -19,7 +19,7 @@ from celery.app import shared_task
 from celery.utils.log import get_task_logger
 from typing import Any, Dict, List, Union
 
-from aica_django.connectors.SIEM import Graylog
+from aica_django.connectors.SIEM import SIEM
 
 logger = get_task_logger(__name__)
 
@@ -83,26 +83,24 @@ def poll_clamav_alerts(frequency: int = 30, single: bool = False) -> None:
 
     logger.info(f"Running {__name__}: poll_dbs")
 
-    gl = Graylog("antivirus")
+    siem = SIEM()
 
     while True:
-        to_time = datetime.datetime.now()
-        from_time = to_time - datetime.timedelta(seconds=frequency)
+        to_time = int(datetime.datetime.now().timestamp())
+        from_time = to_time - frequency
 
-        query_params: Dict[str, Union[str, int, List[str]]] = {
-            "query": r"clamav\: AND FOUND",  # Required
-            "from": from_time.strftime("%Y-%m-%d %H:%M:%S"),  # Required
-            "to": to_time.strftime("%Y-%m-%d %H:%M:%S"),  # Required
-            "fields": "message, gl2_remote_ip",  # Required
-            "limit": 150,  # Optional: Default limit is 150 in Graylog
-        }
-
-        response = gl.query_graylog(query_params)
+        query_str = r"clamav\: FOUND"  # Required
+        response = siem.query_siem(
+            queries={"_all": query_str},
+            from_timestamp=from_time,
+            to_timestamp=to_time,
+        )
 
         try:
             response.raise_for_status()
             if response.json()["total_results"] > 0:
-                for message in response.json()["messages"]:
+                for message in response.json()["hits"]["hits"]:
+                    message = json.loads(message["_source"]["event"]["original"])
                     event = {
                         "message": message["message"]["message"],
                         "source_ip": message["message"]["gl2_remote_ip"],
@@ -124,5 +122,5 @@ def poll_clamav_alerts(frequency: int = 30, single: bool = False) -> None:
         if single:
             break
 
-        execution_time = (to_time - datetime.datetime.now()).total_seconds()
+        execution_time = to_time - int(datetime.datetime.now().timestamp())
         time.sleep(frequency - execution_time)

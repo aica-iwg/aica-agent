@@ -1,13 +1,15 @@
 #!/bin/sh
 
-# Start Syslog
-syslog-ng
-
 # Switch home net as required
 sed -i "s#HOME_NET: \"\[\]\"#HOME_NET: \"\[${HOME_NET}]\"#" /etc/suricata/suricata.yaml
 
-# Start netflow exporter
+# Start Netflow exporter
 fprobe -fip -i ${SURICATA_IF} localhost:2055
 
 # Start Suricata
-suricata -i ${SURICATA_IF}
+suricata -D -i ${SURICATA_IF}
+
+# Start Logstash to Forward Suricata Logs to Opensearch
+logstash/bin/logstash -f /logstash/logstash.conf
+
+tail -f /dev/null

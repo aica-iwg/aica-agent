@@ -46,7 +46,7 @@ outputs:
 
   - eve-log:
       enabled: true
-      filetype: regular
+      type: file
       filename: eve.json
       pcap-file: false
       community-id: false

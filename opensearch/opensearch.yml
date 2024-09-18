@@ -1,0 +1,16 @@
+---
+network.host: 127.0.0.1
+plugins.security.ssl.http.enabled: true
+plugins.security.ssl.transport.pemcert_filepath: aica-node.crt
+plugins.security.ssl.transport.pemkey_filepath: aica-node.key
+plugins.security.ssl.transport.pemtrustedcas_filepath: rootCA.crt
+plugins.security.ssl.http.pemcert_filepath: aica-node.crt
+plugins.security.ssl.http.pemkey_filepath: aica-node.key
+plugins.security.ssl.http.pemtrustedcas_filepath: rootCA.crt
+plugins.security.authcz.admin_dn:
+  - CN=aica-admin,OU=S3,O=Argonne,L=Chicago,ST=Illinois,C=US
+plugins.security.nodes_dn:
+  - CN=aica-node,OU=S3,O=Argonne,L=Chicago,ST=Illinois,C=US
+plugins.security.restapi.roles_enabled: ["all_access", "security_rest_api_access"]
+
+plugins.security.audit.type: internal_opensearch

@@ -1,0 +1,26 @@
+---
+# ALLCAPS values in this file get replaced by the docker_entrypoint-local.sh script on startup
+
+_meta:
+  type: "internalusers"
+  config_version: 2
+
+admin:
+  hash: "OS_ADMIN_PASSWORD"
+  reserved: true
+  opendistro_security_roles:
+    - "all_access"
+
+OS_DASHBOARD_USER:
+  hash: "OS_DASHBOARD_PASSWORD"
+  reserved: true
+  opendistro_security_roles:
+    - "readall"
+    - "kibana_user"
+
+# kibana server user must be "kibanaserver"
+kibanaserver:
+  hash: "OS_DASHBOARD_SERVER_PASSWORD"
+  reserved: true
+  opendistro_security_roles:
+    - "kibana_server"

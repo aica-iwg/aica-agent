@@ -43,19 +43,26 @@ lint:
 		@${MAMBA_RUN} mypy --install-types --warn-unreachable --strict --non-interactive --exclude test manager/
 
 build:
+		@sh create_certs.sh
 		@docker compose build 
 
-tests:
-		@docker compose up --wait -d && \
-			docker exec -e SKIP_TASKS=true \
+start:
+		@docker compose up --wait -d
+		@echo Waiting 30 seconds for OpenSearch to start...
+		@sleep 30
+		@docker compose exec opensearch bash -c "/usr/share/opensearch/plugins/opensearch-security/tools/securityadmin.sh -icl -nhnv \
+		-cacert /usr/share/opensearch/config/rootCA.crt \
+		-cert /usr/share/opensearch/config/aica-admin.crt \
+		-key /usr/share/opensearch/config/aica-admin.key \
+		--configdir /usr/share/opensearch/plugins/opensearch-security/securityconfig"
+
+tests: start
+		@docker exec -e SKIP_TASKS=true \
 			manager /bin/bash -c " \
 				/usr/src/app/bin/micromamba run -n base coverage run --omit='*test*' manage.py test --noinput && \
 				/usr/src/app/bin/micromamba run -n base coverage report --fail-under=30"
 
 test: tests security-post-launch-check
-
-start:
-		@docker compose up --wait -d
 
 stop:
 		@docker compose down --remove-orphans
@@ -72,5 +79,6 @@ restart: stop start
 logs:
 		@docker compose logs -f
 
-clean:
+clean: stop_purge
 		@docker compose down -v --rmi all --remove-orphans
+		@rm -f */*.crt */*.key */*.csr */*.srl

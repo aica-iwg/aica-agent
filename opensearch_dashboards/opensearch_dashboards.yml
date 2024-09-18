@@ -1,0 +1,23 @@
+---
+# ALLCAPS values in this file get replaced by the docker_entrypoint-local.sh script on startup
+
+server.host: "127.0.0.1"
+
+server.ssl.enabled: true
+server.ssl.certificate: /usr/share/opensearch-dashboards/config/aica-dashboard.crt
+server.ssl.key: /usr/share/opensearch-dashboards/config/aica-dashboard.key
+
+opensearch.ssl.verificationMode: full
+opensearch.ssl.certificateAuthorities: ["/usr/share/opensearch-dashboards/config/rootCA.crt"]
+
+opensearch.hosts: ["https://localhost:9200"]
+# kibana server user must be "kibanaserver"
+opensearch.username: "kibanaserver"
+opensearch.password: "OS_DASHBOARD_SERVER_PASSWORD"
+
+opensearch_security.cookie.secure: true
+opensearch_security.multitenancy.enabled: true
+opensearch_security.multitenancy.tenants.enable_global: true
+opensearch_security.multitenancy.tenants.enable_private: true
+opensearch_security.multitenancy.tenants.preferred: ["Private", "Global"]
+opensearch_security.multitenancy.enable_filter: false

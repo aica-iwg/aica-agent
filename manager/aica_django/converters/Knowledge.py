@@ -16,7 +16,9 @@ Functions:
 
 import dateparser
 import datetime
+import diskcache as dc  # type: ignore
 import ipaddress
+import json
 import pytz
 import re2 as re  # type: ignore
 
@@ -61,6 +63,8 @@ from aica_django.converters.AICAStix import (
 logger = get_task_logger(__name__)
 
 graph = AicaNeo4j()
+
+whois_cache = dc.Cache("aica_whois")
 
 # https://www.iana.org/assignments/protocol-numbers/protocol-numbers.xhtml
 ip_protos = {
@@ -311,8 +315,14 @@ def get_ip_context(ip_addr: Union[IPv4Address, IPv6Address]) -> List[_STIXBase]:
     asn = None
 
     if not any([is_private, is_multicast, is_reserved, is_loopback, is_link_local]):
-        whois_obj = IPWhois(ip_string)
-        whois_data = whois_obj.lookup_rdap(depth=1)
+        whois_data = whois_cache.get(str.encode(ip_string))
+        if whois_data:
+            whois_data = json.loads(whois_data)
+        else:
+            whois_obj = IPWhois(ip_string)
+            whois_data = whois_obj.lookup_rdap(depth=1)
+            whois_cache.set(str.encode(ip_string), json.dumps(whois_data))
+
         cidr_kwargs: Dict[str, Dict[str, Any]] = {"custom_properties": dict()}
 
         if whois_data["asn"]:
@@ -604,66 +614,6 @@ def nginx_accesslog_to_knowledge(
     return knowledge_nodes
 
 
-def caddy_accesslog_to_knowledge(log_dict: Dict[str, Any]) -> List[_STIXBase]:
-    """
-    Converts an HTTP access log dictionary (as returned by aica_django.connectors.CaddyServer.poll_caddy_accesslogs)
-    to knowledge objects.
-
-    @param log_dict: An HTTP access log dictionary to be converted to knowledge objects
-    @type log_dict: Dict[str, Any]
-    @return: Knowledge nodes resulting from this conversion
-    @rtype: list
-    """
-
-    knowledge_nodes = []
-
-    # dateparser can't seem to handle this format
-    request_time = datetime.datetime.fromtimestamp(log_dict["ts"])
-
-    if not request_time:
-        raise ValueError(f"Couldn't parse timestamp {log_dict['ts']}")
-
-    if type(ipaddress.ip_address(log_dict["src_ip"])) is ipaddress.IPv4Address:
-        protocols = ["ipv4", "tcp", "http"]
-        src_addr = IPv4Address(value=log_dict["src_ip"])
-        knowledge_nodes.extend(get_ip_context(src_addr))
-
-        dest_addr = IPv4Address(value=log_dict["dst_ip"])
-        knowledge_nodes.extend(get_ip_context(dest_addr))
-    else:
-        protocols = ["ipv6", "tcp", "http"]
-        src_addr = IPv6Address(value=log_dict["src_ip"])
-        knowledge_nodes.extend(get_ip_context(src_addr))
-
-        dest_addr = IPv6Address(value=log_dict["dst_ip"])
-        knowledge_nodes.extend(get_ip_context(dest_addr))
-
-    http_req_ext = HTTPRequestExt(
-        request_method=log_dict["request"]["method"],
-        request_value=log_dict["url"],
-        request_header={
-            "User-Agent": log_dict["request"]["headers"]["User-Agent"],
-            "Referer": log_dict["request"]["headers"]["Referer"],
-        },
-    )
-
-    traffic = AICANetworkTraffic(
-        protocols=protocols,
-        start=request_time,
-        src_ref=src_addr,
-        dst_ref=dest_addr,
-        dst_byte_count=log_dict["request"]["host"] + log_dict["uri"],
-        extensions={"http-request-ext": http_req_ext},
-        custom_properties={
-            "caddy_id": log_dict["id"],
-            "http_response_status": log_dict["status"],
-        },
-    )
-    knowledge_nodes.append(traffic)
-
-    return knowledge_nodes
-
-
 def nmap_scan_to_knowledge(scan_results: Dict[str, Any]) -> List[_STIXBase]:
     """
     Converts an nmap scan result (from the Python nmap3 library) to knowledge objects.
@@ -926,66 +876,6 @@ def clamav_alert_to_knowledge(alert: Dict[str, Any]) -> List[_STIXBase]:
         object_refs=[file],
     )
     knowledge_nodes.append(observation)
-
-    return knowledge_nodes
-
-
-def waf_alert_to_knowledge(alert: Dict[str, Any]) -> List[_STIXBase]:
-    """
-    Converts an waf alert (as returned from aica_django.connectors.WAF.poll_waf_alerts)
-    to knowledge objects.
-
-    @param alert: A dictionary as returned by poll_waf_alerts to be converted to knowledge objects
-    @type alert: Dict[str, Any]
-    @return: Knowledge nodes resulting from this conversion
-    @rtype: list
-    """
-
-    knowledge_nodes = []
-
-    alert_dt = datetime.datetime.fromtimestamp(alert["ts"])
-
-    try:
-        alert_name = f"owasp_crs:{alert['id']}/{alert['rev']}"
-    except:
-        logger.warning(f"Skipping alert with no ID: {alert}")
-        return []
-
-    alert_indicator = AICAIndicator(
-        name=alert_name,
-        description=alert["data"],
-        pattern="Not specified",
-        pattern_type="owasp_crs",
-        valid_from=alert_dt,
-    )
-    knowledge_nodes.append(alert_indicator)
-
-    for tag in alert["tags"]:
-        ap_id = get_attack_pattern(tag)
-        ap_rel = Relationship(alert_indicator, "indicates", ap_id)
-        knowledge_nodes.append(ap_rel)
-
-    # Make Cypher query and return node that contains the correct unique ID
-    http_req_nodes = graph.graph.run(
-        f"MATCH (n:NetworkTraffic) WHERE n.caddy_id = \"{alert['unique_id']}\" RETURN n"
-    )
-    http_req = NetworkTraffic(id=list(http_req_nodes)[0].id)
-
-    observation = ObservedData(
-        first_observed=alert_dt,
-        last_observed=alert_dt,
-        number_observed=1,
-        object_refs=[http_req] if len(http_req_nodes) > 0 else [],
-    )
-
-    sighting = Sighting(
-        description="waf_alert",
-        last_seen=alert_dt,
-        count=1,
-        observed_data_refs=[observation],
-        sighting_of_ref=alert_indicator,
-    )
-    knowledge_nodes.append(sighting)
 
     return knowledge_nodes
 
