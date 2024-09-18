@@ -8,13 +8,7 @@ init-core-env:
 		@${MAMBA_RUN} python3 compute_dev.py
 
 init-dev-envs:
-<<<<<<< HEAD
-		@${MAMBA_EXE} create -f attacker/environment.yml -y
-		@${MAMBA_EXE} create -f honeypot/environment.yml -y
-		@${MAMBA_EXE} create -f manager/environment.yml -y   
-=======
 		@${MAMBA_EXE} create -f manager/environment.yml -y
->>>>>>> main
 
 security-precheck-init:
 		@${MAMBA_EXE} create -f environment-security.yml -y

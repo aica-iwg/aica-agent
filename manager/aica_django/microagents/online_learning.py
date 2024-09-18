@@ -71,8 +71,3 @@ def periodic_predictor(period_seconds: int = 300) -> NoReturn:
         # TODO
 
         time.sleep(period_seconds)
-
-
-# Legacy mode
-if __name__ == "__main__":
-    periodic_trainer()
