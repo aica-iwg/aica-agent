@@ -31,12 +31,6 @@ jobs:
       - name: CI-Specific optimization (Purge Cache)
         run: pip cache purge && micromamba clean -a
 
-      - name: CI-Specific optimization (Lower SIEM message journal max size)
-        run: echo "RUN sed -i 's/#message_journal_max_size = 5gb/message_journal_max_size = 500mb/' /usr/share/graylog/data/config/graylog.conf" >> siem/Dockerfile
-
-      - name: Generate SSL Certs
-        run: make ssl
-
       - name: Build Containers
         run: make build
 
