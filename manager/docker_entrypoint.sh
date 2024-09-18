@@ -12,6 +12,10 @@ cat <<EOF > /etc/supervisor/conf.d/0_env.conf
 [supervisord]
 environment=
   MODE="${MODE}",
+  CELERY_HOST="${CELERY_HOST}",
+  CELERY_PORT="${CELERY_PORT}",
+  CELERY_USER="${CELERY_USER}",
+  CELERY_PASSWORD="${CELERY_PASSWORD}",
   MONGO_SERVER="${MONGO_SERVER}",
   MONGO_SERVER_PORT="${MONGO_SERVER_PORT}",
   MONGO_INITDB_DATABASE="${MONGO_INITDB_DATABASE}",
@@ -21,7 +25,7 @@ environment=
   HOME_NET="${HOME_NET}"
 EOF
 
-service supervisor start
+/usr/bin/supervisord -c /etc/supervisor/supervisord.conf
 
 # Tell Celery to not run tasks on the following manage.py invocations
 export SKIP_TASKS=true

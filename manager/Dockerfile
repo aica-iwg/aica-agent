@@ -1,4 +1,4 @@
-FROM --platform=linux/amd64 ubuntu:22.04
+FROM ubuntu:22.04
 
 ENV PYTHONDONTWRITEBYTECODE 1
 ENV PYTHONIOENCODING UTF-8
@@ -59,13 +59,9 @@ RUN apt-get -y remove \
     apt-get -y autoremove && \
     apt-get -y clean
 
-COPY supervisor.conf /etc/supervisor/conf.d/
+COPY supervisor-aica.conf /etc/supervisor/conf.d/
 
-RUN mkdir -p /root/.ssh
-COPY manager_key.priv /root/.ssh/id_rsa
-RUN chown -R root:root /root/.ssh
-RUN chmod 700 /root/.ssh
-RUN chmod 600 /root/.ssh/id_rsa
+COPY --from=common rootCA.crt /usr/src/app/
 
 # copy project
 COPY . .

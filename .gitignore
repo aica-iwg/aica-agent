@@ -1,3 +1,7 @@
+*.crt
+*.csr
+*.key
+*.srl
 */environment.yml
 */reqs*
 .DS_Store
@@ -17,4 +21,3 @@ enviroment.yml
 pcaps/
 reqs*
 venv
-/scratchwork
