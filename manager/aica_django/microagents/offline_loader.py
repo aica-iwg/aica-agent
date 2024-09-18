@@ -27,7 +27,6 @@ from celery.utils.log import get_task_logger
 from typing import Any, Dict
 
 from aica_django.connectors.Antivirus import poll_clamav_alerts
-from aica_django.connectors.CaddyServer import poll_caddy_accesslogs
 from aica_django.connectors.DNP3 import capture_dnp3, replay_dnp3_pcap
 from aica_django.connectors.DocumentDatabase import AicaMongo
 from aica_django.connectors.GraphDatabase import (
@@ -38,7 +37,6 @@ from aica_django.connectors.HTTPServer import poll_nginx_accesslogs
 from aica_django.connectors.IntrusionDetection import poll_suricata_alerts
 from aica_django.connectors.Netflow import network_flow_capture
 from aica_django.connectors.NetworkScan import periodic_network_scan
-from aica_django.connectors.WAF import poll_waf_alerts
 from aica_django.microagents.online_learning import periodic_predictor, periodic_trainer
 from aica_django.microagents.util import (
     create_malware_categories,
@@ -122,17 +120,11 @@ def initialize(**kwargs: Dict[Any, Any]) -> None:
     # Start polling for Nginx access logs
     poll_nginx_accesslogs.apply_async()
 
-    # Start polling for Caddy access logs
-    poll_caddy_accesslogs.apply_async()
-
     # Start polling for IDS alerts in background
     poll_suricata_alerts.apply_async()
 
     # Start polling for AV alerts in background
     poll_clamav_alerts.apply_async()
-
-    # Start polling for WAF alerts in background
-    poll_waf_alerts.apply_async()
 
     # Start the DNP3 capture in background
     capture_dnp3.apply_async(kwargs={"interface": os.getenv("SURICATA_IF")})

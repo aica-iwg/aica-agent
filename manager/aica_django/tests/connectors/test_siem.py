@@ -2,8 +2,5 @@
 #
 #
 # class TestSiem(TestCase):
-#     def test_make_graylog_request(self):
-#         self.fail()
-#
-#     def test_query_graylog(self):
+#     def test_query_siem(self):
 #         self.fail()

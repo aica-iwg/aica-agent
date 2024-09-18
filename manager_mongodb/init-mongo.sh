@@ -19,13 +19,3 @@ db.createUser(
     }
 )
 EOF
-
-mongosh $MONGO_GRAYLOG_DATABASE << EOF
-db.createUser(
-    {
-        user: "$MONGO_GRAYLOG_USER",
-        pwd: "$MONGO_GRAYLOG_PASS",
-        roles: [ { role: "readWrite", db: "$MONGO_GRAYLOG_DATABASE" } ]
-    }
-)
-EOF
