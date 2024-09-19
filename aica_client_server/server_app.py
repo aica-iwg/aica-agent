@@ -40,8 +40,8 @@ def main() -> None:
     # Start Flower server for 10 rounds of federated learning
     fl.server.start_server(
         server_address="127.0.0.1:8080",
-        config=fl.server.ServerConfig(num_rounds=5),
-        strategy=dp_strategy,
+        config=fl.server.ServerConfig(num_rounds=2),
+        strategy=strategy,
     )
 
 def fit_config(server_round: int):
