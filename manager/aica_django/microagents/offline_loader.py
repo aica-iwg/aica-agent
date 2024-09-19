@@ -128,10 +128,7 @@ def initialize(**kwargs: Dict[Any, Any]) -> None:
     poll_clamav_alerts.apply_async()
 
     # Start the DNP3 capture in background
-<<<<<<< HEAD
-=======
     capture_dnp3.apply_async(kwargs={"interface": os.getenv("SURICATA_IF")})
->>>>>>> main
 
     # Start the Netflow graph pruner in background
     prune_netflow_data.apply_async()
