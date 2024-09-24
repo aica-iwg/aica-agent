@@ -113,7 +113,7 @@ class AICAFlowerClient(NumPyClient):  # type: ignore
         config: Optional[Dict[str, Any]] = None,
     ) -> tuple[List[npt.NDArray[np.float64]], int, dict[Any, Any]]:
         self.set_parameters(parameters)
-        self.train(epochs=1)
+        self.train(epochs=1, verbose=True)
         return self.get_parameters(), len(self.training_dataset), {}
 
     def evaluate(
@@ -217,7 +217,7 @@ class AICAFlowerClient(NumPyClient):  # type: ignore
             labels.append(node[1])
 
         label_encoder = LabelEncoder()
-        label_encoder.fit(total_suricata_categories)
+        label_encoder.fit(labels_list)
         total_labels = label_encoder.transform(labels)
 
         embed_arr = np.array(embeds)
