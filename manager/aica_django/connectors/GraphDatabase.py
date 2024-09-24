@@ -22,11 +22,19 @@ import torch.nn.functional as F  # type: ignore
 import torch_geometric.data  # type: ignore
 import torch_geometric.utils  # type: ignore
 
+
 from asyncio import AbstractEventLoop
 from celery import current_app
 from celery.utils.log import get_task_logger
+import datetime
+import hashlib
+import inspect
 from io import BytesIO
 from neo4j import GraphDatabase  # type: ignore
+import networkx as nx
+import numpy as np
+import os
+import re2 as re
 from scipy.io import mmwrite  # type: ignore
 from sklearn.feature_extraction.text import HashingVectorizer  # type: ignore
 from stix2.base import _STIXBase  # type: ignore
@@ -35,6 +43,7 @@ from torch_geometric.data import Data
 from torch_geometric.nn import SAGEConv  # type: ignore
 from typing import Any, Dict, List, Optional, Tuple, Union
 from urllib.parse import quote_plus
+
 
 logger = get_task_logger(__name__)
 
@@ -209,7 +218,6 @@ def run_graphsage(
 
 def update_graph(emb: np.typing.NDArray[np.float64], node_ids: List[str]) -> None:
     logger.info(f"Updating knowledge graph")
-
     graph_obj = AicaNeo4j()
     for i in range(emb.shape[0]):
         if "network-traffic" in node_ids[i]:
@@ -221,7 +229,6 @@ def update_graph(emb: np.typing.NDArray[np.float64], node_ids: List[str]) -> Non
                 + f" SET n.graph_embedding = '{graph_emb}' "
             )
             graph_obj.graph.execute_query(query)
-
     logger.info("Knowledge graph updated.")
 
 

@@ -113,7 +113,7 @@ class AICAFlowerClient(NumPyClient):  # type: ignore
         config: Optional[Dict[str, Any]] = None,
     ) -> tuple[List[npt.NDArray[np.float64]], int, dict[Any, Any]]:
         self.set_parameters(parameters)
-        self.train(epochs=1)
+        self.train(epochs=1, verbose=True)
         return self.get_parameters(), len(self.training_dataset), {}
 
     def evaluate(
@@ -156,7 +156,7 @@ class AICAFlowerClient(NumPyClient):  # type: ignore
                 epoch_loss += loss
                 total += train_labels.size(0)
                 correct += (
-                    (torch.max(outputs.data, 1)[1] == torch.max(train_labels, 1)[1])
+                    (torch.max(outputs.data, 0)[1] == torch.max(train_labels, 0)[1])
                     .sum()
                     .item()
                 )
@@ -185,7 +185,7 @@ class AICAFlowerClient(NumPyClient):  # type: ignore
                 outputs = self.aica_model(emb)
                 loss += criterion(outputs, labels.type(torch.LongTensor)).item()
                 correct += (
-                    (torch.max(outputs.data, 1)[1] == torch.max(labels, 1)[1])
+                    (torch.max(outputs.data, 0)[1] == torch.max(labels, 0)[1])
                     .sum()
                     .item()
                 )
@@ -217,11 +217,14 @@ class AICAFlowerClient(NumPyClient):  # type: ignore
             labels.append(node[1])
 
         label_encoder = LabelEncoder()
-        label_encoder.fit(total_suricata_categories)
+        label_encoder.fit(labels_list)
         total_labels = label_encoder.transform(labels)
 
+        embed_arr = np.array(embeds)
+        embed_arr = np.reshape(embed_arr, (len(embed_arr), embed_arr.shape[2]))
+
         X_train, X_test, y_train, y_test = model_selection.train_test_split(
-            np.array(embeds),
+            embed_arr,
             total_labels,
             test_size=test_size,
         )
