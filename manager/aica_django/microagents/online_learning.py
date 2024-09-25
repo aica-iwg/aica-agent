@@ -48,7 +48,6 @@ def periodic_trainer(period_seconds: int = 300) -> NoReturn:
         logger.info(f"Bad traffic length {len(bad_traffic)}")
         logger.info(f"Good traffic length {len(good_traffic)}")
 
-
         try:
             client.load_data(good_traffic, bad_traffic, test_size=0.2)
 
