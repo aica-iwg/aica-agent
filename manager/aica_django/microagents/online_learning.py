@@ -56,7 +56,7 @@ def periodic_trainer(period_seconds: int = 300) -> NoReturn:
             if global_model_server:
                 start_client(
                     server_address=global_model_server,
-                    client=client,
+                    client=client.to_client(),
                 )
             else:
                 logger.warning("No global model server IP provided")
