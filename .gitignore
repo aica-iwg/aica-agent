@@ -15,7 +15,8 @@ __pycache__
 aica-manager/
 coverage.xml
 db.sqlite3
-/scratchwork
+scratchwork/
+aica_client_server/
 docker-compose-local-overrides.yaml
 enviroment.yml
 pcaps/
