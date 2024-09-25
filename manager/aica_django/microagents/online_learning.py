@@ -44,8 +44,10 @@ def periodic_trainer(period_seconds: int = 300) -> NoReturn:
     while True:
         bad_traffic, _, _ = graph_db.graph.execute_query(bad_traffic_query)
         good_traffic, _, _ = graph_db.graph.execute_query(good_traffic_query)
+
         logger.info(f"Bad traffic length {len(bad_traffic)}")
         logger.info(f"Good traffic length {len(good_traffic)}")
+
 
         try:
             client.load_data(good_traffic, bad_traffic, test_size=0.2)
