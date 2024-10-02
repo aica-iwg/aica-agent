@@ -113,7 +113,7 @@ class AICAFlowerClient(NumPyClient):  # type: ignore
         config: Optional[Dict[str, Any]] = None,
     ) -> tuple[List[npt.NDArray[np.float64]], int, dict[Any, Any]]:
         self.set_parameters(parameters)
-        self.train(epochs=1, verbose=True)
+        self.train(epochs=50, verbose=True)
         return self.get_parameters(), len(self.training_dataset), {}
 
     def evaluate(
