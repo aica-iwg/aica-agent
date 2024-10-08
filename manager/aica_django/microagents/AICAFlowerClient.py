@@ -156,7 +156,7 @@ class AICAFlowerClient(NumPyClient):  # type: ignore
                 epoch_loss += loss
                 total += train_labels.size(0)
                 correct += (
-                    (torch.max(outputs.data, 0)[1] == torch.max(train_labels, 0)[1])
+                    (torch.max(outputs.data, 1)[1] == torch.max(train_labels, 1)[1])
                     .sum()
                     .item()
                 )
@@ -185,7 +185,7 @@ class AICAFlowerClient(NumPyClient):  # type: ignore
                 outputs = self.aica_model(emb)
                 loss += criterion(outputs, labels.type(torch.LongTensor)).item()
                 correct += (
-                    (torch.max(outputs.data, 0)[1] == torch.max(labels, 0)[1])
+                    (torch.max(outputs.data, 1)[1] == torch.max(labels, 1)[1])
                     .sum()
                     .item()
                 )
