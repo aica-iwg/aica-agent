@@ -148,7 +148,7 @@ class AICAFlowerClient(NumPyClient):  # type: ignore
                 )
                 optimizer.zero_grad()
                 outputs = self.aica_model(train_data)
-                loss = criterion(outputs, train_labels.type(torch.cuda.LongTensor))
+                loss = criterion(outputs, train_labels.type(torch.LongTensor))
                 loss.backward()
                 optimizer.step()
 
