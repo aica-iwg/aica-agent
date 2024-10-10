@@ -156,7 +156,7 @@ class AICAFlowerClient(NumPyClient):  # type: ignore
                 epoch_loss += loss
                 total += train_labels.size(0)
                 print(train_data.data.shape)
-                print(train_labels.data.shape)
+                print(train_labels.data)
                 print(outputs.data.shape)
                 correct += (
                     (torch.max(outputs.data, 1)[1] == torch.max(train_labels, 1)[1])
