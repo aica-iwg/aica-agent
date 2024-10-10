@@ -148,17 +148,16 @@ class AICAFlowerClient(NumPyClient):  # type: ignore
                 )
                 optimizer.zero_grad()
                 outputs = self.aica_model(train_data)
-                loss = criterion(outputs, train_labels.type(torch.LongTensor))
+                loss = criterion(outputs, train_labels.type(torch.cuda.LongTensor))
                 loss.backward()
                 optimizer.step()
 
                 # Metrics
                 epoch_loss += loss
                 total += train_labels.size(0)
-                print(outputs.data[1])
-                print(train_labels.data[1])
-                print(outputs.data.shape)
+                print(train_data.data.shape)
                 print(train_labels.data.shape)
+                print(outputs.data.shape)
                 correct += (
                     (torch.max(outputs.data, 1)[1] == torch.max(train_labels, 1)[1])
                     .sum()
