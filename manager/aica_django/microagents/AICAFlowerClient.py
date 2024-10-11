@@ -146,7 +146,6 @@ class AICAFlowerClient(NumPyClient):  # type: ignore
                 train_data, train_labels = X_train.to(self.device), y_train.to(
                     self.device
                 )
-                print(y_train.shape)
                 optimizer.zero_grad()
                 outputs = self.aica_model(train_data)
                 loss = criterion(outputs, train_labels.type(torch.FloatTensor))
@@ -156,7 +155,6 @@ class AICAFlowerClient(NumPyClient):  # type: ignore
                 # Metrics
                 epoch_loss += loss
                 total += train_labels.size(0)
-                print(outputs.data.shape)
                 correct += (
                     (torch.max(outputs.data, 1)[1] == torch.max(train_labels, 1)[1])
                     .sum()
