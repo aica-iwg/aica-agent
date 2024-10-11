@@ -8,7 +8,7 @@ from flwr.client import NumPyClient  # type: ignore
 from io import StringIO
 from scipy.io import mmread  # type: ignore
 from sklearn import model_selection  # type: ignore
-from sklearn.preprocessing import LabelEncoder  # type: ignore
+from sklearn.preprocessing import LabelEncoder, label_binarize  # type: ignore
 from torch.utils.data import DataLoader  
 from tqdm import tqdm
 from typing import Any, List, Dict, Optional, Sized, Tuple
@@ -200,7 +200,7 @@ class AICAFlowerClient(NumPyClient):  # type: ignore
         good_data: List[Tuple[str, str]],
         bad_data: List[Tuple[str, str]],
         batch_size: int = 32,
-        labels_list: List[str] = total_suricata_categories,
+        suricata_labels_list: List[str] = total_suricata_categories,
         test_size: float = 0.2,
     ) -> None:
         # Combine lists to form single dataset of features and labels
@@ -214,15 +214,13 @@ class AICAFlowerClient(NumPyClient):  # type: ignore
 
         # Iterate through single list to get embeddings and labels
         embeds = []
-        labels = []
+        node_labels = []
         for node in data_list:
             embeds.append(mmread(StringIO(node[0])))
-            labels.append(node[1])
+            node_labels.append(node[1])
 
-        label_encoder = LabelEncoder()
-        label_encoder.fit(labels_list)
-        total_labels = label_encoder.transform(labels)
-
+        total_labels = label_binarize(node_labels, classes=suricata_labels_list)
+    
         embed_arr = np.array(embeds)
         embed_arr = np.reshape(embed_arr, (len(embed_arr), embed_arr.shape[2]))
 
@@ -236,13 +234,13 @@ class AICAFlowerClient(NumPyClient):  # type: ignore
             list(zip(X_train.astype(np.float32), y_train))
         )
         self.training_data_loader = DataLoader(
-            list(zip(X_train.astype(np.float32), y_train)),
+            self.training_dataset,
             batch_size=batch_size,
         )
         self.validation_dataset = AICADataset(
             list(zip(X_test.astype(np.float32), y_test))
         )
         self.validation_data_loader = DataLoader(
-            list(zip(X_test.astype(np.float32), y_test)),
+            self.validation_dataset,
             batch_size=batch_size,
         )
