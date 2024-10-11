@@ -156,7 +156,6 @@ class AICAFlowerClient(NumPyClient):  # type: ignore
                 # Metrics
                 epoch_loss += loss
                 total += train_labels.size(0)
-                print(train_labels.data)
                 print(outputs.data.shape)
                 correct += (
                     (torch.max(outputs.data, 1)[1] == torch.max(train_labels, 1)[1])
@@ -237,13 +236,13 @@ class AICAFlowerClient(NumPyClient):  # type: ignore
             list(zip(X_train.astype(np.float32), y_train))
         )
         self.training_data_loader = DataLoader(
-            self.training_dataset,
+            list(zip(X_train.astype(np.float32), y_train)),
             batch_size=batch_size,
         )
         self.validation_dataset = AICADataset(
             list(zip(X_test.astype(np.float32), y_test))
         )
         self.validation_data_loader = DataLoader(
-            self.validation_dataset,
+            list(zip(X_test.astype(np.float32), y_test)),
             batch_size=batch_size,
         )
