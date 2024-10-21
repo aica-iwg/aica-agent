@@ -148,7 +148,7 @@ class AICAFlowerClient(NumPyClient):  # type: ignore
                 )
                 optimizer.zero_grad()
                 outputs = self.aica_model(train_data)
-                loss = criterion(outputs, train_labels.type(torch.FloatTensor))
+                loss = criterion(outputs, train_labels)
                 loss.backward()
                 optimizer.step()
 
@@ -156,7 +156,7 @@ class AICAFlowerClient(NumPyClient):  # type: ignore
                 epoch_loss += loss
                 total += train_labels.size(0)
                 correct += (
-                    (torch.max(outputs.data, 1)[1] == torch.max(train_labels, 1)[1])
+                    (torch.max(outputs.data, 1)[1] == train_labels)
                     .sum()
                     .item()
                 )
@@ -184,9 +184,9 @@ class AICAFlowerClient(NumPyClient):  # type: ignore
                 emb = X_batch.to(self.device)
                 labels = y_batch.to(self.device)
                 outputs = self.aica_model(emb)
-                loss += criterion(outputs, labels.type(torch.FloatTensor)).item()
+                loss += criterion(outputs, labels)
                 correct += (
-                    (torch.max(outputs.data, 1)[1] == torch.max(labels, 1)[1])
+                    (torch.max(outputs.data, 1)[1] == labels)
                     .sum()
                     .item()
                 )
@@ -218,13 +218,14 @@ class AICAFlowerClient(NumPyClient):  # type: ignore
             node_labels.append(node[1])
 
         total_labels = label_binarize(node_labels, classes=suricata_labels_list)
+        aica_labels = np.argmax(total_labels, axis=1)
     
         embed_arr = np.array(embeds)
         embed_arr = np.reshape(embed_arr, (len(embed_arr), embed_arr.shape[2]))
 
         X_train, X_test, y_train, y_test = model_selection.train_test_split(
             embed_arr,
-            total_labels,
+            aica_labels,
             test_size=test_size,
         )
 
