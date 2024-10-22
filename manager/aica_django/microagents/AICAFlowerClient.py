@@ -9,7 +9,7 @@ from io import StringIO
 from scipy.io import mmread  # type: ignore
 from sklearn import model_selection  # type: ignore
 from sklearn.preprocessing import LabelEncoder, label_binarize  # type: ignore
-from torch.utils.data import DataLoader  
+from torch.utils.data import DataLoader  # type: ignore
 from tqdm import tqdm
 from typing import Any, List, Dict, Optional, Sized, Tuple
 
@@ -155,12 +155,8 @@ class AICAFlowerClient(NumPyClient):  # type: ignore
                 # Metrics
                 epoch_loss += loss
                 total += train_labels.size(0)
-                correct += (
-                    (torch.max(outputs.data, 1)[1] == train_labels)
-                    .sum()
-                    .item()
-                )
-                
+                correct += (torch.max(outputs.data, 1)[1] == train_labels).sum().item()
+
             epoch_loss /= len(self.training_dataset)
             epoch_acc = correct / total
             if verbose:
@@ -185,11 +181,7 @@ class AICAFlowerClient(NumPyClient):  # type: ignore
                 labels = y_batch.to(self.device)
                 outputs = self.aica_model(emb)
                 loss += criterion(outputs, labels)
-                correct += (
-                    (torch.max(outputs.data, 1)[1] == labels)
-                    .sum()
-                    .item()
-                )
+                correct += (torch.max(outputs.data, 1)[1] == labels).sum().item()
         accuracy = correct / len(self.validation_dataset)
         return loss, accuracy
 
@@ -219,7 +211,7 @@ class AICAFlowerClient(NumPyClient):  # type: ignore
 
         total_labels = label_binarize(node_labels, classes=suricata_labels_list)
         aica_labels = np.argmax(total_labels, axis=1)
-    
+
         embed_arr = np.array(embeds)
         embed_arr = np.reshape(embed_arr, (len(embed_arr), embed_arr.shape[2]))
 
