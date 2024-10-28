@@ -126,6 +126,7 @@ class AICAFlowerClient(NumPyClient):  # type: ignore
         print(f'loss:{loss}')
         print(f'accuracy:{accuracy}')
         print(len(self.validation_dataset))
+        print(tuple(loss, accuracy, len(self.validation_dataset)))
         return loss, len(self.validation_dataset), {"accuracy": accuracy}
     
     def train(self, epochs: int = 10, lr: float = 0.001, verbose: bool = False) -> None:
