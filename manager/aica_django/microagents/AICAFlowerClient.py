@@ -10,7 +10,6 @@ from scipy.io import mmread  # type: ignore
 from sklearn import model_selection  # type: ignore
 from sklearn.preprocessing import LabelEncoder, label_binarize  # type: ignore
 from torch.utils.data import DataLoader  # type: ignore
-from tqdm import tqdm
 from typing import Any, List, Dict, Optional, Sized, Tuple
 
 from aica_django.connectors.GraphDatabase import AicaNeo4j
@@ -72,6 +71,10 @@ class AICADataset(torch.utils.data.Dataset[Any], Sized):  # type: ignore
         self, data_list: List[Tuple[npt.NDArray[np.float32], npt.NDArray[Any]]]
     ) -> None:
         super().__init__()
+        self.training_dataset = None
+        self.training_data_loader = None
+        self.validation_dataset = None
+        self.validation_data_loader = None
         self.data_list = data_list
 
     def __len__(self) -> int:
@@ -140,9 +143,7 @@ class AICAFlowerClient(NumPyClient):  # type: ignore
             total = 0
             epoch_loss = 0.0
 
-            for X_train, y_train in tqdm(
-                self.training_data_loader, "Training", unit="batch"
-            ):
+            for X_train, y_train in self.training_data_loader:
                 train_data, train_labels = X_train.to(self.device), y_train.to(
                     self.device
                 )
@@ -173,17 +174,21 @@ class AICAFlowerClient(NumPyClient):  # type: ignore
         criterion = torch.nn.CrossEntropyLoss()
         self.aica_model.eval()
         correct = 0
-        loss = 0.0
+        total_loss = 0.0
+        num_batches = 0
 
         with torch.no_grad():
-            for X_batch, y_batch in tqdm(self.validation_data_loader, "Testing"):
+            for X_batch, y_batch in self.validation_data_loader:
                 emb = X_batch.to(self.device)
                 labels = y_batch.to(self.device)
                 outputs = self.aica_model(emb)
-                loss += criterion(outputs, labels)
+                total_loss += criterion(outputs, labels).item()  # Convert to Python float
                 correct += (torch.max(outputs.data, 1)[1] == labels).sum().item()
+                num_batches += 1
+        
+        avg_loss = total_loss / num_batches
         accuracy = correct / len(self.validation_dataset)
-        return loss, accuracy
+        return float(avg_loss), float(accuracy) 
 
     def load_data(
         self,
@@ -203,8 +208,8 @@ class AICAFlowerClient(NumPyClient):  # type: ignore
             raise ValueError("No training data")
 
         # Iterate through single list to get embeddings and labels
-        embeds = []
         node_labels = []
+        embeds = []
         for node in data_list:
             embeds.append(mmread(StringIO(node[0])))
             node_labels.append(node[1])

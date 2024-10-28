@@ -16,11 +16,12 @@ warnings.filterwarnings("ignore", category=UserWarning)
 
 logger = get_task_logger(__name__)
 
-client = AICAFlowerClient()
 
 
 @shared_task(name="online-learning-trainer")
 def periodic_trainer(period_seconds: int = 300) -> NoReturn:
+    client = AICAFlowerClient()
+
     global_model_server = os.environ.get("AICA_MODEL_SERVER", None)
     graph_db = AicaNeo4j()
     last_training = 0
