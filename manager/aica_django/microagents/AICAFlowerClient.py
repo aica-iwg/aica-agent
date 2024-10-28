@@ -124,7 +124,7 @@ class AICAFlowerClient(NumPyClient):  # type: ignore
         self.set_parameters(parameters)
         loss, accuracy = self.test()
         return loss, len(self.validation_dataset), {"accuracy": accuracy}
-
+    
     def train(self, epochs: int = 10, lr: float = 0.001, verbose: bool = False) -> None:
         if not self.training_data_loader:
             logger.warning("No training data, cannot train")
