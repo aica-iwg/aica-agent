@@ -16,11 +16,12 @@ warnings.filterwarnings("ignore", category=UserWarning)
 
 logger = get_task_logger(__name__)
 
-client = AICAFlowerClient()
 
 
 @shared_task(name="online-learning-trainer")
 def periodic_trainer(period_seconds: int = 300) -> NoReturn:
+    client = AICAFlowerClient()
+
     global_model_server = os.environ.get("AICA_MODEL_SERVER", None)
     graph_db = AicaNeo4j()
     last_training = 0
@@ -47,7 +48,7 @@ def periodic_trainer(period_seconds: int = 300) -> NoReturn:
 
         logger.info(f"Bad traffic length {len(bad_traffic)}")
         logger.info(f"Good traffic length {len(good_traffic)}")
-
+        logger.info(f"Total data this round {len(good_traffic+bad_traffic)}")
 
         try:
             client.load_data(good_traffic, bad_traffic, test_size=0.2)

@@ -8,9 +8,8 @@ from flwr.client import NumPyClient  # type: ignore
 from io import StringIO
 from scipy.io import mmread  # type: ignore
 from sklearn import model_selection  # type: ignore
-from sklearn.preprocessing import LabelEncoder  # type: ignore
+from sklearn.preprocessing import LabelEncoder, label_binarize  # type: ignore
 from torch.utils.data import DataLoader  # type: ignore
-from tqdm import tqdm
 from typing import Any, List, Dict, Optional, Sized, Tuple
 
 from aica_django.connectors.GraphDatabase import AicaNeo4j
@@ -72,6 +71,10 @@ class AICADataset(torch.utils.data.Dataset[Any], Sized):  # type: ignore
         self, data_list: List[Tuple[npt.NDArray[np.float32], npt.NDArray[Any]]]
     ) -> None:
         super().__init__()
+        self.training_dataset = None
+        self.training_data_loader = None
+        self.validation_dataset = None
+        self.validation_data_loader = None
         self.data_list = data_list
 
     def __len__(self) -> int:
@@ -113,7 +116,7 @@ class AICAFlowerClient(NumPyClient):  # type: ignore
         config: Optional[Dict[str, Any]] = None,
     ) -> tuple[List[npt.NDArray[np.float64]], int, dict[Any, Any]]:
         self.set_parameters(parameters)
-        self.train(epochs=1, verbose=True)
+        self.train(epochs=50, verbose=True)
         return self.get_parameters(), len(self.training_dataset), {}
 
     def evaluate(
@@ -124,7 +127,7 @@ class AICAFlowerClient(NumPyClient):  # type: ignore
         self.set_parameters(parameters)
         loss, accuracy = self.test()
         return loss, len(self.validation_dataset), {"accuracy": accuracy}
-
+    
     def train(self, epochs: int = 10, lr: float = 0.001, verbose: bool = False) -> None:
         if not self.training_data_loader:
             logger.warning("No training data, cannot train")
@@ -140,26 +143,21 @@ class AICAFlowerClient(NumPyClient):  # type: ignore
             total = 0
             epoch_loss = 0.0
 
-            for X_train, y_train in tqdm(
-                self.training_data_loader, "Training", unit="batch"
-            ):
+            for X_train, y_train in self.training_data_loader:
                 train_data, train_labels = X_train.to(self.device), y_train.to(
                     self.device
                 )
                 optimizer.zero_grad()
                 outputs = self.aica_model(train_data)
-                loss = criterion(outputs, train_labels.type(torch.LongTensor))
+                loss = criterion(outputs, train_labels)
                 loss.backward()
                 optimizer.step()
 
                 # Metrics
                 epoch_loss += loss
                 total += train_labels.size(0)
-                correct += (
-                    (torch.max(outputs.data, 0)[1] == torch.max(train_labels, 0)[1])
-                    .sum()
-                    .item()
-                )
+                correct += (torch.max(outputs.data, 1)[1] == train_labels).sum().item()
+
             epoch_loss /= len(self.training_dataset)
             epoch_acc = correct / total
             if verbose:
@@ -176,28 +174,28 @@ class AICAFlowerClient(NumPyClient):  # type: ignore
         criterion = torch.nn.CrossEntropyLoss()
         self.aica_model.eval()
         correct = 0
-        loss = 0.0
+        total_loss = 0.0
+        num_batches = 0
 
         with torch.no_grad():
-            for X_batch, y_batch in tqdm(self.validation_data_loader, "Testing"):
+            for X_batch, y_batch in self.validation_data_loader:
                 emb = X_batch.to(self.device)
                 labels = y_batch.to(self.device)
                 outputs = self.aica_model(emb)
-                loss += criterion(outputs, labels.type(torch.LongTensor)).item()
-                correct += (
-                    (torch.max(outputs.data, 0)[1] == torch.max(labels, 0)[1])
-                    .sum()
-                    .item()
-                )
+                total_loss += criterion(outputs, labels).item()  # Convert to Python float
+                correct += (torch.max(outputs.data, 1)[1] == labels).sum().item()
+                num_batches += 1
+        
+        avg_loss = total_loss / num_batches
         accuracy = correct / len(self.validation_dataset)
-        return loss, accuracy
+        return float(avg_loss), float(accuracy) 
 
     def load_data(
         self,
         good_data: List[Tuple[str, str]],
         bad_data: List[Tuple[str, str]],
         batch_size: int = 32,
-        labels_list: List[str] = total_suricata_categories,
+        suricata_labels_list: List[str] = total_suricata_categories,
         test_size: float = 0.2,
     ) -> None:
         # Combine lists to form single dataset of features and labels
@@ -210,34 +208,33 @@ class AICAFlowerClient(NumPyClient):  # type: ignore
             raise ValueError("No training data")
 
         # Iterate through single list to get embeddings and labels
+        node_labels = []
         embeds = []
-        labels = []
         for node in data_list:
             embeds.append(mmread(StringIO(node[0])))
-            labels.append(node[1])
+            node_labels.append(node[1])
 
-        label_encoder = LabelEncoder()
-        label_encoder.fit(labels_list)
-        total_labels = label_encoder.transform(labels)
+        total_labels = label_binarize(node_labels, classes=suricata_labels_list)
+        aica_labels = np.argmax(total_labels, axis=1)
 
         embed_arr = np.array(embeds)
         embed_arr = np.reshape(embed_arr, (len(embed_arr), embed_arr.shape[2]))
 
         X_train, X_test, y_train, y_test = model_selection.train_test_split(
             embed_arr,
-            total_labels,
+            aica_labels,
             test_size=test_size,
         )
 
         self.training_dataset = AICADataset(
-            list(zip(X_train.astype(np.float32), y_train.astype(np.int32)))
+            list(zip(X_train.astype(np.float32), y_train))
         )
         self.training_data_loader = DataLoader(
             self.training_dataset,
             batch_size=batch_size,
         )
         self.validation_dataset = AICADataset(
-            list(zip(X_test.astype(np.float32), y_test.astype(np.int32)))
+            list(zip(X_test.astype(np.float32), y_test))
         )
         self.validation_data_loader = DataLoader(
             self.validation_dataset,
